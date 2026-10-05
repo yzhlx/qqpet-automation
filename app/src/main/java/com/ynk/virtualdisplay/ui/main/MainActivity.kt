@@ -24,6 +24,7 @@ import com.ynk.virtualdisplay.data.repository.ShizukuDisplayRepository
 import com.ynk.virtualdisplay.data.repository.IDisplayRepository
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
@@ -32,6 +33,7 @@ import androidx.compose.material3.Text
 import com.ynk.virtualdisplay.ui.screens.SettingsScreen
 import com.ynk.virtualdisplay.ui.screens.ShizukuPermissionScreen
 import com.ynk.virtualdisplay.ui.screens.VirtualDisplayScreen
+import com.ynk.virtualdisplay.ui.screens.PetMvpScreen
 import com.ynk.virtualdisplay.ui.theme.MyApplicationTheme
 import kotlinx.coroutines.launch
 import rikka.shizuku.Shizuku
@@ -54,14 +56,8 @@ class MainActivity : ComponentActivity() {
             Log.e("MainActivity", "Sui init failed", e)
         }
 
+        (application as MyApplication).acquireDisplayRepository("MainActivity")
         viewModel.checkShizukuStatus(this)
-
-        val repository = (application as MyApplication).displayRepository
-        lifecycleScope.launch {
-            repeatOnLifecycle(Lifecycle.State.STARTED) {
-                repository.bindService(this@MainActivity)
-            }
-        }
 
         enableEdgeToEdge()
         setContent {
@@ -78,6 +74,12 @@ class MainActivity : ComponentActivity() {
                                     onClick = { viewModel.switchTab(ScreenTab.CONSOLE) },
                                     icon = { Icon(Icons.Default.Home, contentDescription = "控制台") },
                                     label = { Text("控制台") }
+                                )
+                                NavigationBarItem(
+                                    selected = uiState.currentTab == ScreenTab.PET_MVP,
+                                    onClick = { viewModel.switchTab(ScreenTab.PET_MVP) },
+                                    icon = { Icon(Icons.Default.PlayArrow, contentDescription = "宠物MVP") },
+                                    label = { Text("宠物MVP") }
                                 )
                                 NavigationBarItem(
                                     selected = uiState.currentTab == ScreenTab.SETTINGS,
@@ -99,6 +101,7 @@ class MainActivity : ComponentActivity() {
                             is ShizukuState.Ready -> {
                                 when (uiState.currentTab) {
                                     ScreenTab.CONSOLE -> VirtualDisplayScreen(viewModel = viewModel)
+                                    ScreenTab.PET_MVP -> PetMvpScreen(viewModel = viewModel)
                                     ScreenTab.SETTINGS -> SettingsScreen(viewModel = viewModel)
                                 }
                             }
@@ -130,7 +133,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onDestroy() {
         super.onDestroy()
-        Log.d("MainActivity", "onDestroy: unbinding service")
-        (application as MyApplication).displayRepository.unbindService()
+        Log.d("MainActivity", "onDestroy: releasing repository lease")
+        (application as MyApplication).releaseDisplayRepository("MainActivity")
     }
 }

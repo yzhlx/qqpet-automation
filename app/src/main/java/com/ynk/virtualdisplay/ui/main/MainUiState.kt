@@ -15,6 +15,7 @@ data class DisplayInfoModel(
 
 enum class ScreenTab {
     CONSOLE,
+    PET_MVP,
     SETTINGS
 }
 

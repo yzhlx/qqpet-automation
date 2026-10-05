@@ -13,6 +13,27 @@ class MyApplication : Application() {
     lateinit var displayRepository: IDisplayRepository
         private set
 
+    private var repositoryLeaseCount: Int = 0
+
+    @Synchronized
+    fun acquireDisplayRepository(owner: String) {
+        repositoryLeaseCount += 1
+        Log.i(TAG, "repository lease +1 owner=$owner count=$repositoryLeaseCount")
+        if (repositoryLeaseCount == 1) displayRepository.bindService(this)
+    }
+
+    @Synchronized
+    fun releaseDisplayRepository(owner: String) {
+        if (repositoryLeaseCount <= 0) {
+            Log.w(TAG, "repository lease underflow owner=$owner")
+            repositoryLeaseCount = 0
+            return
+        }
+        repositoryLeaseCount -= 1
+        Log.i(TAG, "repository lease -1 owner=$owner count=$repositoryLeaseCount")
+        if (repositoryLeaseCount == 0) displayRepository.unbindService()
+    }
+
     override fun onCreate() {
         super.onCreate()
         Log.i(TAG, "MyApplication onCreate, initializing ShizukuDisplayRepository")

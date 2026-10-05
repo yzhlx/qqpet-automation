@@ -3,6 +3,10 @@
     xmlns:tools="http://schemas.android.com/tools">
 
     <uses-permission android:name="moe.shizuku.manager.permission.API_V23" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <queries>
         <intent>
@@ -49,6 +53,16 @@
             tools:targetApi="tiramisu"
             android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|density"
             android:theme="@style/Theme.MyApplication" />
+
+        <service
+            android:name=".automation.PetAutomationService"
+            android:exported="false"
+            android:stopWithTask="true"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="User-started, local, time-bounded automation on an app-owned virtual display" />
+        </service>
 
     </application>
 
