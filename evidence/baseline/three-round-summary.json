@@ -1,0 +1,165 @@
+{
+  "verdict": "3_ROUNDS_PASS",
+  "completed": 3,
+  "qualification": "RESUMED_AFTER_REAL_FIXES_WITH_AUTHORIZED_DEBUG_SUPPLEMENT; NOT_UNINTERRUPTED_AUTONOMOUS_THREE_ROUNDS",
+  "evidenceRuns": [
+    "1791203355328",
+    "1791204208048",
+    "1791204552957",
+    "1791205436000"
+  ],
+  "captureStatistics": {
+    "imageReaderSuccess": 1827,
+    "imageReaderTimeout": 3,
+    "shizukuFallbackCount": 3,
+    "shizukuFallbackSuccess": 3,
+    "captureLatencyP50Ms": 946,
+    "captureLatencyP95Ms": 1122,
+    "fallbackFrequency": 0.001639344262295082,
+    "latencySampleCount": 3
+  },
+  "physicalDelta": 0,
+  "rounds": [
+    {
+      "round": 1,
+      "before": {
+        "stamina": 94,
+        "cleanliness": 91,
+        "mood": 79,
+        "measurement": "conservative_bar_estimate",
+        "attr1": "UNKNOWN",
+        "attr2": "UNKNOWN",
+        "attr3": "UNKNOWN"
+      },
+      "ready": {
+        "stamina": 94,
+        "cleanliness": 91,
+        "mood": 79,
+        "measurement": "conservative_bar_estimate",
+        "attr1": "UNKNOWN",
+        "attr2": "UNKNOWN",
+        "attr3": "UNKNOWN"
+      },
+      "after": {
+        "stamina": 88,
+        "cleanliness": 89,
+        "mood": 79,
+        "measurement": "conservative_bar_estimate",
+        "attr1": "UNKNOWN",
+        "attr2": "UNKNOWN",
+        "attr3": "UNKNOWN"
+      },
+      "feedCount": 0,
+      "cleanCount": 0,
+      "appHighFiveAttempted": 1,
+      "appHighFiveSent": 1,
+      "debugSupplementAttempted": 0,
+      "debugSupplementSent": 0,
+      "grade": "A",
+      "gradeSource": "VISUAL_SCREENSHOT_CONFIRMATION",
+      "rawGrade": "A",
+      "businessHighFiveCount": null,
+      "courseStartTs": 1791203381081,
+      "firstHighFiveOffsetMs": 29416,
+      "roundTiming": null,
+      "evidenceRun": "1791203355328"
+    },
+    {
+      "round": 2,
+      "before": {
+        "stamina": 88,
+        "cleanliness": 89,
+        "mood": 79,
+        "measurement": "conservative_bar_estimate",
+        "attr1": "UNKNOWN",
+        "attr2": "UNKNOWN",
+        "attr3": "UNKNOWN"
+      },
+      "ready": {
+        "stamina": 98,
+        "cleanliness": 99,
+        "mood": 80,
+        "measurement": "conservative_bar_estimate",
+        "attr1": "UNKNOWN",
+        "attr2": "UNKNOWN",
+        "attr3": "UNKNOWN"
+      },
+      "after": {
+        "stamina": 94,
+        "cleanliness": 97,
+        "mood": 80,
+        "measurement": "conservative_bar_estimate",
+        "attr1": "UNKNOWN",
+        "attr2": "UNKNOWN",
+        "attr3": "UNKNOWN"
+      },
+      "feedCount": 1,
+      "cleanCount": 1,
+      "appHighFiveAttempted": 1,
+      "appHighFiveSent": 1,
+      "debugSupplementAttempted": 0,
+      "debugSupplementSent": 0,
+      "grade": "A",
+      "gradeSource": "VISUAL_SCREENSHOT_CONFIRMATION",
+      "rawGrade": "A",
+      "businessHighFiveCount": null,
+      "courseStartTs": 1791204575584,
+      "firstHighFiveOffsetMs": 29429,
+      "roundTiming": null,
+      "evidenceRun": "1791204552957"
+    },
+    {
+      "round": 3,
+      "before": {
+        "stamina": 94,
+        "cleanliness": 97,
+        "mood": 80,
+        "measurement": "conservative_bar_estimate",
+        "attr1": "UNKNOWN",
+        "attr2": "UNKNOWN",
+        "attr3": "UNKNOWN"
+      },
+      "ready": {
+        "stamina": 94,
+        "cleanliness": 97,
+        "mood": 80,
+        "measurement": "conservative_bar_estimate",
+        "attr1": "UNKNOWN",
+        "attr2": "UNKNOWN",
+        "attr3": "UNKNOWN"
+      },
+      "after": {
+        "stamina": 88,
+        "cleanliness": 95,
+        "mood": 80,
+        "measurement": "conservative_bar_estimate",
+        "attr1": "UNKNOWN",
+        "attr2": "UNKNOWN",
+        "attr3": "UNKNOWN"
+      },
+      "feedCount": 0,
+      "cleanCount": 0,
+      "appHighFiveAttempted": 1,
+      "appHighFiveSent": 1,
+      "debugSupplementAttempted": 10,
+      "debugSupplementSent": 10,
+      "grade": "A+",
+      "gradeSource": "VISUAL_SCREENSHOT_CONFIRMATION",
+      "rawGrade": "UNKNOWN",
+      "businessHighFiveCount": null,
+      "courseStartTs": 1791205470041,
+      "firstHighFiveOffsetMs": 29739,
+      "roundTiming": {
+        "precheck_ms": 5098,
+        "course_ms": 603269,
+        "result_wait_ms": 562512,
+        "round_transition_ms": 14469,
+        "round_total_ms": 635384
+      },
+      "evidenceRun": "1791205436000"
+    }
+  ],
+  "appTenTapBurstRealTested": false,
+  "soapInventoryBefore": 6,
+  "soapInventoryAfter": 5
+}

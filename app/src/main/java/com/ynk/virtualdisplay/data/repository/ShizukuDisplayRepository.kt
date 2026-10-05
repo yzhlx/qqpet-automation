@@ -17,6 +17,8 @@ import kotlinx.coroutines.flow.*
 import rikka.shizuku.Shizuku
 
 class ShizukuDisplayRepository(private val context: Context) : IDisplayRepository {
+    private val activeCapture = com.ynk.virtualdisplay.automation.ShizukuActiveCapture(context)
+    override suspend fun captureDisplay(displayId: Int) = runCatching { activeCapture.captureDisplay(displayId) }
 
     companion object {
         private const val TAG = "ShizukuDisplayRepository"
@@ -88,6 +90,7 @@ class ShizukuDisplayRepository(private val context: Context) : IDisplayRepositor
     }
 
     override fun unbindService() {
+        activeCapture.close()
         displayManager?.unregisterDisplayListener(displayListener)
         displayManager = null
         binder.unbind()

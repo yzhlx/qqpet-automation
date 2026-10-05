@@ -1,0 +1,1 @@
+{"verdict":"3_ROUNDS_PASS","completed":3,"stopReason":null,"physicalDelta":0,"captureStatistics":{"imageReaderSuccess":593,"imageReaderTimeout":2,"shizukuFallbackCount":2,"shizukuFallbackSuccess":2,"captureLatencyP50Ms":498,"captureLatencyP95Ms":946}}

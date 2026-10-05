@@ -49,7 +49,10 @@ class TemplateMatcher(private val context: Context) {
             val max = w.toDouble() * h.toDouble() * 3.0 * 255.0
             (1.0 - diff / max).coerceIn(0.0, 1.0)
         } finally {
-            aa.recycle(); bb.recycle()
+            // createScaledBitmap may return its source when the dimensions already match.
+            // In that case b can be the cached template; recycling it breaks the next probe.
+            if (aa !== a) aa.recycle()
+            if (bb !== b) bb.recycle()
         }
     }
 }

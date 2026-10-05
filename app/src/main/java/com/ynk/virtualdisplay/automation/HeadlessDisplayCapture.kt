@@ -6,13 +6,16 @@ import android.media.Image
 import android.media.ImageReader
 import android.os.Handler
 import android.os.HandlerThread
+import android.os.SystemClock
 import com.ynk.virtualdisplay.data.repository.IDisplayRepository
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicLong
 import java.util.concurrent.atomic.AtomicReference
+import org.json.JSONObject
 
 /**
  * Headless capture for one VirtualDisplay. No MediaProjection / Accessibility / network.
@@ -30,15 +33,75 @@ class HeadlessDisplayCapture(
     private val latestImage = AtomicReference<Image?>(null)
     private val pendingSignal = AtomicReference<CompletableDeferred<Unit>?>(null)
     private val started = AtomicBoolean(false)
+    private val receivedFrameCount = AtomicLong(0)
+    private val lastFrameAtMs = AtomicLong(0)
+    private var renderedSnapshot: Bitmap? = null
+    private var renderedAtMs = 0L
+    private var lastTelemetry = JSONObject()
+    private var imageReaderSuccess = 0
+    private var imageReaderTimeout = 0
+    private var fallbackCount = 0
+    private var fallbackSuccess = 0
+    private val fallbackLatencies = mutableListOf<Long>()
+    private val frameLock = Any()
+
+    fun telemetry(): JSONObject = JSONObject(lastTelemetry.toString())
+    fun statistics(): JSONObject {
+        val sorted = fallbackLatencies.sorted()
+        fun percentile(p: Double): Any = if (sorted.isEmpty()) JSONObject.NULL
+            else sorted[(kotlin.math.ceil(sorted.size * p).toInt() - 1).coerceIn(sorted.indices)]
+        return JSONObject().put("imageReaderSuccess", imageReaderSuccess).put("imageReaderTimeout", imageReaderTimeout)
+            .put("shizukuFallbackCount", fallbackCount).put("shizukuFallbackSuccess", fallbackSuccess)
+            .put("captureLatencyP50Ms", percentile(0.50)).put("captureLatencyP95Ms", percentile(0.95))
+    }
+
+    private fun setTelemetry(source: String, readerResult: String, waitMs: Long) {
+        lastTelemetry = JSONObject().put("displayId", displayId).put("imageReaderResult", readerResult)
+            .put("imageReaderWaitMs", waitMs).put("fallbackAttempted", false).put("fallbackResult", "NOT_ATTEMPTED")
+            .put("fallbackDurationMs", 0).put("captureSource", source).put("frameDeliveryMiss", false)
+    }
+
+    private fun remember(frame: Bitmap): Bitmap {
+        renderedSnapshot?.recycle()
+        renderedSnapshot = frame.copy(Bitmap.Config.ARGB_8888, false)
+        renderedAtMs = SystemClock.elapsedRealtime()
+        return frame
+    }
+
+    /** For an immediate pre-action check of an unchanged page. After an input,
+     * callers must use awaitFrame(), which still requires a newly rendered frame. */
+    suspend fun latestRenderedFrame(maxAgeMs: Long = 1500L): Bitmap {
+        check(started.get())
+        latestImage.getAndSet(null)?.let { img ->
+            setTelemetry("IMAGEREADER_RECENT", "RECENT", 0)
+            return try { remember(img.toBitmap()) } finally { img.close() }
+        }
+        val snapshot = renderedSnapshot
+        if (snapshot != null && SystemClock.elapsedRealtime() - renderedAtMs <= maxAgeMs) {
+            setTelemetry("RECENT_CACHE", "NOT_REQUESTED", 0)
+            return snapshot.copy(Bitmap.Config.ARGB_8888, false)
+        }
+        return awaitFrame()
+    }
 
     init {
         require(displayId > 0) { "Refuse to capture default display" }
         reader.setOnImageAvailableListener({ r ->
+            synchronized(frameLock) {
             val image = try { r.acquireLatestImage() } catch (_: Throwable) { null }
             if (image == null) return@setOnImageAvailableListener
+            receivedFrameCount.incrementAndGet()
+            lastFrameAtMs.set(SystemClock.elapsedRealtime())
             latestImage.getAndSet(image)?.close()
             pendingSignal.getAndSet(null)?.complete(Unit)
+            }
         }, Handler(thread.looper))
+    }
+
+    fun diagnostics(): String {
+        val last = lastFrameAtMs.get()
+        val age = if (last == 0L) "never" else (SystemClock.elapsedRealtime() - last).toString()
+        return "displayId=$displayId,receivedFrames=${receivedFrameCount.get()},lastFrameAgeMs=$age,pending=${pendingSignal.get()!=null}"
     }
 
     suspend fun start() {
@@ -47,35 +110,66 @@ class HeadlessDisplayCapture(
         }
     }
 
-    suspend fun awaitFrame(timeoutMs: Long = 4_000L): Bitmap {
+    private suspend fun takeImage(timeoutMs: Long): Image {
         check(started.get()) { "capture not started" }
-        latestImage.getAndSet(null)?.let { img ->
-            return try { img.toBitmap() } finally { img.close() }
-        }
-
         val signal = CompletableDeferred<Unit>()
-        check(pendingSignal.compareAndSet(null, signal)) { "another frame request is pending" }
-
-        // Close the race where a frame arrives between the first lookup and pending registration.
-        latestImage.getAndSet(null)?.let { img ->
-            pendingSignal.compareAndSet(signal, null)
-            signal.complete(Unit)
-            return try { img.toBitmap() } finally { img.close() }
+        synchronized(frameLock) {
+            // Post-action verification must not consume a pre-request queued buffer or cached bitmap.
+            latestImage.getAndSet(null)?.close()
+            runCatching { reader.acquireLatestImage()?.close() }
+            check(pendingSignal.compareAndSet(null, signal)) { "another frame request is pending" }
         }
 
         try {
             withTimeout(timeoutMs) { signal.await() }
+        } catch (timeout: kotlinx.coroutines.TimeoutCancellationException) {
+            // A frame can land in the reader queue as the timeout wins the signal race.
+            // The queue was drained before this wait, so any image here is post-request.
+            val lateImage = latestImage.getAndSet(null)
+            if (lateImage != null && timeoutMs > 0) return lateImage
+            lateImage?.close()
+            throw timeout
         } finally {
             pendingSignal.compareAndSet(signal, null)
         }
-        val img = latestImage.getAndSet(null) ?: error("frame signal without image")
-        return try { img.toBitmap() } finally { img.close() }
+        return latestImage.getAndSet(null) ?: error("frame signal without image")
+    }
+
+    suspend fun awaitFrame(timeoutMs: Long = 350L): Bitmap {
+        check(started.get()) { "capture not started" }
+        val began = SystemClock.elapsedRealtime()
+        val img = try {
+            takeImage(timeoutMs)
+        } catch (timeout: kotlinx.coroutines.TimeoutCancellationException) {
+            imageReaderTimeout++; fallbackCount++
+            setTelemetry("SHIZUKU_FALLBACK", "TIMEOUT", SystemClock.elapsedRealtime() - began)
+            lastTelemetry.put("fallbackAttempted", true).put("frameDeliveryMiss", true)
+            val fallbackBegan = SystemClock.elapsedRealtime()
+            try {
+                val captured = repository.captureDisplay(displayId).getOrThrow()
+                check(captured.bitmap.width == width && captured.bitmap.height == height) {
+                    captured.bitmap.recycle(); "CAPTURE_SIZE_CHANGED"
+                }
+                fallbackSuccess++; fallbackLatencies.add(captured.durationMs)
+                lastTelemetry.put("fallbackResult", "OK").put("fallbackDurationMs", captured.durationMs)
+                    .put("source", captured.source).put("byteCount", captured.byteCount)
+                return remember(captured.bitmap)
+            } catch(t: Throwable) {
+                lastTelemetry.put("fallbackResult", "FAILED").put("error", t.toString())
+                    .put("fallbackDurationMs", SystemClock.elapsedRealtime() - fallbackBegan)
+                throw IllegalStateException("CAPTURE_UNCONFIRMED:${t.message}", t)
+            }
+        }
+        imageReaderSuccess++
+        setTelemetry("IMAGEREADER", "OK", SystemClock.elapsedRealtime() - began)
+        return try { remember(img.toBitmap()) } finally { img.close() }
     }
 
     suspend fun stop() {
         if (!started.compareAndSet(true, false)) return
         pendingSignal.getAndSet(null)?.cancel()
         latestImage.getAndSet(null)?.close()
+        renderedSnapshot?.recycle(); renderedSnapshot = null
         // The upstream service interprets null as: restore its own fallback ImageReader Surface.
         withContext(NonCancellable) {
             runCatching { repository.setDisplaySurface(displayId, null).getOrThrow() }

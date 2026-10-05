@@ -10,3 +10,8 @@
 local.properties
 /.gemini/
 /release.keystore
+
+# Local device evidence and build outputs are retained by hashed baseline archive.
+/deliverables/
+*.log
+

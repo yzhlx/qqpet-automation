@@ -1,54 +1,62 @@
 package com.ynk.virtualdisplay.automation
 
 import android.graphics.Bitmap
-import android.util.Log
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
+import java.io.File
 
 class PetStateMachine(
     private val capture: HeadlessDisplayCapture,
     private val input: PetInputController,
     private val matcher: TemplateMatcher,
     private val profile: PetProfile,
-    private val logger: (String) -> Unit,
+    private val evidence: File,
+    private val logger: (String, Double?, String, String, String?) -> Unit,
 ) {
-    enum class State {
-        CHECK_FINISHED, OPEN_SCHOOL, VERIFY_SCHOOL, SELECT_COURSE, VERIFY_COURSE,
-        START_COURSE, VERIFY_LEARNING, COMPLETED, STOPPED_ERROR
-    }
-
+    enum class State { RESULT, COURSE_LIST, COURSE_DETAIL, LEARNING, STOPPED_ERROR }
     data class CycleResult(val ok: Boolean, val finalState: State, val message: String)
+    private var frameIndex = 0
 
     suspend fun runOneCycle(): CycleResult = try {
-        verify(State.CHECK_FINISHED, profile.finishedProbe)
-        logger("transition CHECK_FINISHED -> OPEN_SCHOOL")
-        input.tap(profile.schoolButton.x, profile.schoolButton.y)
+        verify(State.RESULT, "continue", "before")
+        input.tap(profile.continueButton.x, profile.continueButton.y)
         delay(profile.pageSettleMs)
-
-        verify(State.VERIFY_SCHOOL, profile.schoolProbe)
-        logger("transition VERIFY_SCHOOL -> SELECT_COURSE")
+        verify(State.COURSE_LIST, "continue", "after")
+        verify(State.COURSE_LIST, "course", "before")
         input.tap(profile.courseButton.x, profile.courseButton.y)
         delay(profile.pageSettleMs)
-
-        verify(State.VERIFY_COURSE, profile.courseProbe)
-        logger("transition VERIFY_COURSE -> START_COURSE")
+        verify(State.COURSE_DETAIL, "course", "after")
+        verify(State.COURSE_DETAIL, "start", "before")
         input.tap(profile.startButton.x, profile.startButton.y)
         delay(profile.pageSettleMs)
-
-        verify(State.VERIFY_LEARNING, profile.learningProbe)
-        logger("transition VERIFY_LEARNING -> COMPLETED")
-        CycleResult(true, State.COMPLETED, "short course started")
-    } catch (t: Throwable) {
-        Log.e("PetStateMachine", "fail closed", t)
-        logger("STOPPED_ERROR: ${t.javaClass.simpleName}: ${t.message}")
-        CycleResult(false, State.STOPPED_ERROR, t.message ?: t.javaClass.simpleName)
+        verify(State.LEARNING, "start", "after")
+        CycleResult(true, State.LEARNING, "course started")
+    } catch (cancelled: CancellationException) {
+        throw cancelled
+    } catch (failure: Throwable) {
+        logger(State.STOPPED_ERROR.name, null, "none", "STOP", failure.message)
+        CycleResult(false, State.STOPPED_ERROR, failure.message ?: failure.javaClass.simpleName)
     }
 
-    private suspend fun verify(state: State, probe: PetProfile.Probe) {
-        val bitmap: Bitmap = capture.awaitFrame()
+    suspend fun verify(state: State, action: String, phase: String) {
+        val frame = capture.awaitFrame()
         try {
-            val result = matcher.match(bitmap, probe, profile.matchThreshold)
-            logger("verify $state probe=${probe.name} score=${"%.4f".format(result.score)}")
-            check(result.matched) { "$state mismatch (${probe.name}, score=${"%.4f".format(result.score)})" }
-        } finally { bitmap.recycle() }
+            evidence.mkdirs()
+            File(evidence, "%03d_%s_%s_%s.png".format(frameIndex++, state, action, phase))
+                .outputStream().use { check(frame.compress(Bitmap.CompressFormat.PNG, 100, it)) }
+            val probes = when (state) {
+                State.RESULT -> listOf(profile.resultProbe)
+                State.COURSE_LIST -> listOf(profile.courseListProbe)
+                State.COURSE_DETAIL -> listOf(profile.courseDetailProbe)
+                State.LEARNING -> profile.learningProbes
+                State.STOPPED_ERROR -> error("Cannot verify STOPPED_ERROR")
+            }
+            val best = probes.map { it to matcher.match(frame, it, profile.matchThreshold) }
+                .maxBy { it.second.score }
+            val matched = best.second.matched
+            val reason = if (matched) null else "$state mismatch: ${best.first.name}"
+            logger(state.name, best.second.score, "$action:$phase", if (matched) "PASS" else "FAIL", reason)
+            check(matched) { reason!! }
+        } finally { frame.recycle() }
     }
 }

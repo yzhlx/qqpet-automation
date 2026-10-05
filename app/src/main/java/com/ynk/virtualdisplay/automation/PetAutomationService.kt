@@ -10,6 +10,7 @@ import android.content.Intent
 import android.graphics.Point
 import android.hardware.display.DisplayManager
 import android.os.IBinder
+import android.os.Build
 import android.os.PowerManager
 import android.util.Log
 import androidx.core.app.NotificationCompat
@@ -22,6 +23,7 @@ import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import org.json.JSONObject
 
 /**
  * User-started, bounded, local MVP automation session.
@@ -50,7 +52,8 @@ class PetAutomationService : Service() {
                 startForeground(NOTIFICATION_ID, notification("正在初始化…"))
                 if (job?.isActive == true) return START_NOT_STICKY
                 stopReason = "会话结束"
-                val newJob = scope.launch { runSession(displayId) }
+                val rounds = intent.getIntExtra(EXTRA_ROUNDS, 1)
+                val newJob = scope.launch { runSession(displayId, rounds) }
                 job = newJob
                 newJob.invokeOnCompletion {
                     scope.launch(Dispatchers.Main) { finalizeStop() }
@@ -60,10 +63,11 @@ class PetAutomationService : Service() {
         return START_NOT_STICKY
     }
 
-    private suspend fun runSession(displayId: Int) {
+    private suspend fun runSession(displayId: Int, rounds: Int) {
         val errors = profile.validate()
         if (errors.isNotEmpty()) return stopSession("配置未完成：${errors.joinToString()}")
         if (displayId <= 0) return stopSession("拒绝默认/无效 displayId")
+        if (rounds !in listOf(1, 5, 10)) return stopSession("只允许1/5/10轮测试批次")
 
         try {
             withTimeout(7_000L) {
@@ -76,60 +80,33 @@ class PetAutomationService : Service() {
             val capture = HeadlessDisplayCapture(app.displayRepository, displayId, profile.displayWidth, profile.displayHeight)
             val input = PetInputController(app.displayRepository, displayId, profile.displayWidth, profile.displayHeight)
             val matcher = TemplateMatcher(this)
-            val fsm = PetStateMachine(capture, input, matcher, profile, ::logLine)
+            val evidence = File(getExternalFilesDir(null), "pet_mvp_session/${System.currentTimeMillis()}")
+            val fsm = PetStateMachine(capture, input, matcher, profile, evidence, ::logEvent)
 
             capture.start()
             try {
-                var cyclesStarted = 0
-                PetRuntime.update { it.copy(running = true, displayId = displayId, status = "检查空闲页并启动第一节短课") }
-                logLine("SESSION_START display=$displayId used=${budget.usedMinutes()}min")
-
-                // User pressing Start authorizes this bounded MVP session. The first action still
-                // requires the deterministic FINISHED probe; otherwise the FSM fails closed.
-                val first = fsm.runOneCycle()
-                if (!first.ok) {
-                    stopSession("无法从课程结束/空闲页启动：${first.message}")
-                    return
-                }
-                cyclesStarted += 1
-                PetRuntime.update { it.copy(cycles = cyclesStarted, status = "第1节短课已启动") }
-                logLine("CYCLE_START count=$cyclesStarted used=${budget.usedMinutes()}min")
-
-                while (currentCoroutineContext().isActive) {
-                    if (cyclesStarted >= MAX_CYCLES_PER_SESSION) {
-                        stopSession("达到MVP单会话 $MAX_CYCLES_PER_SESSION 轮安全上限")
-                        return
-                    }
-
-                    val usedBefore = budget.usedMinutes()
-                    if (usedBefore >= DailyBudgetStore.HARD_STOP_MINUTES) {
+                PetRuntime.update { it.copy(running = true, displayId = displayId, cycles = 0, status = "验证成绩单") }
+                logEvent("SESSION", null, "none", "START display=$displayId rounds=$rounds", null)
+                repeat(rounds) { index ->
+                    if (budget.usedMinutes() + 10 > DailyBudgetStore.HARD_STOP_MINUTES) {
                         stopSession("达到8小时MVP保护线")
                         return
                     }
-
-                    val next = System.currentTimeMillis() + profile.courseDurationMs + profile.courseFinishGraceMs
-                    PetRuntime.update { it.copy(nextCheckAtMs = next, status = "学习中，等待到点") }
-                    updateNotification("学习中 · 本App今日已记录 ${usedBefore} 分钟")
-                    delay(profile.courseDurationMs + profile.courseFinishGraceMs)
-
-                    // Only completed automated courses are booked into the local fatigue ledger.
-                    budget.addCourse(10)
-                    val usedNow = budget.usedMinutes()
-                    if (usedNow >= DailyBudgetStore.HARD_STOP_MINUTES) {
-                        stopSession("完成本轮后达到8小时MVP保护线")
-                        return
-                    }
-
-                    PetRuntime.update { it.copy(status = "到点检查并续下一节") }
                     val result = fsm.runOneCycle()
                     if (!result.ok) {
-                        stopSession("识别/操作失败，已Fail Closed：${result.message}")
+                        stopSession("识别/操作失败：${result.message}")
                         return
                     }
-                    cyclesStarted += 1
-                    PetRuntime.update { it.copy(cycles = cyclesStarted, status = "第 $cyclesStarted 节短课已启动") }
-                    logLine("CYCLE_START count=$cyclesStarted used=${budget.usedMinutes()}min")
+                    val next = System.currentTimeMillis() + profile.courseDurationMs + profile.courseFinishGraceMs
+                    PetRuntime.update { it.copy(nextCheckAtMs = next, status = "学习中，等待到点") }
+                    updateNotification("第${index + 1}/${rounds}节学习中")
+                    delay(profile.courseDurationMs + profile.courseFinishGraceMs)
+                    fsm.verify(PetStateMachine.State.RESULT, "wait", "after")
+                    budget.addCourse(10)
+                    PetRuntime.update { it.copy(cycles = index + 1, nextCheckAtMs = null, status = "第${index + 1}轮完成") }
+                    logEvent("RESULT", null, "none", "ROUND_PASS ${index + 1}/$rounds", null)
                 }
+                stopReason = "BATCH_PASS $rounds/$rounds"
             } finally {
                 capture.stop()
             }
@@ -146,6 +123,11 @@ class PetAutomationService : Service() {
         val dm = getSystemService(DISPLAY_SERVICE) as DisplayManager
         val d = dm.getDisplay(displayId) ?: error("virtual display disappeared")
         val p = Point(); d.getRealSize(p)
+        val metrics = android.util.DisplayMetrics(); d.getRealMetrics(metrics)
+        check(metrics.densityDpi == 320) { "display density must be 320dpi" }
+        check(Build.MODEL == "FOA-AL00") { "Only the calibrated FOA-AL00 device is supported" }
+        val qq = packageManager.getPackageInfo("com.tencent.mobileqq", 0)
+        check(qq.versionName == "9.3.70" && qq.longVersionCode == 16410L) { "QQ version differs from calibration" }
         check(p.x == profile.displayWidth && p.y == profile.displayHeight) {
             "display must be ${profile.displayWidth}x${profile.displayHeight}, actual=${p.x}x${p.y}"
         }
@@ -207,9 +189,16 @@ class PetAutomationService : Service() {
     }
 
     private fun logLine(message: String) {
+        logEvent("SESSION", null, "none", message, if (message.startsWith("SESSION_STOP")) stopReason else null)
+    }
+
+    private fun logEvent(state: String, score: Double?, action: String, result: String, reason: String?) {
         val ts = SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS", Locale.US).format(Date())
-        runCatching { File(filesDir, "pet_mvp.log").appendText("$ts $message\n") }
-        Log.i(TAG, message)
+        val line = JSONObject().put("timestamp", ts).put("state", state)
+            .put("matchScore", score ?: JSONObject.NULL).put("action", action)
+            .put("result", result).put("stopReason", reason ?: JSONObject.NULL).toString()
+        File(filesDir, "pet_mvp.log").appendText("$line\n")
+        Log.i(TAG, line)
     }
 
     override fun onTaskRemoved(rootIntent: Intent?) {
@@ -234,13 +223,12 @@ class PetAutomationService : Service() {
         private const val CHANNEL_ID = "pet_mvp"
         private const val NOTIFICATION_ID = 10901
         private const val EXTRA_DISPLAY_ID = "display_id"
+        private const val EXTRA_ROUNDS = "rounds"
         private const val ACTION_START = "com.ynk.virtualdisplay.pet.START"
         private const val ACTION_STOP = "com.ynk.virtualdisplay.pet.STOP"
         private const val MAX_WAKELOCK_MS = 8L * 60L * 60L * 1000L
-        private const val MAX_CYCLES_PER_SESSION = 20
-
-        fun startIntent(context: Context, displayId: Int) = Intent(context, PetAutomationService::class.java)
-            .setAction(ACTION_START).putExtra(EXTRA_DISPLAY_ID, displayId)
+        fun startIntent(context: Context, displayId: Int, rounds: Int = 1) = Intent(context, PetAutomationService::class.java)
+            .setAction(ACTION_START).putExtra(EXTRA_DISPLAY_ID, displayId).putExtra(EXTRA_ROUNDS, rounds)
         fun stopIntent(context: Context) = Intent(context, PetAutomationService::class.java).setAction(ACTION_STOP)
     }
 }

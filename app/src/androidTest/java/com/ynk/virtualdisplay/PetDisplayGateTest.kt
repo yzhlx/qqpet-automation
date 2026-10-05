@@ -48,6 +48,20 @@ class PetDisplayGateTest {
             capture = activeCapture
             activeCapture.start()
             val evidence = File(app.getExternalFilesDir(null), "pet_mvp_gates").apply { mkdirs() }
+            // A real rerun captured the Activity's transition colour before the
+            // test blue became visible. Wait for the known fixture, with a bound.
+            withTimeout(5000) {
+                while(true) {
+                    val f=activeCapture.awaitFrame()
+                    val ready=try {
+                        val p=f.getPixel(360,800)
+                        kotlin.math.abs(Color.red(p)-32)<8 && kotlin.math.abs(Color.green(p)-96)<8 &&
+                            kotlin.math.abs(Color.blue(p)-160)<8
+                    } finally { f.recycle() }
+                    if(ready) break
+                    delay(100)
+                }
+            }
             repeat(3) { index ->
                 delay(250)
                 val frame = activeCapture.awaitFrame(5_000)

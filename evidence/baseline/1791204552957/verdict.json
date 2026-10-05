@@ -1,0 +1,1 @@
+{"verdict":"STOPPED","completed":1,"stopReason":"UNKNOWN_WAIT_RESULT_PAGE","physicalDelta":0,"captureStatistics":{"imageReaderSuccess":587,"imageReaderTimeout":0,"shizukuFallbackCount":0,"shizukuFallbackSuccess":0,"captureLatencyP50Ms":null,"captureLatencyP95Ms":null}}

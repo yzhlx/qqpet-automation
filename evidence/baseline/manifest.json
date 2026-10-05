@@ -1,0 +1,2745 @@
+{
+  "previousSha": "05a3416f2946a68f54db9121f6d9ce5dc3a37b40",
+  "branch": "feature/qqpet-mvp-session",
+  "files": [
+    {
+      "path": "deliverables/calibration-screen.png",
+      "bytes": 286798,
+      "sha256": "a8264dafa1f031d953bacab9a7f0aefadfcb6e88863fc6a022c5d2ca8d005c5d"
+    },
+    {
+      "path": "deliverables/capture-gates/1791201091159/events.jsonl",
+      "bytes": 2801,
+      "sha256": "ba839b789bc1ec76d732234ee33b47397beb5d14750846890f3e787a11e7f910"
+    },
+    {
+      "path": "deliverables/capture-gates/1791201091159/static-0.png",
+      "bytes": 848615,
+      "sha256": "32eedc2528d4d5a6d02dbb69dace4033b11933422edca556594c580eab7fef70"
+    },
+    {
+      "path": "deliverables/capture-gates/1791201091159/static-1.png",
+      "bytes": 848672,
+      "sha256": "13f6a4b4d334724da123157cf324a53b04e94b1e8249c754e83a8a8075bcab70"
+    },
+    {
+      "path": "deliverables/capture-gates/1791201091159/static-2.png",
+      "bytes": 848246,
+      "sha256": "9b5d1ad15cbf0188c89a83aba271e0887104aebc1c2cbfb7345327a142e39118"
+    },
+    {
+      "path": "deliverables/capture-gates/1791201091159/static-3.png",
+      "bytes": 848353,
+      "sha256": "7f91318836e880250978ee2031d760d230034f30bc3f1ba905bcdb32c35fb441"
+    },
+    {
+      "path": "deliverables/capture-gates/1791201091159/static-4.png",
+      "bytes": 848595,
+      "sha256": "cc28c069411cd84e24feeac2f01e396fefeba51d41a3e417758a54106df8de03"
+    },
+    {
+      "path": "deliverables/capture-gates/1791201091159/static-5.png",
+      "bytes": 848255,
+      "sha256": "b047deb9e758cf77744884538fdbf9631d88fdf83350f36f50983132d2199094"
+    },
+    {
+      "path": "deliverables/capture-gates/1791201091159/static-6.png",
+      "bytes": 848031,
+      "sha256": "3a5aa8866ec883c91d2757f559ae2078d240c7f38312d907d08d9c5132cbd108"
+    },
+    {
+      "path": "deliverables/capture-gates/1791201091159/static-7.png",
+      "bytes": 843141,
+      "sha256": "c3cb990fe0c8fbd878442f3d8d3aef3f8d439f3d572a8b57b9614949bcc9e7b5"
+    },
+    {
+      "path": "deliverables/capture-gates/1791201091159/static-8.png",
+      "bytes": 837284,
+      "sha256": "ed8678afe0580cf36b641d370ace77c8f1875b7f59b90a00412edd0b380f7a52"
+    },
+    {
+      "path": "deliverables/capture-gates/1791201091159/static-9.png",
+      "bytes": 847139,
+      "sha256": "4fa5b1c9092157b059bd4e33908c3622c179e5318c7212aae3f720653eaac79e"
+    },
+    {
+      "path": "deliverables/capture-gates/1791201091159/verdict.json",
+      "bytes": 155,
+      "sha256": "7c4e93ffd1b735905f30c28fd97d8d07f88753201d3428629bd7face2c172f4c"
+    },
+    {
+      "path": "deliverables/capture-gates-updated/1791201091159/events.jsonl",
+      "bytes": 2801,
+      "sha256": "ba839b789bc1ec76d732234ee33b47397beb5d14750846890f3e787a11e7f910"
+    },
+    {
+      "path": "deliverables/capture-gates-updated/1791201091159/static-0.png",
+      "bytes": 848615,
+      "sha256": "32eedc2528d4d5a6d02dbb69dace4033b11933422edca556594c580eab7fef70"
+    },
+    {
+      "path": "deliverables/capture-gates-updated/1791201091159/static-1.png",
+      "bytes": 848672,
+      "sha256": "13f6a4b4d334724da123157cf324a53b04e94b1e8249c754e83a8a8075bcab70"
+    },
+    {
+      "path": "deliverables/capture-gates-updated/1791201091159/static-2.png",
+      "bytes": 848246,
+      "sha256": "9b5d1ad15cbf0188c89a83aba271e0887104aebc1c2cbfb7345327a142e39118"
+    },
+    {
+      "path": "deliverables/capture-gates-updated/1791201091159/static-3.png",
+      "bytes": 848353,
+      "sha256": "7f91318836e880250978ee2031d760d230034f30bc3f1ba905bcdb32c35fb441"
+    },
+    {
+      "path": "deliverables/capture-gates-updated/1791201091159/static-4.png",
+      "bytes": 848595,
+      "sha256": "cc28c069411cd84e24feeac2f01e396fefeba51d41a3e417758a54106df8de03"
+    },
+    {
+      "path": "deliverables/capture-gates-updated/1791201091159/static-5.png",
+      "bytes": 848255,
+      "sha256": "b047deb9e758cf77744884538fdbf9631d88fdf83350f36f50983132d2199094"
+    },
+    {
+      "path": "deliverables/capture-gates-updated/1791201091159/static-6.png",
+      "bytes": 848031,
+      "sha256": "3a5aa8866ec883c91d2757f559ae2078d240c7f38312d907d08d9c5132cbd108"
+    },
+    {
+      "path": "deliverables/capture-gates-updated/1791201091159/static-7.png",
+      "bytes": 843141,
+      "sha256": "c3cb990fe0c8fbd878442f3d8d3aef3f8d439f3d572a8b57b9614949bcc9e7b5"
+    },
+    {
+      "path": "deliverables/capture-gates-updated/1791201091159/static-8.png",
+      "bytes": 837284,
+      "sha256": "ed8678afe0580cf36b641d370ace77c8f1875b7f59b90a00412edd0b380f7a52"
+    },
+    {
+      "path": "deliverables/capture-gates-updated/1791201091159/static-9.png",
+      "bytes": 847139,
+      "sha256": "4fa5b1c9092157b059bd4e33908c3622c179e5318c7212aae3f720653eaac79e"
+    },
+    {
+      "path": "deliverables/capture-gates-updated/1791201091159/verdict.json",
+      "bytes": 155,
+      "sha256": "7c4e93ffd1b735905f30c28fd97d8d07f88753201d3428629bd7face2c172f4c"
+    },
+    {
+      "path": "deliverables/capture-gates-updated/1791201186621/0-close-after.png",
+      "bytes": 849146,
+      "sha256": "87af55b6aff739d36e70d7a5f0e268687ba0112b396854d3f9bf855601a89180"
+    },
+    {
+      "path": "deliverables/capture-gates-updated/1791201186621/0-close-before.png",
+      "bytes": 824937,
+      "sha256": "7c62b8516a35bd9ea7a990ae46e7f5763b3e7cb73ffc513f9023dd98e16bc0b4"
+    },
+    {
+      "path": "deliverables/capture-gates-updated/1791201186621/0-open-after.png",
+      "bytes": 823161,
+      "sha256": "a03eddda89c4e94b10868ed5dbd00a8d98ab7f8050717d7738b249ac3c19c5bb"
+    },
+    {
+      "path": "deliverables/capture-gates-updated/1791201186621/0-open-before.png",
+      "bytes": 848983,
+      "sha256": "297bda1dc6e7e44a91ef01e0f43d5f200db9f8082e4921618440590df141b330"
+    },
+    {
+      "path": "deliverables/capture-gates-updated/1791201186621/1-close-after.png",
+      "bytes": 848042,
+      "sha256": "dbd3d861ee0e9163409f3ea9f9aa3305ac421562f5c86b1159f7a8894bbeea1c"
+    },
+    {
+      "path": "deliverables/capture-gates-updated/1791201186621/1-close-before.png",
+      "bytes": 824444,
+      "sha256": "c348cb71adaa69a5ac32e3e9db640940f88aa5ba0d642590351526e069ff5eb2"
+    },
+    {
+      "path": "deliverables/capture-gates-updated/1791201186621/1-open-after.png",
+      "bytes": 824288,
+      "sha256": "ce98428faadc5cc8b8285aec88a59f6e59d321cb702c4303df6d2b0bb1082893"
+    },
+    {
+      "path": "deliverables/capture-gates-updated/1791201186621/1-open-before.png",
+      "bytes": 847512,
+      "sha256": "bd70e6b8fe503d0bc8a1e16e8e1d0a6a74b632fae52b61f57f1c8d4997b8b327"
+    },
+    {
+      "path": "deliverables/capture-gates-updated/1791201186621/2-close-after.png",
+      "bytes": 837598,
+      "sha256": "ad9be1750b8b881bcdadbfa8ad230718868f86fb98f560fa72edbf9b5a31e607"
+    },
+    {
+      "path": "deliverables/capture-gates-updated/1791201186621/2-close-before.png",
+      "bytes": 823928,
+      "sha256": "947c0118721120e7df8e041cdfd13093f4bd83e6b98c189335e9e71c03bcc781"
+    },
+    {
+      "path": "deliverables/capture-gates-updated/1791201186621/2-open-after.png",
+      "bytes": 822773,
+      "sha256": "c2bf2c2d70e80767676bae15c891742cb973808ca0b4c188a90de43596419579"
+    },
+    {
+      "path": "deliverables/capture-gates-updated/1791201186621/2-open-before.png",
+      "bytes": 848350,
+      "sha256": "3186a1da8ae4962d70b1f0478e6d6ed959741507680efe98dc4b69742d707723"
+    },
+    {
+      "path": "deliverables/capture-gates-updated/1791201186621/events.jsonl",
+      "bytes": 3331,
+      "sha256": "6b2bfe379db1231841f6772d0858c29f59cf5ae6cefd796991da9d51013754ee"
+    },
+    {
+      "path": "deliverables/capture-gates-updated/1791201186621/verdict.json",
+      "bytes": 159,
+      "sha256": "c07ac89e408beda5107826c9a9741e88db693fe1956b0903b91d7090aa81afb7"
+    },
+    {
+      "path": "deliverables/experimental/1791192381179/events.jsonl",
+      "bytes": 483,
+      "sha256": "60cd98cdb1f32e53fca486f890d38957bc6c748213f6b5ddf1429c91ed6cc65d"
+    },
+    {
+      "path": "deliverables/experimental/1791192381179/round-1-initial-home.png",
+      "bytes": 847964,
+      "sha256": "e065194863956f33f8119e47fed1a2d2284852af451dc842386071cc11950edc"
+    },
+    {
+      "path": "deliverables/experimental/1791192749747/events.jsonl",
+      "bytes": 3183,
+      "sha256": "757b946257f6ea960b589c6f9a926a2bdecf2bc825d0debedb71d5c4d8f3243f"
+    },
+    {
+      "path": "deliverables/experimental/1791192749747/round-1-0-open-health-before.png",
+      "bytes": 848953,
+      "sha256": "537af8ec92cb00be73cca94f611dfa03a2479a263c0364aa7dc5bee1b7edb7cd"
+    },
+    {
+      "path": "deliverables/experimental/1791192749747/round-1-1-open-health-after.png",
+      "bytes": 823844,
+      "sha256": "aaca005c70224cd2c6bf15036482c7a8049486e1e84a6e64f7f97fa88c6a7933"
+    },
+    {
+      "path": "deliverables/experimental/1791192749747/round-1-10-academy-before.png",
+      "bytes": 1802492,
+      "sha256": "73da7ba2aeea6cbfa1802a6f33cef7e7365417209fab7ac4779b118654151a3b"
+    },
+    {
+      "path": "deliverables/experimental/1791192749747/round-1-2-close-health-before.png",
+      "bytes": 823711,
+      "sha256": "5e72e7501194327585feb8923932a585247350890648f842a87d8914f0f15deb"
+    },
+    {
+      "path": "deliverables/experimental/1791192749747/round-1-3-close-health-after.png",
+      "bytes": 848163,
+      "sha256": "99d5aca6c5b77610443124790f69d4efab21dd3e402f007e95cf0bafc04da5ac"
+    },
+    {
+      "path": "deliverables/experimental/1791192749747/round-1-4-open-health-before.png",
+      "bytes": 849697,
+      "sha256": "8b99f50ce4d1be4b4c7580bff5c23ea2a82c25c5529d120e8b2c39f7de51ee07"
+    },
+    {
+      "path": "deliverables/experimental/1791192749747/round-1-5-open-health-after.png",
+      "bytes": 824381,
+      "sha256": "0161433fefa0f0ea667bd65f906513ba6496af305b1169d3a35f0890f44e0bd1"
+    },
+    {
+      "path": "deliverables/experimental/1791192749747/round-1-6-close-health-before.png",
+      "bytes": 825600,
+      "sha256": "f95bb84cd50b7ce4b9014ae783436e2d5d1c29fab5a01c795414de92d1c32fc0"
+    },
+    {
+      "path": "deliverables/experimental/1791192749747/round-1-7-close-health-after.png",
+      "bytes": 849033,
+      "sha256": "26a79a147667eef186432304051415a37b35c4d32cee17c981d94d95e91bbf07"
+    },
+    {
+      "path": "deliverables/experimental/1791192749747/round-1-8-outdoor-before.png",
+      "bytes": 849104,
+      "sha256": "832c788261fa844f9ee5adefd5376e8b7f6936a86104562ecfcfef3683aca5d6"
+    },
+    {
+      "path": "deliverables/experimental/1791192749747/round-1-9-outdoor-after.png",
+      "bytes": 1801873,
+      "sha256": "19694f7a745a1b93d68cc5698051893add3e0816a5049825c374eb31389c600d"
+    },
+    {
+      "path": "deliverables/experimental/1791192749747/round-1-before.png",
+      "bytes": 823211,
+      "sha256": "107babd6ab48f376fb4e807d18fccf656564f4e9ce3f0731e95408ac8e59a896"
+    },
+    {
+      "path": "deliverables/experimental/1791192749747/round-1-initial-home.png",
+      "bytes": 848748,
+      "sha256": "fbfbdaf9b3a4e91a28a8b68a1fc5de4d4a5008505899d52426a3becf10268c51"
+    },
+    {
+      "path": "deliverables/experimental/1791192749747/round-1-ready.png",
+      "bytes": 823599,
+      "sha256": "25581eca468c7dbd499fe20ef21dc0c3a1611d79a9b97ba228b89785bbf64852"
+    },
+    {
+      "path": "deliverables/experimental/1791192749747/round-1-STOP-last-frame.png",
+      "bytes": 1802383,
+      "sha256": "824a3fef9b4098aff1ecb76d0be1a4ddd7b40ee47a2c351c567e216d97f62c70"
+    },
+    {
+      "path": "deliverables/experimental/1791192749747/verdict.json",
+      "bytes": 133,
+      "sha256": "b2bb2794bb5b628c36bf38ebe988262ffc1b5c07cccfaa22e34d01efef4f467b"
+    },
+    {
+      "path": "deliverables/experimental/1791192978270/events.jsonl",
+      "bytes": 3349,
+      "sha256": "8654fc73b49f5eca5750e8c63568058886a7611b134ea461c6aacde74725c41c"
+    },
+    {
+      "path": "deliverables/experimental/1791192978270/round-1-0-open-health-before.png",
+      "bytes": 848329,
+      "sha256": "e855c7ba0981cc846198f6accda56f2d14ee85eb1eec650cd22772115eb69511"
+    },
+    {
+      "path": "deliverables/experimental/1791192978270/round-1-1-open-health-after.png",
+      "bytes": 824344,
+      "sha256": "777477624d541d1aa75553182b7ab424d316ae58e85d6cf4cf1dc3c6da49d0e7"
+    },
+    {
+      "path": "deliverables/experimental/1791192978270/round-1-10-academy-before.png",
+      "bytes": 1304321,
+      "sha256": "4231d43326247ebea320b4a6e4019633c86b4cf788e60a0dad2f08e65ca1748d"
+    },
+    {
+      "path": "deliverables/experimental/1791192978270/round-1-11-academy-after.png",
+      "bytes": 1997480,
+      "sha256": "6a3a2c715cbf62d72a78a757f5e3fe55da846b7e72dd710ab97a155e9aa22238"
+    },
+    {
+      "path": "deliverables/experimental/1791192978270/round-1-2-close-health-before.png",
+      "bytes": 823907,
+      "sha256": "29831ea5cf0168731eb23ce1827a08b7ad30aea6ca4aee0913de9754b3aa6fb3"
+    },
+    {
+      "path": "deliverables/experimental/1791192978270/round-1-3-close-health-after.png",
+      "bytes": 850435,
+      "sha256": "9a267f747e2ba8d6a77edf770c65248609373a336b0ac993bfe3f7efabc882b9"
+    },
+    {
+      "path": "deliverables/experimental/1791192978270/round-1-4-open-health-before.png",
+      "bytes": 849361,
+      "sha256": "3caa1929e12b867ce8eb0c0e96d95ad32c0d88ac65fb1efbada49201153a2c2e"
+    },
+    {
+      "path": "deliverables/experimental/1791192978270/round-1-5-open-health-after.png",
+      "bytes": 823519,
+      "sha256": "679d762ed9886e164cd89732270d3a12b5d3dc6db2b5d07162e6a6815ac6fa67"
+    },
+    {
+      "path": "deliverables/experimental/1791192978270/round-1-6-close-health-before.png",
+      "bytes": 823864,
+      "sha256": "66d2f3e5b7642fdaa4c878c3c7d3e00608e863c8296212122eb7fddf318bf51f"
+    },
+    {
+      "path": "deliverables/experimental/1791192978270/round-1-7-close-health-after.png",
+      "bytes": 846876,
+      "sha256": "89f60c868ed58919057f09b29b5fcf3997192b6f3a880695cd7e1c8aaa7bc77f"
+    },
+    {
+      "path": "deliverables/experimental/1791192978270/round-1-8-outdoor-before.png",
+      "bytes": 842547,
+      "sha256": "fa1713ac117119b5271591c71fe14c2a976a2045702cc0076cdde3f988d587a7"
+    },
+    {
+      "path": "deliverables/experimental/1791192978270/round-1-9-outdoor-after.png",
+      "bytes": 1302922,
+      "sha256": "186d96a99760872d85fb42d2263f06af74982cd9706a9469a25934574581dbf1"
+    },
+    {
+      "path": "deliverables/experimental/1791192978270/round-1-before.png",
+      "bytes": 823069,
+      "sha256": "4d318cbcd47c15d5fc7f0d743da1884cce1fb2c995dbdb261384f8bea81d6dd5"
+    },
+    {
+      "path": "deliverables/experimental/1791192978270/round-1-initial-home.png",
+      "bytes": 847978,
+      "sha256": "26963962cd9c9fbc545299ba73ecd41e721939994e3bcb222e934787514101d1"
+    },
+    {
+      "path": "deliverables/experimental/1791192978270/round-1-ready.png",
+      "bytes": 825632,
+      "sha256": "fd5e0b177fca1a39777bcbeca5a6237dd6fd4f50e444cb6bd5a51b40f3bcc845"
+    },
+    {
+      "path": "deliverables/experimental/1791192978270/round-1-STOP-last-frame.png",
+      "bytes": 1141526,
+      "sha256": "eb26a2b8145918216641b4a39baee9a9669809f41dae192b78f1c0b9b247d9d2"
+    },
+    {
+      "path": "deliverables/experimental/1791192978270/verdict.json",
+      "bytes": 132,
+      "sha256": "26f2fdeabc62ddf7ec69ffe9e43d4c2d005b6239ccf55f504596b3e5ab7b5a06"
+    },
+    {
+      "path": "deliverables/experimental/1791195439383/events.jsonl",
+      "bytes": 3330,
+      "sha256": "7b16b4b04030b987e843e6bd446f88d596a8832a3da0533addd75064ed4c8588"
+    },
+    {
+      "path": "deliverables/experimental/1791195439383/round-1-0-open-health-before.png",
+      "bytes": 848238,
+      "sha256": "e1f9791d05fc50e9e1384a2874a781dad523ea5519e8479d5acfeda7ea0b44c8"
+    },
+    {
+      "path": "deliverables/experimental/1791195439383/round-1-1-open-health-after.png",
+      "bytes": 823996,
+      "sha256": "d8822a6e38c7d97e48bee24d76544669c9b2f1da2e6d4a91a6a3e74f4be58c28"
+    },
+    {
+      "path": "deliverables/experimental/1791195439383/round-1-10-academy-before.png",
+      "bytes": 1804172,
+      "sha256": "370921f8450f1da88b3856d72766c49350ee51f19c05e5b3e1c0805f21cfb309"
+    },
+    {
+      "path": "deliverables/experimental/1791195439383/round-1-11-academy-after.png",
+      "bytes": 2166672,
+      "sha256": "084d95abb2966921f2ae3c4ac181ac0ee4cba44ba4a4da58fa5b93cf399559c4"
+    },
+    {
+      "path": "deliverables/experimental/1791195439383/round-1-12-primary-before.png",
+      "bytes": 2166672,
+      "sha256": "084d95abb2966921f2ae3c4ac181ac0ee4cba44ba4a4da58fa5b93cf399559c4"
+    },
+    {
+      "path": "deliverables/experimental/1791195439383/round-1-2-close-health-before.png",
+      "bytes": 824828,
+      "sha256": "83c186ccbcf0f911060152b5078d4f6e9c04926ffe63ce9f84b47081f6402e82"
+    },
+    {
+      "path": "deliverables/experimental/1791195439383/round-1-3-close-health-after.png",
+      "bytes": 848274,
+      "sha256": "17e0d316153015ce509dc85133ea799d276c2a546d95b03686e0749a6117751b"
+    },
+    {
+      "path": "deliverables/experimental/1791195439383/round-1-4-open-health-before.png",
+      "bytes": 847585,
+      "sha256": "a729db2c2b611996b2bc30bfec6922898a7748dbe9a4e37649c3011031f39c56"
+    },
+    {
+      "path": "deliverables/experimental/1791195439383/round-1-5-open-health-after.png",
+      "bytes": 813931,
+      "sha256": "a4e760036115ca223942af357d171e3725394ab2d4c159877876ab46ebe308c0"
+    },
+    {
+      "path": "deliverables/experimental/1791195439383/round-1-6-close-health-before.png",
+      "bytes": 811642,
+      "sha256": "b6494175742f60ce5e8fa12dc55504287de1dc74de93a7f28677e1822a21e265"
+    },
+    {
+      "path": "deliverables/experimental/1791195439383/round-1-7-close-health-after.png",
+      "bytes": 843225,
+      "sha256": "41f24f0a0f070b82ece6a03802b165c97129225102c5fa94b4f6fe61aca060de"
+    },
+    {
+      "path": "deliverables/experimental/1791195439383/round-1-8-outdoor-before.png",
+      "bytes": 842314,
+      "sha256": "f5665e64af6b67c76b4d75402c4017a7e33a9eddee26c96c30544f947f0e8e42"
+    },
+    {
+      "path": "deliverables/experimental/1791195439383/round-1-9-outdoor-after.png",
+      "bytes": 1802383,
+      "sha256": "824a3fef9b4098aff1ecb76d0be1a4ddd7b40ee47a2c351c567e216d97f62c70"
+    },
+    {
+      "path": "deliverables/experimental/1791195439383/round-1-before.png",
+      "bytes": 823126,
+      "sha256": "762936587619af1155c3f0986fd0e2a0d117f7d6ef6678f3e8005a354b656238"
+    },
+    {
+      "path": "deliverables/experimental/1791195439383/round-1-initial-home.png",
+      "bytes": 848115,
+      "sha256": "42702e1e71c094d7352f8af9c84ae3895f807571d2939284fbeca9356ef22839"
+    },
+    {
+      "path": "deliverables/experimental/1791195439383/round-1-ready.png",
+      "bytes": 813409,
+      "sha256": "75b12412fae9d3cc772fd38fef0e615e640bf07a58b38706e9e02036d30700ff"
+    },
+    {
+      "path": "deliverables/experimental/1791195439383/round-1-STOP-last-frame.png",
+      "bytes": 2034274,
+      "sha256": "59d0fb2326fdc124f79d5542b583f8b172f4a7cc4d88090f64fdadddd8aa437c"
+    },
+    {
+      "path": "deliverables/experimental/1791195439383/verdict.json",
+      "bytes": 113,
+      "sha256": "708df87a2c929ace3af25d3acf3f17977282a986545a5d44914b1cdded7a053f"
+    },
+    {
+      "path": "deliverables/experimental/1791196162375/events.jsonl",
+      "bytes": 2385,
+      "sha256": "39d7dcc29a1f594f2dd324aa7ae4cb652480c0ceec28277ee573d6c64e9fca7d"
+    },
+    {
+      "path": "deliverables/experimental/1791196162375/round-1-0-open-health-before.png",
+      "bytes": 847793,
+      "sha256": "06ea176688ac27d852102abd017e7a2db855bc42e7572e40599c12993e6a3f5f"
+    },
+    {
+      "path": "deliverables/experimental/1791196162375/round-1-1-open-health-after.png",
+      "bytes": 817747,
+      "sha256": "ad96fd6317fdc431a84fbd8c7747ca49ac643195327fe1a3a0e33c30d19d1f0f"
+    },
+    {
+      "path": "deliverables/experimental/1791196162375/round-1-2-close-health-before.png",
+      "bytes": 814020,
+      "sha256": "1ba8c089bf2fc19bba4eca0492b8772cc58e51a7763f523b7684e983722fbd86"
+    },
+    {
+      "path": "deliverables/experimental/1791196162375/round-1-3-close-health-after.png",
+      "bytes": 848340,
+      "sha256": "c439fad920fd62eb6024b145681a2e61e3fb3e67a570f1a5f810df75e3be0087"
+    },
+    {
+      "path": "deliverables/experimental/1791196162375/round-1-4-open-health-before.png",
+      "bytes": 848121,
+      "sha256": "7f5649a334ec57c28e408dda1554a531f4adf2f84cdef4cf2213a2ae1ead9e60"
+    },
+    {
+      "path": "deliverables/experimental/1791196162375/round-1-5-open-health-after.png",
+      "bytes": 822696,
+      "sha256": "208e11f87ea1c1618965cc7177d27ecac03f02132234b46081040b32ea9b6fb9"
+    },
+    {
+      "path": "deliverables/experimental/1791196162375/round-1-6-close-health-before.png",
+      "bytes": 823455,
+      "sha256": "29640b5321c828f7a837dd24c3e4580db032bae6c4966cd1c1306769106cbe4c"
+    },
+    {
+      "path": "deliverables/experimental/1791196162375/round-1-before.png",
+      "bytes": 816047,
+      "sha256": "83626b8c038233e6ee2f39ffdfea11d84b2bf67dc0088b8d1c418437809caa07"
+    },
+    {
+      "path": "deliverables/experimental/1791196162375/round-1-initial-home.png",
+      "bytes": 848004,
+      "sha256": "2fca13d45ea00de56bb510ca1ef538ec0fa719749ec6a5dada30892e50067d54"
+    },
+    {
+      "path": "deliverables/experimental/1791196162375/round-1-ready.png",
+      "bytes": 823455,
+      "sha256": "29640b5321c828f7a837dd24c3e4580db032bae6c4966cd1c1306769106cbe4c"
+    },
+    {
+      "path": "deliverables/experimental/1791196162375/verdict.json",
+      "bytes": 114,
+      "sha256": "295940b9323033dd3d3c1ff9f2377d151b3756b3d52cae82bf3f7df80c009797"
+    },
+    {
+      "path": "deliverables/experimental/1791196488723/events.jsonl",
+      "bytes": 3517,
+      "sha256": "380db854eb6678c6b74c6f8b8ab99a8c51aad409431f30b178a7857a73b74d16"
+    },
+    {
+      "path": "deliverables/experimental/1791196488723/round-1-0-open-health-before.png",
+      "bytes": 848332,
+      "sha256": "b0e51b344f932ec4c58b53035bc295d975d3f8dbded64ce5ea706417bc916ca6"
+    },
+    {
+      "path": "deliverables/experimental/1791196488723/round-1-1-open-health-after.png",
+      "bytes": 814762,
+      "sha256": "adafd1b29c1a1abcfe8c36c44a45f88623207d22add819726bc6b07d563be409"
+    },
+    {
+      "path": "deliverables/experimental/1791196488723/round-1-10-academy-before.png",
+      "bytes": 1299755,
+      "sha256": "380de4d6460cf6c356b970ab51e53728d312e16bee15610e054a327dadecbca7"
+    },
+    {
+      "path": "deliverables/experimental/1791196488723/round-1-11-academy-after.png",
+      "bytes": 2004280,
+      "sha256": "27e014f6c245a9152535deddf3d68453b44d8bc67dd4cce7f0cd3fad16cc859e"
+    },
+    {
+      "path": "deliverables/experimental/1791196488723/round-1-12-primary-before.png",
+      "bytes": 1141546,
+      "sha256": "7c1cce0810cb947b50dfa601059dd8b80eb528bd2b2b767c3b853490cfb0f078"
+    },
+    {
+      "path": "deliverables/experimental/1791196488723/round-1-2-close-health-before.png",
+      "bytes": 811998,
+      "sha256": "6c658168d3bfefff436209181d6d4ac28484dac7ddb439fdbbb0ff14735cc78c"
+    },
+    {
+      "path": "deliverables/experimental/1791196488723/round-1-3-close-health-after.png",
+      "bytes": 848775,
+      "sha256": "440d14fac918d367042e9e0a17358bdcf0ccad09743730411377b81ba5efa0e7"
+    },
+    {
+      "path": "deliverables/experimental/1791196488723/round-1-4-open-health-before.png",
+      "bytes": 848631,
+      "sha256": "cbe1dca566b9d34dd16200f3a956004174f6bb1c12a7837f93f7dbac5f657308"
+    },
+    {
+      "path": "deliverables/experimental/1791196488723/round-1-5-open-health-after.png",
+      "bytes": 823310,
+      "sha256": "41ea0ce1d425c980ac93b70e19a7e046872b3996cb973d8d3a9f304a26aa7b12"
+    },
+    {
+      "path": "deliverables/experimental/1791196488723/round-1-6-close-health-before.png",
+      "bytes": 823397,
+      "sha256": "8ca1ec73c5db690548286cec434fb474aee905041a0a54f7b38c5a035e72e55e"
+    },
+    {
+      "path": "deliverables/experimental/1791196488723/round-1-7-close-health-after.png",
+      "bytes": 841311,
+      "sha256": "d977481484ccbe01227eed476fc3c0b949020a82d64e988d8bc16a8667fc678e"
+    },
+    {
+      "path": "deliverables/experimental/1791196488723/round-1-8-outdoor-before.png",
+      "bytes": 837755,
+      "sha256": "949e2f5479b93ac6f26b37158397bead6dd8de5358415ad74737737153a3d219"
+    },
+    {
+      "path": "deliverables/experimental/1791196488723/round-1-9-outdoor-after.png",
+      "bytes": 1303079,
+      "sha256": "5a47320c6ec0d038b9de52ac2572c0d88873fcfd43416f6b95c4c995349f00cf"
+    },
+    {
+      "path": "deliverables/experimental/1791196488723/round-1-before.png",
+      "bytes": 813284,
+      "sha256": "6ce12423dac6bdcd9d1bce6807c7f90fc1ee79370fc04a8ec4338765fc2c0d6e"
+    },
+    {
+      "path": "deliverables/experimental/1791196488723/round-1-initial-home.png",
+      "bytes": 840236,
+      "sha256": "09204a6c2c7597b6d5b0c506076d71c7bff8e9070b3b8ce6e621297be0b5f027"
+    },
+    {
+      "path": "deliverables/experimental/1791196488723/round-1-ready.png",
+      "bytes": 823138,
+      "sha256": "3792e86813ec5bb762761d1fee58fcb19873a544bb17737e1615033b5add4d3e"
+    },
+    {
+      "path": "deliverables/experimental/1791196488723/round-1-STOP-last-frame.png",
+      "bytes": 1141546,
+      "sha256": "7c1cce0810cb947b50dfa601059dd8b80eb528bd2b2b767c3b853490cfb0f078"
+    },
+    {
+      "path": "deliverables/experimental/1791196488723/verdict.json",
+      "bytes": 133,
+      "sha256": "65f8968da9de39518ef9a9e29acbe1cb786a0450ef115d5576b18b147c642186"
+    },
+    {
+      "path": "deliverables/experimental/1791196952114/events.jsonl",
+      "bytes": 3374,
+      "sha256": "843929c3ff15130e43f0a19b796adfb8920bfc2dd9b750826bc37f6d72944172"
+    },
+    {
+      "path": "deliverables/experimental/1791196952114/round-1-0-open-health-before.png",
+      "bytes": 848613,
+      "sha256": "7e21ee0bbd59b9309e65f74062b6bff1bcfe1a3a42b0a7bf0bb959d9eb27a4bd"
+    },
+    {
+      "path": "deliverables/experimental/1791196952114/round-1-1-open-health-after.png",
+      "bytes": 824491,
+      "sha256": "051fc6f2489c07cf4f52d6919108b485f786ad23a564b907e8037c3d0ce5653f"
+    },
+    {
+      "path": "deliverables/experimental/1791196952114/round-1-2-close-health-before.png",
+      "bytes": 824117,
+      "sha256": "2ee4403a67d91852045015157aaeba27080a069237032e41c959bba2a11d3e94"
+    },
+    {
+      "path": "deliverables/experimental/1791196952114/round-1-3-close-health-after.png",
+      "bytes": 848357,
+      "sha256": "669fa2ef5ff07d75d7f76e66ab813b09f4cef7a76766aaf36886681bb253aaca"
+    },
+    {
+      "path": "deliverables/experimental/1791196952114/round-1-4-open-health-before.png",
+      "bytes": 848327,
+      "sha256": "203e0371896e5afb8d9763b6ad89a09ea37979a11e24c33886346a3063c672c9"
+    },
+    {
+      "path": "deliverables/experimental/1791196952114/round-1-5-open-health-after.png",
+      "bytes": 824376,
+      "sha256": "c5e86656a94ff26e7e37342171c76e75e3c4ec0943cf1091ee95eb25c5662d66"
+    },
+    {
+      "path": "deliverables/experimental/1791196952114/round-1-6-close-health-before.png",
+      "bytes": 817538,
+      "sha256": "626f75f7644ee8766a06d64b31d71cbf03fde6e08eaf499f4d52caeae2952096"
+    },
+    {
+      "path": "deliverables/experimental/1791196952114/round-1-7-close-health-after.png",
+      "bytes": 839724,
+      "sha256": "e133281128054fbfe93602f26f01ec5417c3accacb22dc3fe630a3ad559656c3"
+    },
+    {
+      "path": "deliverables/experimental/1791196952114/round-1-8-outdoor-before.png",
+      "bytes": 847973,
+      "sha256": "2be3d37149e1ffa5bc748edee20b80aefeaba82efe7697b8c8816fb060f2eff4"
+    },
+    {
+      "path": "deliverables/experimental/1791196952114/round-1-9-outdoor-after.png",
+      "bytes": 1304081,
+      "sha256": "34abe1c050d1cd0b8798d101342ef9e161a41c2b4a406b3082fd2f5a88f56eff"
+    },
+    {
+      "path": "deliverables/experimental/1791196952114/round-1-academy-entry-before.png",
+      "bytes": 1304321,
+      "sha256": "4231d43326247ebea320b4a6e4019633c86b4cf788e60a0dad2f08e65ca1748d"
+    },
+    {
+      "path": "deliverables/experimental/1791196952114/round-1-before.png",
+      "bytes": 824045,
+      "sha256": "53089a7cfd533c4102cad0217d9ad1e32c03096d90d36c0cb1c950df499a7d03"
+    },
+    {
+      "path": "deliverables/experimental/1791196952114/round-1-initial-home.png",
+      "bytes": 848400,
+      "sha256": "91eb251d4e1653a7bffb5c8549c59737137b2555e06a218a73e522d06c1d3c90"
+    },
+    {
+      "path": "deliverables/experimental/1791196952114/round-1-ready.png",
+      "bytes": 819409,
+      "sha256": "629541f931274c12731708e87fe045b1f4454aab99d01b276d79ff71462abf16"
+    },
+    {
+      "path": "deliverables/experimental/1791196952114/round-1-STOP-last-frame.png",
+      "bytes": 1893990,
+      "sha256": "d46209bd484783798becd79b8eb2213782fa83272aa9af5e9ca5eda8a4413613"
+    },
+    {
+      "path": "deliverables/experimental/1791196952114/verdict.json",
+      "bytes": 148,
+      "sha256": "07aa182c7a63e08992b4ecb522abaa3b1415b385f090bc57c41f83b59fd224e0"
+    },
+    {
+      "path": "deliverables/experimental/1791197823237/events.jsonl",
+      "bytes": 2451,
+      "sha256": "5be7468a251cade655245143b634cefbb8b66a8143faee695ee792376a870d03"
+    },
+    {
+      "path": "deliverables/experimental/1791197823237/round-1-0-open-health-before.png",
+      "bytes": 848321,
+      "sha256": "9fb54e06771451113dd60f27863ab721ddba16c33c855238664c8dc48b283320"
+    },
+    {
+      "path": "deliverables/experimental/1791197823237/round-1-1-open-health-after.png",
+      "bytes": 823669,
+      "sha256": "88f0d82f5207d247a0f16657cbba1217c761c6d6430f0279f208b739ebfec1c1"
+    },
+    {
+      "path": "deliverables/experimental/1791197823237/round-1-2-close-health-before.png",
+      "bytes": 822984,
+      "sha256": "64f9b7fb0a034ed88729b03e493ecb028bd10c24479f8c5e147fe68f892a5830"
+    },
+    {
+      "path": "deliverables/experimental/1791197823237/round-1-3-close-health-after.png",
+      "bytes": 847984,
+      "sha256": "16d6c4257edc95ee53b17c5454f752a276d132cdabf82ed3ac31f145a1fd4b16"
+    },
+    {
+      "path": "deliverables/experimental/1791197823237/round-1-4-open-health-before.png",
+      "bytes": 848443,
+      "sha256": "59fc73f4e1b5070df1f788f372c2a05a818348be8b8a686234763b734485ec06"
+    },
+    {
+      "path": "deliverables/experimental/1791197823237/round-1-5-open-health-after.png",
+      "bytes": 825324,
+      "sha256": "9d39957c6c2206e6795fc2a95f05601caa441b76484279249a5b91de148f64ce"
+    },
+    {
+      "path": "deliverables/experimental/1791197823237/round-1-6-close-health-before.png",
+      "bytes": 825324,
+      "sha256": "9d39957c6c2206e6795fc2a95f05601caa441b76484279249a5b91de148f64ce"
+    },
+    {
+      "path": "deliverables/experimental/1791197823237/round-1-before.png",
+      "bytes": 822381,
+      "sha256": "fdc629712db62ef785653890529326eb61a33d3fdb4f6919f94b15266363d38f"
+    },
+    {
+      "path": "deliverables/experimental/1791197823237/round-1-initial-home.png",
+      "bytes": 847665,
+      "sha256": "a633268ebb09f75efc3157ad82070a9be6369911fa236dc78d2196dd290a32be"
+    },
+    {
+      "path": "deliverables/experimental/1791197823237/round-1-ready.png",
+      "bytes": 825324,
+      "sha256": "9d39957c6c2206e6795fc2a95f05601caa441b76484279249a5b91de148f64ce"
+    },
+    {
+      "path": "deliverables/experimental/1791197823237/round-1-STOP-last-frame.png",
+      "bytes": 825324,
+      "sha256": "9d39957c6c2206e6795fc2a95f05601caa441b76484279249a5b91de148f64ce"
+    },
+    {
+      "path": "deliverables/experimental/1791197823237/verdict.json",
+      "bytes": 180,
+      "sha256": "9d16f8c7b6288f3ac789d4037d88765773b0ab5718dc0f23b2555633ccdd7757"
+    },
+    {
+      "path": "deliverables/experimental/1791198749090/events.jsonl",
+      "bytes": 3561,
+      "sha256": "7a42098ea8d559edcc8a53f723afa37ecc3be13cba7e6ce72b5be3ae35e09260"
+    },
+    {
+      "path": "deliverables/experimental/1791198749090/round-1-0-open-health-before.png",
+      "bytes": 837001,
+      "sha256": "1c9731abca09ebf6e06541153d856cc6faf32a1e763afddcf5d8db5c5db35183"
+    },
+    {
+      "path": "deliverables/experimental/1791198749090/round-1-1-open-health-after.png",
+      "bytes": 824052,
+      "sha256": "a2dfb46e7ab2540baed45a6ef62cdaa402cce39d381d222a18d8d1f2316befa3"
+    },
+    {
+      "path": "deliverables/experimental/1791198749090/round-1-2-close-health-before.png",
+      "bytes": 822394,
+      "sha256": "670e8ad3935c847209a861347e7b4acaac8de96821e2f0383dbba97cafc87370"
+    },
+    {
+      "path": "deliverables/experimental/1791198749090/round-1-3-close-health-after.png",
+      "bytes": 848368,
+      "sha256": "a7209246c46e3920d3351b6b04641e18d57b2c2b9549f44a7c9245d5930d65cc"
+    },
+    {
+      "path": "deliverables/experimental/1791198749090/round-1-4-open-health-before.png",
+      "bytes": 848275,
+      "sha256": "750d10d12ff82d3b16f265439db02258ddfa612da17e9ae8916ad607165217dc"
+    },
+    {
+      "path": "deliverables/experimental/1791198749090/round-1-5-open-health-after.png",
+      "bytes": 823279,
+      "sha256": "dfbc3a9eb1276c4c84af7f1510e75b4b2ee1732f870e2a964750076f1d6eff5d"
+    },
+    {
+      "path": "deliverables/experimental/1791198749090/round-1-6-close-health-before.png",
+      "bytes": 823311,
+      "sha256": "af7e7f635fbb9c62d29477d0eb7577f021cb07c13d02bd13ccb044daaf997303"
+    },
+    {
+      "path": "deliverables/experimental/1791198749090/round-1-7-close-health-after.png",
+      "bytes": 848143,
+      "sha256": "74c2a5304dabd8659dedcf53c81dfc4e7ea67582e9142dcce3db8a5e91dabf4d"
+    },
+    {
+      "path": "deliverables/experimental/1791198749090/round-1-8-outdoor-before.png",
+      "bytes": 848908,
+      "sha256": "28e89685071ee6be305c87028a1da4ea04db87c3d841760c22fde963bc015aee"
+    },
+    {
+      "path": "deliverables/experimental/1791198749090/round-1-9-outdoor-after.png",
+      "bytes": 1304188,
+      "sha256": "28f6b53945ed63e877942f8296bac476c06b03d7e421b05e42422f12cce76192"
+    },
+    {
+      "path": "deliverables/experimental/1791198749090/round-1-academy-entry-before.png",
+      "bytes": 1301942,
+      "sha256": "b95952e5e9df8abc9e58dede37f0c8f02c694c2977ff6282c8449eb8d5603e1e"
+    },
+    {
+      "path": "deliverables/experimental/1791198749090/round-1-before.png",
+      "bytes": 824002,
+      "sha256": "7b25e7007c4e21bc80798d4cf715f88dcb2bb2624afea58e67fad07b33468707"
+    },
+    {
+      "path": "deliverables/experimental/1791198749090/round-1-initial-home.png",
+      "bytes": 838528,
+      "sha256": "6ceffaa5fe0c11a9ef38a031f613aba863230db6427738bd99549be3b855ca28"
+    },
+    {
+      "path": "deliverables/experimental/1791198749090/round-1-ready.png",
+      "bytes": 824093,
+      "sha256": "a1926c0a14f817e17883151e207025a20f9e2b20e61beeb870573f02a01c7532"
+    },
+    {
+      "path": "deliverables/experimental/1791198749090/round-1-STOP-last-frame.png",
+      "bytes": 2004054,
+      "sha256": "cf1136cd2abaf9f3ef48f972b4cfd39b6d2bfc8a40a7561311a565db97054bab"
+    },
+    {
+      "path": "deliverables/experimental/1791198749090/verdict.json",
+      "bytes": 180,
+      "sha256": "a28b09f9852444c3ef5e2640fd08c108d76684a3158c9c0dcb509a6bb159eab5"
+    },
+    {
+      "path": "deliverables/experimental/1791199799477/events.jsonl",
+      "bytes": 1314,
+      "sha256": "9f2f65db5a82aeca38c89c04c94bd705ae85fa28e6e849b734ee24faf1e40c90"
+    },
+    {
+      "path": "deliverables/experimental/1791199799477/round-1-0-open-health-before.png",
+      "bytes": 848709,
+      "sha256": "6b15ea8976af5f7b29e90483821006e66ebec0c7a0ab8756c666d22e8303fdf9"
+    },
+    {
+      "path": "deliverables/experimental/1791199799477/round-1-1-open-health-after.png",
+      "bytes": 823637,
+      "sha256": "9f36c7cad739fd063641749e38af0c66c8466a7aeb96740ba73c977d7e9d8567"
+    },
+    {
+      "path": "deliverables/experimental/1791199799477/round-1-2-close-health-before.png",
+      "bytes": 823637,
+      "sha256": "9f36c7cad739fd063641749e38af0c66c8466a7aeb96740ba73c977d7e9d8567"
+    },
+    {
+      "path": "deliverables/experimental/1791199799477/round-1-before.png",
+      "bytes": 823637,
+      "sha256": "9f36c7cad739fd063641749e38af0c66c8466a7aeb96740ba73c977d7e9d8567"
+    },
+    {
+      "path": "deliverables/experimental/1791199799477/round-1-initial-home.png",
+      "bytes": 848342,
+      "sha256": "0fb537af73e268fd007a8c24e535f55eaa379171f8516736ceb8cdf379851b1e"
+    },
+    {
+      "path": "deliverables/experimental/1791199799477/round-1-STOP-last-frame.png",
+      "bytes": 823637,
+      "sha256": "9f36c7cad739fd063641749e38af0c66c8466a7aeb96740ba73c977d7e9d8567"
+    },
+    {
+      "path": "deliverables/experimental/1791199799477/verdict.json",
+      "bytes": 180,
+      "sha256": "854ecf5d1a5e328019a8c963fd90c516c9fc06127fad570be03edc4d54088152"
+    },
+    {
+      "path": "deliverables/experimental/1791201870302/events.jsonl",
+      "bytes": 22908,
+      "sha256": "1000202ad016b874a9fe5ab5a8dc4a66cb6ffa53bf3c91276111bf7d98758ec4"
+    },
+    {
+      "path": "deliverables/experimental/1791201870302/round-1-0-open-health-before.png",
+      "bytes": 848056,
+      "sha256": "d7f175f919cf2c05352781516063c5433ff72e16af88d9341ea7bfd95f17712e"
+    },
+    {
+      "path": "deliverables/experimental/1791201870302/round-1-1-open-health-after.png",
+      "bytes": 823884,
+      "sha256": "740f03fcff736b7fc5cf6671bd43796a8ee02f93136c74c08be5bc2e663fea0d"
+    },
+    {
+      "path": "deliverables/experimental/1791201870302/round-1-10-leave-food-before.png",
+      "bytes": 828577,
+      "sha256": "abb088cebb3147805595d5b360235aa0a9b02260b6091e9c74f6bfc874f27a96"
+    },
+    {
+      "path": "deliverables/experimental/1791201870302/round-1-11-leave-food-after.png",
+      "bytes": 848709,
+      "sha256": "379da594aeaeed6283e3778e8f3c6765f67f3507a9d93a02e57cf3b4fc9320b8"
+    },
+    {
+      "path": "deliverables/experimental/1791201870302/round-1-12-open-health-before.png",
+      "bytes": 848103,
+      "sha256": "b82f6f448eded75239ec6fd8ce806d1904be424a79c86dbaba885ad069f27151"
+    },
+    {
+      "path": "deliverables/experimental/1791201870302/round-1-13-open-health-after.png",
+      "bytes": 822718,
+      "sha256": "8d719c0bffc165052edfb8a0a8c66f798ef8a354f3ec55f278cf7ea5387a8113"
+    },
+    {
+      "path": "deliverables/experimental/1791201870302/round-1-14-close-health-before.png",
+      "bytes": 823677,
+      "sha256": "7b1e57d34f5810f927eecfaeda81629ef0afd7fa5486a08b9f3de7d5f6fb157c"
+    },
+    {
+      "path": "deliverables/experimental/1791201870302/round-1-15-close-health-after.png",
+      "bytes": 848508,
+      "sha256": "2fd54622181aa47e4456848d22fb36897c1c2e149e95638b35454026c7750c5f"
+    },
+    {
+      "path": "deliverables/experimental/1791201870302/round-1-16-outdoor-before.png",
+      "bytes": 848720,
+      "sha256": "f9ad60404cd5d1e1dd1a406e2fda9482e88da32fbbecdfdce2ad83c70ce732f8"
+    },
+    {
+      "path": "deliverables/experimental/1791201870302/round-1-17-outdoor-after.png",
+      "bytes": 1302297,
+      "sha256": "543b3dae195d4d338b985a6dfa71dcaa8379a1a29b494ace88ae8c660b1e7f12"
+    },
+    {
+      "path": "deliverables/experimental/1791201870302/round-1-18-enter-primary-academy-before.png",
+      "bytes": 1141205,
+      "sha256": "eb1324f4b628e1fb1316e5254d32b634b1ba0f5355c0cdf0932dadb943325e7f"
+    },
+    {
+      "path": "deliverables/experimental/1791201870302/round-1-19-enter-primary-academy-after.png",
+      "bytes": 1647085,
+      "sha256": "763ef99a306d790f851b326fd5d05b64ecdbe10188d55e4b1b2eefa079ef4e54"
+    },
+    {
+      "path": "deliverables/experimental/1791201870302/round-1-2-close-health-before.png",
+      "bytes": 823613,
+      "sha256": "87d656eb5a7b7069628011ceb228a48aecd20a8302dcd1d7007e1c8040a3fc41"
+    },
+    {
+      "path": "deliverables/experimental/1791201870302/round-1-3-close-health-after.png",
+      "bytes": 848038,
+      "sha256": "1b7201138b79fea855133e106cd9b9bdbeacc6752acd3aac982d9ca26cdd8060"
+    },
+    {
+      "path": "deliverables/experimental/1791201870302/round-1-4-enter-food-before.png",
+      "bytes": 847703,
+      "sha256": "e7bfaed8cd3c55829da9abd6d3a69d7037cb0a0ad611c0f4e986f14484064d45"
+    },
+    {
+      "path": "deliverables/experimental/1791201870302/round-1-5-enter-food-after.png",
+      "bytes": 829824,
+      "sha256": "b4b720652e2c457ba25a78971d066b717451a98a624bf7257905df7bbcac4cfd"
+    },
+    {
+      "path": "deliverables/experimental/1791201870302/round-1-6-open-health-before.png",
+      "bytes": 828241,
+      "sha256": "ab0f874c25a4763478ec4fc73adbde311ef445ff6db17abf82f27acba83eb4d6"
+    },
+    {
+      "path": "deliverables/experimental/1791201870302/round-1-7-open-health-after.png",
+      "bytes": 817167,
+      "sha256": "f9f4b9546f7b855c59d4c1ee778dcd613ff477e8771e573a2d86cfc97ff6f05a"
+    },
+    {
+      "path": "deliverables/experimental/1791201870302/round-1-8-close-health-before.png",
+      "bytes": 813844,
+      "sha256": "6b6ba372c6b48e75e9f788b9ac543125868e5d3d4e37ebea38b73d2d064719e9"
+    },
+    {
+      "path": "deliverables/experimental/1791201870302/round-1-9-close-health-after.png",
+      "bytes": 830421,
+      "sha256": "43152b88df09f415bdc87781d87c05301c476a2e6b7b67dd684a0182dad23b09"
+    },
+    {
+      "path": "deliverables/experimental/1791201870302/round-1-academy-entry-before.png",
+      "bytes": 1301723,
+      "sha256": "78f7de2eb88ed99c1ebc6543000abaa24d7af2620217457d42106ab91c588aa2"
+    },
+    {
+      "path": "deliverables/experimental/1791201870302/round-1-academy-map.png",
+      "bytes": 2006093,
+      "sha256": "925e8311638f9aad327fd6c2573cd318cd030c4e023999346e711c065978deac"
+    },
+    {
+      "path": "deliverables/experimental/1791201870302/round-1-before.png",
+      "bytes": 824155,
+      "sha256": "e39d31c1978f824dbe964bbca7c00e92ef8d9a59d1f3a37fd9b63cac69b858e8"
+    },
+    {
+      "path": "deliverables/experimental/1791201870302/round-1-feed-after.png",
+      "bytes": 853240,
+      "sha256": "b8f096c3da8a1e88d34e716de0ec382a4a68dbcf3871bfe5706bdb99377950b8"
+    },
+    {
+      "path": "deliverables/experimental/1791201870302/round-1-feed-before.png",
+      "bytes": 831123,
+      "sha256": "104c3bc7f40f31ccf7a4c66472c26448876894aeb2c4585c9f222baeb7893512"
+    },
+    {
+      "path": "deliverables/experimental/1791201870302/round-1-feed-health.png",
+      "bytes": 817279,
+      "sha256": "6bc35421b8fde8a688c6aacac2ba094754f4a9aa11576b2ad3ce31b964a66cf1"
+    },
+    {
+      "path": "deliverables/experimental/1791201870302/round-1-initial-home.png",
+      "bytes": 848940,
+      "sha256": "4fb8b9416fb5f1e860ccb40defd803407a40f201ed1fe75b36a92ccd7d0f2e16"
+    },
+    {
+      "path": "deliverables/experimental/1791201870302/round-1-ready.png",
+      "bytes": 823262,
+      "sha256": "4526f25815a918ccadd4821742031a61d9114e7327b9897312f9b82b18296133"
+    },
+    {
+      "path": "deliverables/experimental/1791201870302/round-1-STOP-last-frame.png",
+      "bytes": 1647085,
+      "sha256": "763ef99a306d790f851b326fd5d05b64ecdbe10188d55e4b1b2eefa079ef4e54"
+    },
+    {
+      "path": "deliverables/experimental/1791201870302/verdict.json",
+      "bytes": 321,
+      "sha256": "f240b0072b8a9c20b9560d68de92e40efc57644905641b05fd2092f5c09c97ce"
+    },
+    {
+      "path": "deliverables/experimental/1791202276391/events.jsonl",
+      "bytes": 16271,
+      "sha256": "7ea160b8ba2879f919af127c1533a109926ddd19bdcd6097f9a25833e325dff0"
+    },
+    {
+      "path": "deliverables/experimental/1791202276391/round-1-0-open-health-before.png",
+      "bytes": 849304,
+      "sha256": "6b019c16ed8c20484fd090f232b432097f21d548a6aaaa494332981a36290c3b"
+    },
+    {
+      "path": "deliverables/experimental/1791202276391/round-1-1-open-health-after.png",
+      "bytes": 823696,
+      "sha256": "3b65fa18e7496cf43d9f47577ded87c9e851efdc991e55aac607dda062a1366c"
+    },
+    {
+      "path": "deliverables/experimental/1791202276391/round-1-10-select-fixed-course-before.png",
+      "bytes": 1141205,
+      "sha256": "eb1324f4b628e1fb1316e5254d32b634b1ba0f5355c0cdf0932dadb943325e7f"
+    },
+    {
+      "path": "deliverables/experimental/1791202276391/round-1-11-select-fixed-course-after.png",
+      "bytes": 1141205,
+      "sha256": "eb1324f4b628e1fb1316e5254d32b634b1ba0f5355c0cdf0932dadb943325e7f"
+    },
+    {
+      "path": "deliverables/experimental/1791202276391/round-1-2-close-health-before.png",
+      "bytes": 823354,
+      "sha256": "cd095453b70251d3c08a573db7e726d5e278bd3b79196cfae9bf2abc1d2785bc"
+    },
+    {
+      "path": "deliverables/experimental/1791202276391/round-1-3-close-health-after.png",
+      "bytes": 848062,
+      "sha256": "a0c1f973767397f1774d4474ac5761b0568ab3b1f9102c8adc6b2b0c49be5396"
+    },
+    {
+      "path": "deliverables/experimental/1791202276391/round-1-4-open-health-before.png",
+      "bytes": 848756,
+      "sha256": "5b45f0f18dcb9cb11a17fcd48772f3522b00e12200c9f9bd0d16f71be27b5857"
+    },
+    {
+      "path": "deliverables/experimental/1791202276391/round-1-5-open-health-after.png",
+      "bytes": 822082,
+      "sha256": "05b36b3f3abcfd083c850357cf0eebf6ac4d1ac4c465022157c39eed709b1acf"
+    },
+    {
+      "path": "deliverables/experimental/1791202276391/round-1-6-close-health-before.png",
+      "bytes": 822949,
+      "sha256": "7e95c2c40fd4d91ff599c99ea833aeabd7df55390f23d07038d3acfd5baebef1"
+    },
+    {
+      "path": "deliverables/experimental/1791202276391/round-1-7-close-health-after.png",
+      "bytes": 848394,
+      "sha256": "a6728d3d1f5cd713e02f17fbe5847415f1369f69bc8e1c08fd8b048cfeda6884"
+    },
+    {
+      "path": "deliverables/experimental/1791202276391/round-1-8-outdoor-before.png",
+      "bytes": 848930,
+      "sha256": "90aa2a49b92fa03231048c53b90d7496dce768724a883e9db91c7f981d95e0c9"
+    },
+    {
+      "path": "deliverables/experimental/1791202276391/round-1-9-outdoor-after.png",
+      "bytes": 1302922,
+      "sha256": "186d96a99760872d85fb42d2263f06af74982cd9706a9469a25934574581dbf1"
+    },
+    {
+      "path": "deliverables/experimental/1791202276391/round-1-academy-course-panel-already-open.png",
+      "bytes": 1141205,
+      "sha256": "eb1324f4b628e1fb1316e5254d32b634b1ba0f5355c0cdf0932dadb943325e7f"
+    },
+    {
+      "path": "deliverables/experimental/1791202276391/round-1-academy-entry-before.png",
+      "bytes": 1305312,
+      "sha256": "55ec5d4ad134bd607b01917be6cacdf94354801ac020b269501702e0c233c1cc"
+    },
+    {
+      "path": "deliverables/experimental/1791202276391/round-1-academy-map.png",
+      "bytes": 2000393,
+      "sha256": "ecdf88a8cf85e6d436eada351f0dc38a4a7b7f37aa78c5c28df4db2420415fdc"
+    },
+    {
+      "path": "deliverables/experimental/1791202276391/round-1-before.png",
+      "bytes": 824305,
+      "sha256": "02f5cc45bfb34aa734d6ab7ac96425b287bf1cc493517f023a67b9ea77af98b7"
+    },
+    {
+      "path": "deliverables/experimental/1791202276391/round-1-course-before-start.png",
+      "bytes": 1141205,
+      "sha256": "eb1324f4b628e1fb1316e5254d32b634b1ba0f5355c0cdf0932dadb943325e7f"
+    },
+    {
+      "path": "deliverables/experimental/1791202276391/round-1-course-start.png",
+      "bytes": 1327244,
+      "sha256": "7336ea67ef1764c248018086fa16a04e309e8021e30454a493622d4ae9440df0"
+    },
+    {
+      "path": "deliverables/experimental/1791202276391/round-1-initial-home.png",
+      "bytes": 848310,
+      "sha256": "799ee09aa9f44d6c173dcf6a30d80e17bd6bfc5ca8ebf0090993f908ff58e119"
+    },
+    {
+      "path": "deliverables/experimental/1791202276391/round-1-ready.png",
+      "bytes": 823554,
+      "sha256": "69bfbc3aad5bc2902c04da93b34bdad6c410e5a74223883bc19ee0ede9b72c84"
+    },
+    {
+      "path": "deliverables/experimental/1791202276391/round-1-STOP-last-frame.png",
+      "bytes": 918367,
+      "sha256": "450f4e225b1556cd0c2d7f102d3fcc53d045e3166c69c8650a4ef28ca5f7f91a"
+    },
+    {
+      "path": "deliverables/experimental/1791202276391/verdict.json",
+      "bytes": 301,
+      "sha256": "5d6d35316ad6f7b78d99ddfcd1827da6458a15309561ba8bd0a00fe5eac67ee6"
+    },
+    {
+      "path": "deliverables/experimental/1791203090192/events.jsonl",
+      "bytes": 10771,
+      "sha256": "ef14641871ef80f0937009f805560c2b05fba9e575498e79c04111285a1a882d"
+    },
+    {
+      "path": "deliverables/experimental/1791203090192/round-1-0-open-health-before.png",
+      "bytes": 848871,
+      "sha256": "5c06c8613be46f98addda038c6e40b7e2a29dd0878204a9be8730cf73884a80a"
+    },
+    {
+      "path": "deliverables/experimental/1791203090192/round-1-1-open-health-after.png",
+      "bytes": 823112,
+      "sha256": "9668c5f762cb2fe31fad668324662a4e3e23771dfc95850d81ddae073c5ce8b6"
+    },
+    {
+      "path": "deliverables/experimental/1791203090192/round-1-2-close-health-before.png",
+      "bytes": 824938,
+      "sha256": "8ed2df1dedb75ed92995dd987e647964ba958cbd29c4c6916f3040dad3a4b582"
+    },
+    {
+      "path": "deliverables/experimental/1791203090192/round-1-3-close-health-after.png",
+      "bytes": 848575,
+      "sha256": "4b8c889e772981a074d76fc32c937450d547876d406e1edd7edcaee8ca8784b2"
+    },
+    {
+      "path": "deliverables/experimental/1791203090192/round-1-4-open-health-before.png",
+      "bytes": 848363,
+      "sha256": "01cd5b0d2a2b76f26cf37c86bd0653aeb1ae4ce61d38a2610188e2954ba091b5"
+    },
+    {
+      "path": "deliverables/experimental/1791203090192/round-1-5-open-health-after.png",
+      "bytes": 823529,
+      "sha256": "d977c31b36d7c37ddd6fdaa42e8966aec21cfb6d440fb0dfbf5a9a64de0d2784"
+    },
+    {
+      "path": "deliverables/experimental/1791203090192/round-1-6-close-health-before.png",
+      "bytes": 823393,
+      "sha256": "ecbe38f6ba1c4b4154bacfa58d341b918aac53fe26adcfd895e717d05fba2df6"
+    },
+    {
+      "path": "deliverables/experimental/1791203090192/round-1-7-close-health-after.png",
+      "bytes": 848278,
+      "sha256": "48f6293c60bafe9bd4eeec9d574238ca69172a6e8f19ae1480160c2caeaebf26"
+    },
+    {
+      "path": "deliverables/experimental/1791203090192/round-1-8-outdoor-before.png",
+      "bytes": 848125,
+      "sha256": "9b2865aba5889597d075b04730d70deb1c32e37830c538d8c2b55507fffaa5eb"
+    },
+    {
+      "path": "deliverables/experimental/1791203090192/round-1-9-outdoor-after.png",
+      "bytes": 396805,
+      "sha256": "cedeab69e843f154acdf1b55e3a09cddfca2ef2ccb464f0f68b94f8d6f9d4587"
+    },
+    {
+      "path": "deliverables/experimental/1791203090192/round-1-before.png",
+      "bytes": 823220,
+      "sha256": "c4d9ce680ed0f267ab343fc76ce56c01ead5d18b5759da74055ba9f287454c95"
+    },
+    {
+      "path": "deliverables/experimental/1791203090192/round-1-initial-home.png",
+      "bytes": 847341,
+      "sha256": "772e02c9a3e300dd68dafa84c215d53e554a148701093c3a9d10067562b7092a"
+    },
+    {
+      "path": "deliverables/experimental/1791203090192/round-1-ready.png",
+      "bytes": 824141,
+      "sha256": "1c8490e2bbcecada8c3b4c57fb7f5a834926424e7d99b7833f5e9115032e925a"
+    },
+    {
+      "path": "deliverables/experimental/1791203090192/round-1-STOP-last-frame.png",
+      "bytes": 396805,
+      "sha256": "cedeab69e843f154acdf1b55e3a09cddfca2ef2ccb464f0f68b94f8d6f9d4587"
+    },
+    {
+      "path": "deliverables/experimental/1791203090192/verdict.json",
+      "bytes": 303,
+      "sha256": "756bc421e77ec6f37c975b6ff02394d8dd219bb02eca7e5cabfe38fc948d6ffd"
+    },
+    {
+      "path": "deliverables/experimental/1791203218382/events.jsonl",
+      "bytes": 2436,
+      "sha256": "252487f8c56dc8c570e2b81e35380ea77adf1785a788d57018b08f08442941c2"
+    },
+    {
+      "path": "deliverables/experimental/1791203218382/round-0-0-previous-continue-before.png",
+      "bytes": 396805,
+      "sha256": "cedeab69e843f154acdf1b55e3a09cddfca2ef2ccb464f0f68b94f8d6f9d4587"
+    },
+    {
+      "path": "deliverables/experimental/1791203218382/round-0-1-previous-continue-after.png",
+      "bytes": 1569529,
+      "sha256": "66a697005a083e8e8f4c7f8d1513bea7af8cb9f5db2a5c9909426d0a399fe2a0"
+    },
+    {
+      "path": "deliverables/experimental/1791203218382/round-0-previous-result.png",
+      "bytes": 396805,
+      "sha256": "cedeab69e843f154acdf1b55e3a09cddfca2ef2ccb464f0f68b94f8d6f9d4587"
+    },
+    {
+      "path": "deliverables/experimental/1791203218382/round-0-STOP-last-frame.png",
+      "bytes": 1517157,
+      "sha256": "86514c6fd63c67db08e48d78da3d141b907bc53dcf5daed5e66384b1354798d5"
+    },
+    {
+      "path": "deliverables/experimental/1791203218382/verdict.json",
+      "bytes": 323,
+      "sha256": "248617bf05b102f2ddfd8a36156e9f53d5a9fc76eb74b0249248bbc2519d85c1"
+    },
+    {
+      "path": "deliverables/experimental/1791203355328/events.jsonl",
+      "bytes": 243291,
+      "sha256": "ed3b8d5c01bf92acea666f3611ce0e3b9dd86b486dd6035ef61713c7079a7765"
+    },
+    {
+      "path": "deliverables/experimental/1791203355328/round-0-0-resume-close-course-before.png",
+      "bytes": 1141354,
+      "sha256": "b1b062d2985396af5621d22d253ad09a04fdb23343f955d48a5d95efad124000"
+    },
+    {
+      "path": "deliverables/experimental/1791203355328/round-0-1-resume-close-course-after.png",
+      "bytes": 1647002,
+      "sha256": "441b7d137af070eaa484185bb768d42b1f81ded3b65b456241ccacd05c7103a9"
+    },
+    {
+      "path": "deliverables/experimental/1791203355328/round-0-2-resume-leave-academy-before.png",
+      "bytes": 1647002,
+      "sha256": "441b7d137af070eaa484185bb768d42b1f81ded3b65b456241ccacd05c7103a9"
+    },
+    {
+      "path": "deliverables/experimental/1791203355328/round-0-3-resume-leave-academy-after.png",
+      "bytes": 1803670,
+      "sha256": "0f241075a05fc1cbf0e97ff2678642440ed376951e20ec2e3a27c9b9fe1a8ba6"
+    },
+    {
+      "path": "deliverables/experimental/1791203355328/round-0-4-resume-return-home-before.png",
+      "bytes": 1811209,
+      "sha256": "e8a2e3941a7b464643318fdd59042489fd9f25a1425bf0ae62d98b901adfd9c9"
+    },
+    {
+      "path": "deliverables/experimental/1791203355328/round-0-5-resume-return-home-after.png",
+      "bytes": 848132,
+      "sha256": "97d1f13f2e5909318dbef4216d09dba63b99ab95ba85f7e5464542c46a8d1609"
+    },
+    {
+      "path": "deliverables/experimental/1791203355328/round-1-10-open-health-before.png",
+      "bytes": 848506,
+      "sha256": "ed29611b77bc90e06e4c7eabeac15c4b44a470183385c4dda6af2436b5ed4da1"
+    },
+    {
+      "path": "deliverables/experimental/1791203355328/round-1-11-open-health-after.png",
+      "bytes": 823261,
+      "sha256": "16d85127f8f7cb91d217bef56d07e62847d974b53e02b02774c64f23b6668794"
+    },
+    {
+      "path": "deliverables/experimental/1791203355328/round-1-12-close-health-before.png",
+      "bytes": 823049,
+      "sha256": "4e2f5948f44b9a8f6ade26ba4a699afb8ad4987c5dc423eda981f03f84e46270"
+    },
+    {
+      "path": "deliverables/experimental/1791203355328/round-1-13-close-health-after.png",
+      "bytes": 848108,
+      "sha256": "1f8ac117d13150a17b671eef7f37b190fbccd917cde5b5534cce287621b24957"
+    },
+    {
+      "path": "deliverables/experimental/1791203355328/round-1-14-outdoor-before.png",
+      "bytes": 848944,
+      "sha256": "3b2f49fadd2050155fa16bd336797eeb1fe229627b55cbebbee068a05994216a"
+    },
+    {
+      "path": "deliverables/experimental/1791203355328/round-1-15-outdoor-after.png",
+      "bytes": 1302922,
+      "sha256": "186d96a99760872d85fb42d2263f06af74982cd9706a9469a25934574581dbf1"
+    },
+    {
+      "path": "deliverables/experimental/1791203355328/round-1-16-select-fixed-course-before.png",
+      "bytes": 1141354,
+      "sha256": "b1b062d2985396af5621d22d253ad09a04fdb23343f955d48a5d95efad124000"
+    },
+    {
+      "path": "deliverables/experimental/1791203355328/round-1-17-select-fixed-course-after.png",
+      "bytes": 1141354,
+      "sha256": "b1b062d2985396af5621d22d253ad09a04fdb23343f955d48a5d95efad124000"
+    },
+    {
+      "path": "deliverables/experimental/1791203355328/round-1-18-result-continue-before.png",
+      "bytes": 397049,
+      "sha256": "e7cf208bf20696a59b10aebc0f1a9560e21ad59e81b531b81e4bf2f735efc1a0"
+    },
+    {
+      "path": "deliverables/experimental/1791203355328/round-1-6-open-health-before.png",
+      "bytes": 848543,
+      "sha256": "021430852ce92e7e921e4cbd9a9eab232b65ef3362b7743a67f0aa3f8fc173f0"
+    },
+    {
+      "path": "deliverables/experimental/1791203355328/round-1-7-open-health-after.png",
+      "bytes": 823083,
+      "sha256": "9fbe0c1c9cf67afff0c7833f0c4ff8fdcd33ecf89df99f5baeb6c16d687ea860"
+    },
+    {
+      "path": "deliverables/experimental/1791203355328/round-1-8-close-health-before.png",
+      "bytes": 823090,
+      "sha256": "9e350f3350e599fbd8160468ba4f702d69c26de5cfb502f47d711dc7be78e26c"
+    },
+    {
+      "path": "deliverables/experimental/1791203355328/round-1-9-close-health-after.png",
+      "bytes": 848597,
+      "sha256": "4c7475577a90b2b54e063cc2d414355a0a8cbd7277b46424535d0ea85cc73802"
+    },
+    {
+      "path": "deliverables/experimental/1791203355328/round-1-academy-course-panel-already-open.png",
+      "bytes": 1141354,
+      "sha256": "b1b062d2985396af5621d22d253ad09a04fdb23343f955d48a5d95efad124000"
+    },
+    {
+      "path": "deliverables/experimental/1791203355328/round-1-academy-entry-before.png",
+      "bytes": 1305312,
+      "sha256": "55ec5d4ad134bd607b01917be6cacdf94354801ac020b269501702e0c233c1cc"
+    },
+    {
+      "path": "deliverables/experimental/1791203355328/round-1-academy-map.png",
+      "bytes": 2003500,
+      "sha256": "dca3b2afec23957863d845c4633e467a35d454b58c439e34de1116bc45c7c647"
+    },
+    {
+      "path": "deliverables/experimental/1791203355328/round-1-after-high-five.png",
+      "bytes": 924091,
+      "sha256": "aa19b75750f8363c683425e20082ecb90f7859e29288548ceb9ec36b529d52cc"
+    },
+    {
+      "path": "deliverables/experimental/1791203355328/round-1-before-high-five.png",
+      "bytes": 928227,
+      "sha256": "38cfd373d7c2433e3b0b8fa5886907f6a88a67b8d89cff22e9424b4c943024ce"
+    },
+    {
+      "path": "deliverables/experimental/1791203355328/round-1-before.png",
+      "bytes": 823465,
+      "sha256": "7ce33169f703f39e5b4dd1bf6916d15cbcbbb6dd9dc7bf03f90baa282be1fa83"
+    },
+    {
+      "path": "deliverables/experimental/1791203355328/round-1-course-before-start.png",
+      "bytes": 1141354,
+      "sha256": "b1b062d2985396af5621d22d253ad09a04fdb23343f955d48a5d95efad124000"
+    },
+    {
+      "path": "deliverables/experimental/1791203355328/round-1-course-start.png",
+      "bytes": 918698,
+      "sha256": "648e1bddceca93dc8e1b8f2b9c4009b08fb76e760078b6dcee3698f6bd3dc07e"
+    },
+    {
+      "path": "deliverables/experimental/1791203355328/round-1-initial-home.png",
+      "bytes": 848155,
+      "sha256": "669a0f76bf233fb110be497bb023fd2b1e9a3c0049f9858566b1e98e18705652"
+    },
+    {
+      "path": "deliverables/experimental/1791203355328/round-1-ready.png",
+      "bytes": 823024,
+      "sha256": "8d6770051de8f48aaae8de01110f7985fdb9eea04c038e8c1228dd97d7b0ec55"
+    },
+    {
+      "path": "deliverables/experimental/1791203355328/round-1-result.png",
+      "bytes": 397049,
+      "sha256": "e7cf208bf20696a59b10aebc0f1a9560e21ad59e81b531b81e4bf2f735efc1a0"
+    },
+    {
+      "path": "deliverables/experimental/1791203355328/round-1-STOP-last-frame.png",
+      "bytes": 678983,
+      "sha256": "aefe0b2d503d9bf603499b5902a3020805780f510dc7f520d808818466050ec9"
+    },
+    {
+      "path": "deliverables/experimental/1791203355328/verdict.json",
+      "bytes": 318,
+      "sha256": "947dd359520ae5e81a0a3d92dcc9cc21722dc0ae8008bc5db4de993acdd6b4e1"
+    },
+    {
+      "path": "deliverables/experimental/1791204208048/events.jsonl",
+      "bytes": 42088,
+      "sha256": "d5e7c1f02a5db92c4f8fc4ffaf6a97521d2f13d9945994231fb9dedc6fd91ec0"
+    },
+    {
+      "path": "deliverables/experimental/1791204208048/round-1-0-resume-close-course-before.png",
+      "bytes": 1141568,
+      "sha256": "2dd48663bd45f5780a92d8017033ccb1f42b642492d50f5f50d3982064119905"
+    },
+    {
+      "path": "deliverables/experimental/1791204208048/round-1-1-resume-close-course-after.png",
+      "bytes": 1646811,
+      "sha256": "5e23ee904b87572a55da60e0ef565688c08565985dcc3b30b5c2bc2b269f5be5"
+    },
+    {
+      "path": "deliverables/experimental/1791204208048/round-1-2-resume-leave-academy-before.png",
+      "bytes": 1646811,
+      "sha256": "5e23ee904b87572a55da60e0ef565688c08565985dcc3b30b5c2bc2b269f5be5"
+    },
+    {
+      "path": "deliverables/experimental/1791204208048/round-1-3-resume-leave-academy-after.png",
+      "bytes": 1302242,
+      "sha256": "9f3e5b3c13313b772c115c5379f7333aa716f7929b8e7776dce1c1ba61a2a0ee"
+    },
+    {
+      "path": "deliverables/experimental/1791204208048/round-1-4-resume-return-home-before.png",
+      "bytes": 1306329,
+      "sha256": "56fff7cbd0c3e3cd3656c02d6ece03732154195f9d6a42136a8a84f42bed607d"
+    },
+    {
+      "path": "deliverables/experimental/1791204208048/round-1-5-resume-return-home-after.png",
+      "bytes": 848068,
+      "sha256": "1ffc671c02bcbcf0fe27b429d398906b563bfe52e8fc1b89cd98f8f7e5d4e71d"
+    },
+    {
+      "path": "deliverables/experimental/1791204208048/round-1-6-open-health-before.png",
+      "bytes": 847276,
+      "sha256": "b7ddc730290e699e0aba54490f4a3331a0ed01aab94f7e0e97fc123f5c16c63c"
+    },
+    {
+      "path": "deliverables/experimental/1791204208048/round-1-7-open-health-after.png",
+      "bytes": 824912,
+      "sha256": "0445b8553ee93db8a26bf4c73f097bb7b35dc886c4e4538288f9b5fee8c3886c"
+    },
+    {
+      "path": "deliverables/experimental/1791204208048/round-1-8-close-health-before.png",
+      "bytes": 823163,
+      "sha256": "a7746a6c6116a4403556bd501aaf9944530e128c32f437e5832b7e1e2ab1d0a5"
+    },
+    {
+      "path": "deliverables/experimental/1791204208048/round-1-9-close-health-after.png",
+      "bytes": 848356,
+      "sha256": "2ae298132ec5a99bc844f87c8692500d1afdc01a08499ef9702d4ed5ff58086c"
+    },
+    {
+      "path": "deliverables/experimental/1791204208048/round-1-after-resume.png",
+      "bytes": 823696,
+      "sha256": "3412fee5a02630734b14076565d875baf961f1d67e08a91ba14ae1ccef77526c"
+    },
+    {
+      "path": "deliverables/experimental/1791204208048/round-1-resume-upgrade-after.png",
+      "bytes": 1141568,
+      "sha256": "2dd48663bd45f5780a92d8017033ccb1f42b642492d50f5f50d3982064119905"
+    },
+    {
+      "path": "deliverables/experimental/1791204208048/round-2-10-open-health-before.png",
+      "bytes": 847790,
+      "sha256": "d47f69f200ffe17fc375491ab20ada75b28928a20834f66cc7ab5562adf1d4f2"
+    },
+    {
+      "path": "deliverables/experimental/1791204208048/round-2-11-open-health-after.png",
+      "bytes": 823476,
+      "sha256": "682a6993becd61e54a23e7584dffb8a4a4575a2d7ce684bd7b4c7fac34912392"
+    },
+    {
+      "path": "deliverables/experimental/1791204208048/round-2-12-close-health-before.png",
+      "bytes": 823245,
+      "sha256": "f1fbb10005d6b9840f215755b7fbe731013714d19fd074c134160001b1e8dde1"
+    },
+    {
+      "path": "deliverables/experimental/1791204208048/round-2-13-close-health-after.png",
+      "bytes": 848154,
+      "sha256": "ea1458f89fbcec6a614fa9eaaf6606e585dec8617b4a255c299ee66e571984f9"
+    },
+    {
+      "path": "deliverables/experimental/1791204208048/round-2-14-enter-food-before.png",
+      "bytes": 848689,
+      "sha256": "6f9e56f1db4861919deaf1c39b113ede6b4286cf49423ad90e9b1292add55325"
+    },
+    {
+      "path": "deliverables/experimental/1791204208048/round-2-15-enter-food-after.png",
+      "bytes": 830500,
+      "sha256": "f9adc04f45e3ffafe967b147d8dda3e9c553aca91b8f4ea37e32c3f7be9ee655"
+    },
+    {
+      "path": "deliverables/experimental/1791204208048/round-2-16-open-health-before.png",
+      "bytes": 826053,
+      "sha256": "aa9ef9cb74d973f65589dc18496cc574a2e4a2fffcaac95856e19d7a266e1fd7"
+    },
+    {
+      "path": "deliverables/experimental/1791204208048/round-2-17-open-health-after.png",
+      "bytes": 817821,
+      "sha256": "9f28f71c91513a2ad8f4832c7cc8759a667e20bc88c424eb11fc27ae8ff96f52"
+    },
+    {
+      "path": "deliverables/experimental/1791204208048/round-2-18-close-health-before.png",
+      "bytes": 813020,
+      "sha256": "e6b5d5ac85239c9702c6a58be33877dca251577ae0384462d84fc6f6c7aa6aeb"
+    },
+    {
+      "path": "deliverables/experimental/1791204208048/round-2-19-close-health-after.png",
+      "bytes": 828484,
+      "sha256": "0f90aa78dc9a641ce93594fe52c2e3812296543265f5da2dbd5657ddc6c4289d"
+    },
+    {
+      "path": "deliverables/experimental/1791204208048/round-2-20-leave-food-before.png",
+      "bytes": 830976,
+      "sha256": "fc99e34922de8a898d9065a12431911753b684799b30a7e2fed1bc3f21ff930c"
+    },
+    {
+      "path": "deliverables/experimental/1791204208048/round-2-21-leave-food-after.png",
+      "bytes": 848554,
+      "sha256": "e1af3d6d112fa1a5c911fc8426fcb922de5dccf15699e7ea70cbce7627967b2e"
+    },
+    {
+      "path": "deliverables/experimental/1791204208048/round-2-22-enter-bath-before.png",
+      "bytes": 846626,
+      "sha256": "e0b782cdaa8ce807456befc137ebfba380f2622f467b8ee59bcf71c29bd109a2"
+    },
+    {
+      "path": "deliverables/experimental/1791204208048/round-2-before.png",
+      "bytes": 822828,
+      "sha256": "2f0eabc6f5722d7ef9df34ec949d068bac45ec9fdeba884b4d1cd2c5d8996dae"
+    },
+    {
+      "path": "deliverables/experimental/1791204208048/round-2-feed-after.png",
+      "bytes": 856298,
+      "sha256": "babb54adc36d234d249d6a346318ef9df9113630a268fdbbd997cdd009aa53b6"
+    },
+    {
+      "path": "deliverables/experimental/1791204208048/round-2-feed-before.png",
+      "bytes": 828880,
+      "sha256": "9105914c0c515a3507c38330d98f8b322ce8dacbbfd43586e06dd87b3555c54b"
+    },
+    {
+      "path": "deliverables/experimental/1791204208048/round-2-feed-health.png",
+      "bytes": 813063,
+      "sha256": "c34e3e40301ff5b3d9898226e1e221ac2743296de161550816d71182d44ded37"
+    },
+    {
+      "path": "deliverables/experimental/1791204208048/round-2-initial-home.png",
+      "bytes": 848006,
+      "sha256": "3cd52fdf81b02864808f04d6e28e18ea90d894c15f83ab9a0cfabe4dc769fcc0"
+    },
+    {
+      "path": "deliverables/experimental/1791204208048/round-2-STOP-last-frame.png",
+      "bytes": 845085,
+      "sha256": "acaba94e237bbfc5804707a8a92b93519479ad59b8752d58e6199897d83c9d7c"
+    },
+    {
+      "path": "deliverables/experimental/1791204208048/verdict.json",
+      "bytes": 314,
+      "sha256": "87e27e4bf15d06ac15a2c5d63de9892cbf0d1c2d8e766ff09ff84cc0cb46c6f9"
+    },
+    {
+      "path": "deliverables/experimental/1791204552957/events.jsonl",
+      "bytes": 226222,
+      "sha256": "fca7ea298940b615c3dc24902699d31717886239f36c0384054992df92bc767b"
+    },
+    {
+      "path": "deliverables/experimental/1791204552957/round-1-0-open-health-before.png",
+      "bytes": 848852,
+      "sha256": "a2ec399c8a0cdff1d5a7c136127b4dc4aa6915f612848e695d5a1edb414c9475"
+    },
+    {
+      "path": "deliverables/experimental/1791204552957/round-1-1-open-health-after.png",
+      "bytes": 823721,
+      "sha256": "ea8aee7120142f1a85073ef33a72ab487b57194c1634035b9d925c18de83684c"
+    },
+    {
+      "path": "deliverables/experimental/1791204552957/round-1-2-close-health-before.png",
+      "bytes": 823613,
+      "sha256": "28f9a3e07d26303b03d881b9c6a09196e4704ae9fae1f66c7f6a897c310c4e64"
+    },
+    {
+      "path": "deliverables/experimental/1791204552957/round-1-3-close-health-after.png",
+      "bytes": 848007,
+      "sha256": "d0f8f172ebe212821953023df9f974dceaf2ca163c65f5331e97615d2f8ed378"
+    },
+    {
+      "path": "deliverables/experimental/1791204552957/round-1-after-resume.png",
+      "bytes": 823613,
+      "sha256": "28f9a3e07d26303b03d881b9c6a09196e4704ae9fae1f66c7f6a897c310c4e64"
+    },
+    {
+      "path": "deliverables/experimental/1791204552957/round-2-10-close-health-before.png",
+      "bytes": 823180,
+      "sha256": "faac1f9fd8fae19bae26d4c658dacf2e16aad977b7c6d084421ae8a9b4b47344"
+    },
+    {
+      "path": "deliverables/experimental/1791204552957/round-2-11-close-health-after.png",
+      "bytes": 842556,
+      "sha256": "b165d4017400ba81a8d9659c4ba269ace522bb19502ee4dd3a0cb0484afdd533"
+    },
+    {
+      "path": "deliverables/experimental/1791204552957/round-2-12-outdoor-before.png",
+      "bytes": 838860,
+      "sha256": "2dcb53c633c1f13738762da35f87201149318f3837ac3164d2813acad88e5f9b"
+    },
+    {
+      "path": "deliverables/experimental/1791204552957/round-2-13-outdoor-after.png",
+      "bytes": 1304081,
+      "sha256": "34abe1c050d1cd0b8798d101342ef9e161a41c2b4a406b3082fd2f5a88f56eff"
+    },
+    {
+      "path": "deliverables/experimental/1791204552957/round-2-14-select-fixed-course-before.png",
+      "bytes": 1141204,
+      "sha256": "4f65f08134d0b80587e00c20a41df287c49fa5fdcda170543fc5db9e0c5f4cc1"
+    },
+    {
+      "path": "deliverables/experimental/1791204552957/round-2-15-select-fixed-course-after.png",
+      "bytes": 1141204,
+      "sha256": "4f65f08134d0b80587e00c20a41df287c49fa5fdcda170543fc5db9e0c5f4cc1"
+    },
+    {
+      "path": "deliverables/experimental/1791204552957/round-2-4-open-health-before.png",
+      "bytes": 844117,
+      "sha256": "0e6f2afd8bc60ac428f2854a8f8819873f387e6cbd0e0fb9bd0e188ea1e7a01f"
+    },
+    {
+      "path": "deliverables/experimental/1791204552957/round-2-5-open-health-after.png",
+      "bytes": 812542,
+      "sha256": "0dd53d5f3f01856c08067bcb3d8e0f1e96d31099a252da16953ddb429ad57741"
+    },
+    {
+      "path": "deliverables/experimental/1791204552957/round-2-6-close-health-before.png",
+      "bytes": 822913,
+      "sha256": "1381df1149bf83e37e4e0fd05cb5abd12052bf3e072abd9c9aa1b7a10024be7d"
+    },
+    {
+      "path": "deliverables/experimental/1791204552957/round-2-7-close-health-after.png",
+      "bytes": 839223,
+      "sha256": "0ecfc0b5fae40bed6db077ecd7f2d5a3323f195fdff2acf77e725dfac3768e6c"
+    },
+    {
+      "path": "deliverables/experimental/1791204552957/round-2-8-open-health-before.png",
+      "bytes": 838746,
+      "sha256": "e21558ed44cd2c6f27bee14f3180f3a54d7538c93c0f8f052999236ac2dd3397"
+    },
+    {
+      "path": "deliverables/experimental/1791204552957/round-2-9-open-health-after.png",
+      "bytes": 823143,
+      "sha256": "a662c0cf22e7986996ecc5564d564020e6fe1cd3e9bed57cc315bbf7c7391c48"
+    },
+    {
+      "path": "deliverables/experimental/1791204552957/round-2-academy-course-panel-already-open.png",
+      "bytes": 1141204,
+      "sha256": "4f65f08134d0b80587e00c20a41df287c49fa5fdcda170543fc5db9e0c5f4cc1"
+    },
+    {
+      "path": "deliverables/experimental/1791204552957/round-2-academy-entry-before.png",
+      "bytes": 1304765,
+      "sha256": "91427d80c56c8102d79a0a3d739a7bce74befbfd62e1311b17caf56699bb3ab0"
+    },
+    {
+      "path": "deliverables/experimental/1791204552957/round-2-academy-map.png",
+      "bytes": 2003605,
+      "sha256": "dd8ff43382f6ea12409fcbd20284c7815d78c0fc1b2962f7460092c0d0517808"
+    },
+    {
+      "path": "deliverables/experimental/1791204552957/round-2-after-high-five.png",
+      "bytes": 924180,
+      "sha256": "6482d8c6e900ae354b4a7ed6aacac18511576d3a81d116bcee020f25228378be"
+    },
+    {
+      "path": "deliverables/experimental/1791204552957/round-2-before-high-five.png",
+      "bytes": 927388,
+      "sha256": "f863a2b2ff34a09a09aaf22d86132b46aea9ca02e9ae9be7fbedadc32449e8fe"
+    },
+    {
+      "path": "deliverables/experimental/1791204552957/round-2-before.png",
+      "bytes": 815464,
+      "sha256": "63c49337105f281564e49d4aeaeea4a1690fb8571dedf6ee78c9ab0765120d47"
+    },
+    {
+      "path": "deliverables/experimental/1791204552957/round-2-course-before-start.png",
+      "bytes": 1141204,
+      "sha256": "4f65f08134d0b80587e00c20a41df287c49fa5fdcda170543fc5db9e0c5f4cc1"
+    },
+    {
+      "path": "deliverables/experimental/1791204552957/round-2-course-start.png",
+      "bytes": 919113,
+      "sha256": "7b7b8475be2617c770e5ff1a8d4d2b3668c3e1553bd3770103641a31a1811981"
+    },
+    {
+      "path": "deliverables/experimental/1791204552957/round-2-initial-home.png",
+      "bytes": 849312,
+      "sha256": "ddbb58b33cdedf5eaf6513d829453be0d8930ce7ecc4e4177e9bb3027e3dce3d"
+    },
+    {
+      "path": "deliverables/experimental/1791204552957/round-2-ready.png",
+      "bytes": 823180,
+      "sha256": "faac1f9fd8fae19bae26d4c658dacf2e16aad977b7c6d084421ae8a9b4b47344"
+    },
+    {
+      "path": "deliverables/experimental/1791204552957/round-2-STOP-last-frame.png",
+      "bytes": 1302614,
+      "sha256": "bff0acf37fb9d34e694cbc5100c9b5029cd0bd8a025131e00be833f7376b0f61"
+    },
+    {
+      "path": "deliverables/experimental/1791204552957/verdict.json",
+      "bytes": 269,
+      "sha256": "74f2bdcfdde00f83ce44ae2a640ebb18e636e34b0c78c44e1e79ba71a70f6c7f"
+    },
+    {
+      "path": "deliverables/experimental/1791205436000/events.jsonl",
+      "bytes": 244649,
+      "sha256": "4ddfa8a707343a461f68929e5c25498bc8969f469f8393f1841380ca8fc660ee"
+    },
+    {
+      "path": "deliverables/experimental/1791205436000/round-2-0-previous-close-course-before.png",
+      "bytes": 1141039,
+      "sha256": "3d36996f60c086abafc980d4bf1c6ca0f3362e4a29780f3cc47fc60a3f87d6d8"
+    },
+    {
+      "path": "deliverables/experimental/1791205436000/round-2-1-previous-close-course-after.png",
+      "bytes": 1646709,
+      "sha256": "3d569d675648e81a2de0009b4e5310eb224984e7abf7f34359e54bf3e110a08b"
+    },
+    {
+      "path": "deliverables/experimental/1791205436000/round-2-2-previous-leave-academy-before.png",
+      "bytes": 1646709,
+      "sha256": "3d569d675648e81a2de0009b4e5310eb224984e7abf7f34359e54bf3e110a08b"
+    },
+    {
+      "path": "deliverables/experimental/1791205436000/round-2-3-previous-leave-academy-after.png",
+      "bytes": 1301723,
+      "sha256": "78f7de2eb88ed99c1ebc6543000abaa24d7af2620217457d42106ab91c588aa2"
+    },
+    {
+      "path": "deliverables/experimental/1791205436000/round-2-4-previous-return-home-before.png",
+      "bytes": 1303030,
+      "sha256": "7853330871cb565ca226c0e8721073b81e26ad2e1d9b4bbd943a71201538f260"
+    },
+    {
+      "path": "deliverables/experimental/1791205436000/round-2-5-previous-return-home-after.png",
+      "bytes": 848779,
+      "sha256": "4bfa67ddc322058646edcbe2250e9f1abe3619168c3182f9205aa1a96f69955c"
+    },
+    {
+      "path": "deliverables/experimental/1791205436000/round-2-6-open-health-before.png",
+      "bytes": 846895,
+      "sha256": "1e094ebac8f4b110de69ffe1e5104a1a4603db7a5f9113bb0c33632cca8726da"
+    },
+    {
+      "path": "deliverables/experimental/1791205436000/round-2-7-open-health-after.png",
+      "bytes": 824075,
+      "sha256": "8fbcc681daffafb829b618f4b489be0119d7f02cea9f3c93a48650f02298a2c5"
+    },
+    {
+      "path": "deliverables/experimental/1791205436000/round-2-8-close-health-before.png",
+      "bytes": 823817,
+      "sha256": "0edeb84b8e1e06258d2a6b953b61d3c62cb06fcfe5a1a64d06334ba22efd755f"
+    },
+    {
+      "path": "deliverables/experimental/1791205436000/round-2-9-close-health-after.png",
+      "bytes": 848005,
+      "sha256": "b94d608cdd71a0b6ed3014d244c545e980d63f7f26edc33cb4cd1e17772bae1a"
+    },
+    {
+      "path": "deliverables/experimental/1791205436000/round-2-after-resume.png",
+      "bytes": 823771,
+      "sha256": "edfe0f604aecff19e440dc83bacf3fae56f4fea17a789056cb3ced116335e88f"
+    },
+    {
+      "path": "deliverables/experimental/1791205436000/round-2-previous-continue-after.png",
+      "bytes": 1971324,
+      "sha256": "48f23b54af0cc19d4e9ba87b92854052be62b060629afa99aea4ce0fc46f561e"
+    },
+    {
+      "path": "deliverables/experimental/1791205436000/round-2-previous-continue-before.png",
+      "bytes": 397618,
+      "sha256": "080883745863ddcbd9575ce6b80fcf628872aa1e397ac019b7473737cfbe87ff"
+    },
+    {
+      "path": "deliverables/experimental/1791205436000/round-2-previous-result.png",
+      "bytes": 397618,
+      "sha256": "080883745863ddcbd9575ce6b80fcf628872aa1e397ac019b7473737cfbe87ff"
+    },
+    {
+      "path": "deliverables/experimental/1791205436000/round-3-10-open-health-before.png",
+      "bytes": 838424,
+      "sha256": "6935e7745f1f61c5f12835345715e4e4dc1fe3ef8609a6e25ba73c2ab257500f"
+    },
+    {
+      "path": "deliverables/experimental/1791205436000/round-3-11-open-health-after.png",
+      "bytes": 819805,
+      "sha256": "f8638ee987cd0b4dc5a528ee01e30173b9b5f5566ee81ef44760395b73365538"
+    },
+    {
+      "path": "deliverables/experimental/1791205436000/round-3-12-close-health-before.png",
+      "bytes": 823997,
+      "sha256": "8471e8a89d74fd64c679047cc15c330cb1b3a67cad9da927aa542d3d5f161ab7"
+    },
+    {
+      "path": "deliverables/experimental/1791205436000/round-3-13-close-health-after.png",
+      "bytes": 848471,
+      "sha256": "3cc0d9aebc6a6f2868ec8fc59f60bded4e76c41569ff94e59682c670681b94ed"
+    },
+    {
+      "path": "deliverables/experimental/1791205436000/round-3-14-open-health-before.png",
+      "bytes": 848129,
+      "sha256": "6fac15fb51bf7f5f4cb0d51d371ae8e2f30f9c6b840b9f6f8dc62533606c22af"
+    },
+    {
+      "path": "deliverables/experimental/1791205436000/round-3-15-open-health-after.png",
+      "bytes": 823814,
+      "sha256": "188c2c0986f23607c050fd209edc454b4a62555f0ce404d5596854cb058af15d"
+    },
+    {
+      "path": "deliverables/experimental/1791205436000/round-3-16-close-health-before.png",
+      "bytes": 823884,
+      "sha256": "b35450b53aa0ea973899cd9ae16c89f949c450ebefc04102ca2a86b47d6696fa"
+    },
+    {
+      "path": "deliverables/experimental/1791205436000/round-3-17-close-health-after.png",
+      "bytes": 848472,
+      "sha256": "0ecb8048c3e8d7c0e0f79c5a716c227e5ce6b1541142ff97220f07989cf09c05"
+    },
+    {
+      "path": "deliverables/experimental/1791205436000/round-3-18-outdoor-before.png",
+      "bytes": 848075,
+      "sha256": "53fd82a399221f1da637a2040ffa7986ee7e98efe6b99f8ba2034ccb0ed23906"
+    },
+    {
+      "path": "deliverables/experimental/1791205436000/round-3-19-outdoor-after.png",
+      "bytes": 1302922,
+      "sha256": "186d96a99760872d85fb42d2263f06af74982cd9706a9469a25934574581dbf1"
+    },
+    {
+      "path": "deliverables/experimental/1791205436000/round-3-20-select-fixed-course-before.png",
+      "bytes": 1141039,
+      "sha256": "3d36996f60c086abafc980d4bf1c6ca0f3362e4a29780f3cc47fc60a3f87d6d8"
+    },
+    {
+      "path": "deliverables/experimental/1791205436000/round-3-21-select-fixed-course-after.png",
+      "bytes": 1141039,
+      "sha256": "3d36996f60c086abafc980d4bf1c6ca0f3362e4a29780f3cc47fc60a3f87d6d8"
+    },
+    {
+      "path": "deliverables/experimental/1791205436000/round-3-22-result-close-course-before.png",
+      "bytes": 1142262,
+      "sha256": "9424b4e1c3f51fc18f897462e9d570d89198179e2280f46e2a001b6701543a44"
+    },
+    {
+      "path": "deliverables/experimental/1791205436000/round-3-23-result-close-course-after.png",
+      "bytes": 1647070,
+      "sha256": "b396190799749408b368ea08bc7a77ca48dd85f70f713eb340535967fdec267b"
+    },
+    {
+      "path": "deliverables/experimental/1791205436000/round-3-24-result-leave-academy-before.png",
+      "bytes": 1647070,
+      "sha256": "b396190799749408b368ea08bc7a77ca48dd85f70f713eb340535967fdec267b"
+    },
+    {
+      "path": "deliverables/experimental/1791205436000/round-3-25-result-leave-academy-after.png",
+      "bytes": 1302546,
+      "sha256": "e9e136f28c3b99a6b6ab6ba8b6823dac2e69ea1076df9a1673c6eac43fa45ef2"
+    },
+    {
+      "path": "deliverables/experimental/1791205436000/round-3-26-result-return-home-before.png",
+      "bytes": 1301888,
+      "sha256": "325c86b6a490ca2b7a3f5e3a3ae68ecd65d78a0426e5681bdcb623f313297173"
+    },
+    {
+      "path": "deliverables/experimental/1791205436000/round-3-27-result-return-home-after.png",
+      "bytes": 862821,
+      "sha256": "1a9b8d5a1b78010523f97cf956718bd4ab8e887fbeee17d32762bb5b32305563"
+    },
+    {
+      "path": "deliverables/experimental/1791205436000/round-3-28-open-health-before.png",
+      "bytes": 862783,
+      "sha256": "e1babd4f7524ad0323dccb53c7e7e293195682277be3a968012743561fe3bdcb"
+    },
+    {
+      "path": "deliverables/experimental/1791205436000/round-3-29-open-health-after.png",
+      "bytes": 837861,
+      "sha256": "d1e6c8a94fe6df87ae5595eb5a66dcf0f81385c93eb6c61bcf9fb6b53819bd76"
+    },
+    {
+      "path": "deliverables/experimental/1791205436000/round-3-30-close-health-before.png",
+      "bytes": 837180,
+      "sha256": "a34dcb44ad28b608e19de465ae30b9840477b64842c42aa17ea06ff2a8c42934"
+    },
+    {
+      "path": "deliverables/experimental/1791205436000/round-3-31-close-health-after.png",
+      "bytes": 861797,
+      "sha256": "5bab69fa4c780eb9598a992437da41c408adc74f7b755548ef74d8fc3ee662bf"
+    },
+    {
+      "path": "deliverables/experimental/1791205436000/round-3-academy-course-panel-already-open.png",
+      "bytes": 1141039,
+      "sha256": "3d36996f60c086abafc980d4bf1c6ca0f3362e4a29780f3cc47fc60a3f87d6d8"
+    },
+    {
+      "path": "deliverables/experimental/1791205436000/round-3-academy-entry-before.png",
+      "bytes": 1305312,
+      "sha256": "55ec5d4ad134bd607b01917be6cacdf94354801ac020b269501702e0c233c1cc"
+    },
+    {
+      "path": "deliverables/experimental/1791205436000/round-3-academy-map.png",
+      "bytes": 1141726,
+      "sha256": "37ab162074010265b8db4294a65215cb4bc4df6b43464f92240181784d75d770"
+    },
+    {
+      "path": "deliverables/experimental/1791205436000/round-3-after-high-five.png",
+      "bytes": 916769,
+      "sha256": "2c3a412ca1ab00f138949c021d47815fc08f1b406bca3a129324cdfe102dc6eb"
+    },
+    {
+      "path": "deliverables/experimental/1791205436000/round-3-after.png",
+      "bytes": 836643,
+      "sha256": "905a945368f6920604055ad9ddfcc79bc24c2da8dfd6350b57b4ddc80f6903b7"
+    },
+    {
+      "path": "deliverables/experimental/1791205436000/round-3-before-high-five.png",
+      "bytes": 930603,
+      "sha256": "0df388c82a1eceb36524d3c0af3af1d6673200613d4527925ccf90e44a25d99d"
+    },
+    {
+      "path": "deliverables/experimental/1791205436000/round-3-before.png",
+      "bytes": 822955,
+      "sha256": "28fd8a1b3c79ab5724e73db783abcc6ecc0925237f5ada3bf57bfb5ad1bd19cd"
+    },
+    {
+      "path": "deliverables/experimental/1791205436000/round-3-course-before-start.png",
+      "bytes": 1141039,
+      "sha256": "3d36996f60c086abafc980d4bf1c6ca0f3362e4a29780f3cc47fc60a3f87d6d8"
+    },
+    {
+      "path": "deliverables/experimental/1791205436000/round-3-course-start.png",
+      "bytes": 919737,
+      "sha256": "66a0708a9a5e2fe044d93cf1f94a8b4c3023b919a986ccf5554c177bb95c66c5"
+    },
+    {
+      "path": "deliverables/experimental/1791205436000/round-3-initial-home.png",
+      "bytes": 841214,
+      "sha256": "46e19ab9c1dbef2af17cdf3faaeee34cc5bfb957f51d5b9c1d705e961ac72bda"
+    },
+    {
+      "path": "deliverables/experimental/1791205436000/round-3-ready.png",
+      "bytes": 823687,
+      "sha256": "8aed0306fe8b6b58ef9cf44fdaa236db3852726412c24127977f629504ce12ab"
+    },
+    {
+      "path": "deliverables/experimental/1791205436000/round-3-result-continue-after.png",
+      "bytes": 1142262,
+      "sha256": "9424b4e1c3f51fc18f897462e9d570d89198179e2280f46e2a001b6701543a44"
+    },
+    {
+      "path": "deliverables/experimental/1791205436000/round-3-result-continue-before.png",
+      "bytes": 396961,
+      "sha256": "0ff9ced74bcb8ee84650e2aa008acf23cf1f6505525971b8ba6f322b81741098"
+    },
+    {
+      "path": "deliverables/experimental/1791205436000/round-3-result.png",
+      "bytes": 396961,
+      "sha256": "0ff9ced74bcb8ee84650e2aa008acf23cf1f6505525971b8ba6f322b81741098"
+    },
+    {
+      "path": "deliverables/experimental/1791205436000/verdict.json",
+      "bytes": 251,
+      "sha256": "19eeb93db8b654f391a8552ba12f52f47acb15c039895948166f7fa1a663e86a"
+    },
+    {
+      "path": "deliverables/experimental/academy-back.png",
+      "bytes": 1647085,
+      "sha256": "763ef99a306d790f851b326fd5d05b64ecdbe10188d55e4b1b2eefa079ef4e54"
+    },
+    {
+      "path": "deliverables/experimental/academy-entry-tap-calibration.log",
+      "bytes": 1347,
+      "sha256": "5213e686dfe761b7adab43790edb65ffbed99818672b56ccc7c2ffd3027cd5d4"
+    },
+    {
+      "path": "deliverables/experimental/academy-stable-recheck.png",
+      "bytes": 1647085,
+      "sha256": "763ef99a306d790f851b326fd5d05b64ecdbe10188d55e4b1b2eefa079ef4e54"
+    },
+    {
+      "path": "deliverables/experimental/bath-back.png",
+      "bytes": 847901,
+      "sha256": "55a8e9f8b1ed6d42a99d2004c8ac9747b335c177e41dc176135a5c91e77e9993"
+    },
+    {
+      "path": "deliverables/experimental/bath-nav.png",
+      "bytes": 840676,
+      "sha256": "aaf18545a84619820058e28fffaea465c66553b145ea66a1d62b4fd2091bc374"
+    },
+    {
+      "path": "deliverables/experimental/capture-rebind-regression.log",
+      "bytes": 89,
+      "sha256": "ad9432a66f1ee79987e9afebfb00109ee644f50063ab81132934e1a09e8348a3"
+    },
+    {
+      "path": "deliverables/experimental/capture-static-course-panel.log",
+      "bytes": 89,
+      "sha256": "f2d5fcd684a0f9dcb882d9e5b6428b1f2289772b0168b00db00c2b309a55b35e"
+    },
+    {
+      "path": "deliverables/experimental/final-recorded-regression.log",
+      "bytes": 86,
+      "sha256": "5da2d6cc9b30ccb32ee50385cadf809833d4f43af0a6e2337806b5362ab5d1d5"
+    },
+    {
+      "path": "deliverables/experimental/food-back.png",
+      "bytes": 847570,
+      "sha256": "44de184ae3fc7de44b20bdc3673ad7f0c9b48aa34eed397d8e63746190df1724"
+    },
+    {
+      "path": "deliverables/experimental/food-close.png",
+      "bytes": 831808,
+      "sha256": "807e984e12314ea963b6c9ac1de4e0ab2e3528fe4fc490ef466d5dbbdbacb2aa"
+    },
+    {
+      "path": "deliverables/experimental/food-nav.png",
+      "bytes": 830094,
+      "sha256": "01c447a88259e940a49301812c67b42ccb521fdb716f147febd083395f375a66"
+    },
+    {
+      "path": "deliverables/experimental/hybrid-forced-timeout-gate.log",
+      "bytes": 83,
+      "sha256": "96dc288e39111ad9a284cbd04df05368622a1e350c8ff9c0d18e0c650b5af6b9"
+    },
+    {
+      "path": "deliverables/experimental/hybrid-recorded-regression.log",
+      "bytes": 85,
+      "sha256": "b1f64960411598775f9e1c3cea5e9447817945db4b346bd4e47466cc99c2b20a"
+    },
+    {
+      "path": "deliverables/experimental/hybrid-restore-home.log",
+      "bytes": 89,
+      "sha256": "92553f0688cd67698fad336670eafdf4f150ce5f5e6175056b7ffde80e589f5a"
+    },
+    {
+      "path": "deliverables/experimental/hybrid-restore-map.log",
+      "bytes": 89,
+      "sha256": "c206aa19259f4b8fbea5964010f7c78d174c5ac043919b8b11f28ed1e4fa5e61"
+    },
+    {
+      "path": "deliverables/experimental/hybrid-stop-current-capture.log",
+      "bytes": 89,
+      "sha256": "b983e3943d9e8addb3e4b7cf31b313689957438001631bb4560cbae5bfaf1bb5"
+    },
+    {
+      "path": "deliverables/experimental/initial.png",
+      "bytes": 4588,
+      "sha256": "e2dc496be6f5332ebf26463f46395e8f554a96f3d74f6c7652a98c70edeb76bb"
+    },
+    {
+      "path": "deliverables/experimental/instrumentation.log",
+      "bytes": 184,
+      "sha256": "3352afce04d098d2861a98244dd7196f865a68e8fb4635824d2da7c6e8db1f0a"
+    },
+    {
+      "path": "deliverables/experimental/navigation-reset.png",
+      "bytes": 847344,
+      "sha256": "eaddb6b7d1577cc2abef39472009d5e7af3b16285e3e7c76b1aa9b958d4508ab"
+    },
+    {
+      "path": "deliverables/experimental/regression-system.log",
+      "bytes": 56128,
+      "sha256": "675031f08ed21522664d431f2c76c1ae145a0b8d56a6ff9e44ce7f48f4fb70ef"
+    },
+    {
+      "path": "deliverables/experimental/request.txt",
+      "bytes": 16474,
+      "sha256": "40c33f423318904a4b58729a2c615a500d5a0bfb04857093733c836e2f7f1922"
+    },
+    {
+      "path": "deliverables/experimental/restored-health.png",
+      "bytes": 823948,
+      "sha256": "3988ec987885ccd504d881dc821cf16409c705af87731fc3f282b820b9084903"
+    },
+    {
+      "path": "deliverables/experimental/restored.png",
+      "bytes": 848252,
+      "sha256": "57d80fac07c450c712c7c30fdbce6124ea5ca68114887879dcda4e60920bf8f5"
+    },
+    {
+      "path": "deliverables/experimental/resume-current.png",
+      "bytes": 4588,
+      "sha256": "e2dc496be6f5332ebf26463f46395e8f554a96f3d74f6c7652a98c70edeb76bb"
+    },
+    {
+      "path": "deliverables/experimental/round2-leave-bath.log",
+      "bytes": 89,
+      "sha256": "a47c1209f1e80261b65c51bc43f0d73fd9a8b567d741da28dd888e7cc57e48fd"
+    },
+    {
+      "path": "deliverables/experimental/round2-soap-recovery.log",
+      "bytes": 86,
+      "sha256": "cbd40ce21bef463070e63d85ab5dc93f5a2d17751127995ae8ee3731be2225c8"
+    },
+    {
+      "path": "deliverables/experimental/round3-high-five-supplement.json",
+      "bytes": 325,
+      "sha256": "b02f21a19122c325acb7d466408f50cd762013fd7c0cb355baba8b76ef348990"
+    },
+    {
+      "path": "deliverables/experimental/shizuku-static-gate.log",
+      "bytes": 84,
+      "sha256": "f975e522a6399ad9d10cb764e569ebea7ecb2f534eab63f86e29801406fa513f"
+    },
+    {
+      "path": "deliverables/experimental/shizuku-transition-gate.log",
+      "bytes": 84,
+      "sha256": "3837c332f9afe86d03997d64cd10d49fcda7dbc06b50c20b83235e9df9c5cafe"
+    },
+    {
+      "path": "deliverables/experimental/target-gate-after.png",
+      "bytes": 817020,
+      "sha256": "8abec6c8368dc9558312c2094bb6042125264d776839df57f9228860aec0dbc8"
+    },
+    {
+      "path": "deliverables/experimental/three-round-summary.json",
+      "bytes": 4574,
+      "sha256": "e13dc2e917fc071cd2a7868b1339ed0712d8e1e3bb7100239a3bbb65ce9d192d"
+    },
+    {
+      "path": "deliverables/gate-c/authorized-course.png",
+      "bytes": 1133731,
+      "sha256": "49a6354d7a06caef028c536b41c54966608d165669ad1cf22620d61c0eeb3853"
+    },
+    {
+      "path": "deliverables/gate-c/before-selection.png",
+      "bytes": 1141361,
+      "sha256": "e377f743c6937d10fe4d070dd9c6853402d6c3b1e146705f9296853fb9183d14"
+    },
+    {
+      "path": "deliverables/gate-c/build.log",
+      "bytes": 5805,
+      "sha256": "05c2e9537097ed4f15b05793a0766714dd526e38fc80bb3b9a128b1b9b1b259b"
+    },
+    {
+      "path": "deliverables/gate-c/capture_course.py",
+      "bytes": 1025,
+      "sha256": "9ccddebe72f511d612dbe637075383368cd01820b7140bce3d623724f089133e"
+    },
+    {
+      "path": "deliverables/gate-c/continue-after.png",
+      "bytes": 1141006,
+      "sha256": "c36d1d491baa49ad2349fe3037f8d02689969dc140cfca8ad8f3825a92124685"
+    },
+    {
+      "path": "deliverables/gate-c/cookie-after-1.png",
+      "bytes": 854537,
+      "sha256": "6d4b656d4cf94a077dfeea68b2b3b0530fe79631207426f58836d8c0adcd464a"
+    },
+    {
+      "path": "deliverables/gate-c/cookie-after-2.png",
+      "bytes": 842178,
+      "sha256": "46da85cdf56c8f6ab9af329ca3fef260f6fc95e65b75bbc34de47c64089f21b9"
+    },
+    {
+      "path": "deliverables/gate-c/cookie-after-3.png",
+      "bytes": 840108,
+      "sha256": "24e2177023e00c5cf0429f670dc47b001eadb00a16d6624567037abb72cfd485"
+    },
+    {
+      "path": "deliverables/gate-c/course-1-details.png",
+      "bytes": 1133602,
+      "sha256": "b9085d14b2a917995db982c67f3820557467ba3f177d2af5c696a22676fbad6f"
+    },
+    {
+      "path": "deliverables/gate-c/course-2-details.png",
+      "bytes": 1134949,
+      "sha256": "5ddfcf95fe03f432c341912ced32be40f86d17458d61b3a70635e1283232f2bd"
+    },
+    {
+      "path": "deliverables/gate-c/course-3-details.png",
+      "bytes": 1136509,
+      "sha256": "2c27d3462eb6cf33481df74736c220dc157ba4fa9aa8f8c9b394f401ad8f2f6d"
+    },
+    {
+      "path": "deliverables/gate-c/course-4-details.png",
+      "bytes": 1136782,
+      "sha256": "1e42862970355d2591676ff7b9013466c1128ab2e9fa974a4f448042cc8c5cb2"
+    },
+    {
+      "path": "deliverables/gate-c/course-5-details.png",
+      "bytes": 1150053,
+      "sha256": "4fb1e43e1faa4d7714f7580e917dd01b98fde811c98422da1768fcc08c923243"
+    },
+    {
+      "path": "deliverables/gate-c/course-6-details.png",
+      "bytes": 1145571,
+      "sha256": "c3eb47bc68c3408993e4150f746cf619e0d6abfc9c52cd6292d9e1fe93437571"
+    },
+    {
+      "path": "deliverables/gate-c/course-7-details.png",
+      "bytes": 1135426,
+      "sha256": "7528f348916ee0e59d24a9aa5d4777fdde1372bc7dd3574e62f3758d1a58472d"
+    },
+    {
+      "path": "deliverables/gate-c/course-carousel-end.png",
+      "bytes": 1151045,
+      "sha256": "73a3affd94b744b34927453b27736b8bf2bbc490808efd51a2edddec1d564dd8"
+    },
+    {
+      "path": "deliverables/gate-c/course-carousel.png",
+      "bytes": 1143696,
+      "sha256": "b3a0ab36346ef312a5ee41a68580daf60e7c6e3e45030f82a8525e96f1b5a6bd"
+    },
+    {
+      "path": "deliverables/gate-c/course-detail-confirmed.png",
+      "bytes": 1141006,
+      "sha256": "c36d1d491baa49ad2349fe3037f8d02689969dc140cfca8ad8f3825a92124685"
+    },
+    {
+      "path": "deliverables/gate-c/course-last-card.png",
+      "bytes": 1134107,
+      "sha256": "f0106e19d2df3aebb9e2407caa58e0936e9249fbe9950bf7b95130fe6d78f19b"
+    },
+    {
+      "path": "deliverables/gate-c/course-page-stable.png",
+      "bytes": 1147114,
+      "sha256": "32ca5150e6cc46bce33ef45e7126e7e836e69bf993b0d3d7bec97e8b053ec54b"
+    },
+    {
+      "path": "deliverables/gate-c/current.png",
+      "bytes": 1135426,
+      "sha256": "7528f348916ee0e59d24a9aa5d4777fdde1372bc7dd3574e62f3758d1a58472d"
+    },
+    {
+      "path": "deliverables/gate-c/food-inventory-stable.png",
+      "bytes": 817974,
+      "sha256": "8db8a6744c05dbf48767af0530eef0ac6f1f8212c3f6bbabaf2b56ab2971b043"
+    },
+    {
+      "path": "deliverables/gate-c/food-inventory.png",
+      "bytes": 817356,
+      "sha256": "2a740a6ff3ff1d9374b29304a5e576de838faedc390ad20ce0e20eb36291a2f4"
+    },
+    {
+      "path": "deliverables/gate-c/health-home-before.png",
+      "bytes": 846887,
+      "sha256": "c93785673f1195576c24c3b4ec7209ac33c1f253504520629b1dd761fe022dae"
+    },
+    {
+      "path": "deliverables/gate-c/health-home-recheck.png",
+      "bytes": 842286,
+      "sha256": "673fde0078b783370aff131277c051d501b160c4f4592360f3dd050b7fe70a39"
+    },
+    {
+      "path": "deliverables/gate-c/health-nav-1.png",
+      "bytes": 1141006,
+      "sha256": "c36d1d491baa49ad2349fe3037f8d02689969dc140cfca8ad8f3825a92124685"
+    },
+    {
+      "path": "deliverables/gate-c/health-nav-2.png",
+      "bytes": 1647085,
+      "sha256": "763ef99a306d790f851b326fd5d05b64ecdbe10188d55e4b1b2eefa079ef4e54"
+    },
+    {
+      "path": "deliverables/gate-c/health-nav-3.png",
+      "bytes": 1771162,
+      "sha256": "90e861f5aa21b2590e915518397f68a94a45d3f77a5366c6822de383f6503ea6"
+    },
+    {
+      "path": "deliverables/gate-c/health-values-before.png",
+      "bytes": 822188,
+      "sha256": "0d4b89445ad20e83535e289461eea76247902a0c9fbf7986cd17a98ac63a084e"
+    },
+    {
+      "path": "deliverables/gate-c/learning-start.png",
+      "bytes": 1151833,
+      "sha256": "2175852dae960e3a471d02df42984449388f3adccdf52a624cf97307fd898a45"
+    },
+    {
+      "path": "deliverables/gate-c/observed-00.png",
+      "bytes": 978967,
+      "sha256": "5e2dabf26b47bd23e7443a61e5f62609e744a80ee4d03de1584ab3e15b378c7d"
+    },
+    {
+      "path": "deliverables/gate-c/observed-01.png",
+      "bytes": 972002,
+      "sha256": "6334538f24b3e24fab42fab0cc164ed340b6a03fa2782c9ea7439a854e48d670"
+    },
+    {
+      "path": "deliverables/gate-c/observed-02.png",
+      "bytes": 981780,
+      "sha256": "67d00dac69cf0e4b52781a6f83ae2ffd095bc0ad2495038cc71fd558c60a6cfb"
+    },
+    {
+      "path": "deliverables/gate-c/observed-03.png",
+      "bytes": 985018,
+      "sha256": "7ae2342e2e7ca6eec425d255ddc07a9e7d5f6d68e2dee010c55ccec2e658cf8d"
+    },
+    {
+      "path": "deliverables/gate-c/observed-04.png",
+      "bytes": 972215,
+      "sha256": "e96440bb1e79ff6cca8a88c4206759526f6dbdcbb993a0035990d749e618cdcb"
+    },
+    {
+      "path": "deliverables/gate-c/observed-05.png",
+      "bytes": 971126,
+      "sha256": "0d3a92461aa6da606e334f2fef3519fe8e1a7af1e88d8b550502acde5a38c33e"
+    },
+    {
+      "path": "deliverables/gate-c/observed-06.png",
+      "bytes": 985668,
+      "sha256": "f6fe1f1d8637e985dffcec15a08a1dfa239f30a2999090d83d9677ca978d5e55"
+    },
+    {
+      "path": "deliverables/gate-c/observed-07.png",
+      "bytes": 985805,
+      "sha256": "bff27d99f92eec47aafd282add463e3e491fe5598627ca38625457b00dd58e85"
+    },
+    {
+      "path": "deliverables/gate-c/observed-08.png",
+      "bytes": 398177,
+      "sha256": "b7fec6864de05a85cf24e6a2663db5f1423dcee2c0d98ceff5b09b1b723b7e1c"
+    },
+    {
+      "path": "deliverables/gate-c/observed-09.png",
+      "bytes": 398177,
+      "sha256": "b7fec6864de05a85cf24e6a2663db5f1423dcee2c0d98ceff5b09b1b723b7e1c"
+    },
+    {
+      "path": "deliverables/gate-c/outdoor.png",
+      "bytes": 1768485,
+      "sha256": "007748db22a033f214442eb2c448e0456b43393941a7ea7102082cb31f85890f"
+    },
+    {
+      "path": "deliverables/gate-c/pet-entry.png",
+      "bytes": 841802,
+      "sha256": "d719d56028c047cebcb151396bebbc78fb35e606cf439c543505b76b0086eae8"
+    },
+    {
+      "path": "deliverables/gate-c/physical-current.png",
+      "bytes": 2141450,
+      "sha256": "4ed7f5320d3d15c9a84eb76aefad0195d2c54b47b37c7f8f76c9549bb429cb0a"
+    },
+    {
+      "path": "deliverables/gate-c/physical.png",
+      "bytes": 316471,
+      "sha256": "c15d48644d80b66548583a8dc7697e2fa124d303ce8ba115264ccea656dd6c66"
+    },
+    {
+      "path": "deliverables/gate-c/primary-course-list.png",
+      "bytes": 1147114,
+      "sha256": "32ca5150e6cc46bce33ef45e7126e7e836e69bf993b0d3d7bec97e8b053ec54b"
+    },
+    {
+      "path": "deliverables/gate-c/primary-school.png",
+      "bytes": 2059655,
+      "sha256": "e5142007bd5df09ac66ffb49adf852301cee81390c838d8916a05523c4f8493e"
+    },
+    {
+      "path": "deliverables/gate-c/qq-home.png",
+      "bytes": 156418,
+      "sha256": "dbde6615aeb7f9d29170246624fe9393724c6b2887f1c0101ec46998c3c4d626"
+    },
+    {
+      "path": "deliverables/gate-c/result-before-continue.png",
+      "bytes": 398177,
+      "sha256": "b7fec6864de05a85cf24e6a2663db5f1423dcee2c0d98ceff5b09b1b723b7e1c"
+    },
+    {
+      "path": "deliverables/gate-c/school.png",
+      "bytes": 1934947,
+      "sha256": "2f5750c451a6e30f92d642a7ff03456fb3e7aad0b55c0e21b5300746c1bffa20"
+    },
+    {
+      "path": "deliverables/gate-c/soap-after-1.png",
+      "bytes": 788183,
+      "sha256": "9d291d8d6bfb45e927199dbd6d31ee5fb6c3567b5034f7c99383a9d74345cbc2"
+    },
+    {
+      "path": "deliverables/gate-c/soap-calibration-test.log",
+      "bytes": 86,
+      "sha256": "6d6d4f3d9863a1a17faaa96ec6f1cf1957d0201b11848b3b23ebef2ae997c416"
+    },
+    {
+      "path": "deliverables/gate-c/soap-drag-after-1.png",
+      "bytes": 795709,
+      "sha256": "0b61fa82caac3d8b7852fc45efb3d1d742634c4d6f3e6964a08c808e9559a04f"
+    },
+    {
+      "path": "deliverables/gate-c/soap-draganddrop.png",
+      "bytes": 866006,
+      "sha256": "f9e5b996f7752175ba789fddf978a3101e722a8bde50242765142c4b5d148110"
+    },
+    {
+      "path": "deliverables/gate-c/soap-extended-drag.png",
+      "bytes": 845954,
+      "sha256": "10cdf12a075b22fb10f5e5c82b0596b8b9bc773b754df8b0d1d2604633d5a82e"
+    },
+    {
+      "path": "deliverables/gate-c/soap-finger-after.png",
+      "bytes": 840225,
+      "sha256": "312141d37dd77663f00fa545269d11186636484b8779243c475b9efbe3c2260b"
+    },
+    {
+      "path": "deliverables/gate-c/soap-finger-before.png",
+      "bytes": 839203,
+      "sha256": "f1369c1f974b1e4385d65f38fd0c65787b2e8a54b0af99f9d9971492f62f6b65"
+    },
+    {
+      "path": "deliverables/gate-c/soap-finger-during.png",
+      "bytes": 822260,
+      "sha256": "fc0400e1aa2796a3d1c837702aff76c2d2712bd65d64bdcfc4c06c9e296bbf86"
+    },
+    {
+      "path": "deliverables/gate-c/soap-inventory.png",
+      "bytes": 771976,
+      "sha256": "d068ef05fdcca29cc7e20f7e364a69308d83417cccdcbcba4ccbc550a04cc0d5"
+    },
+    {
+      "path": "deliverables/gate-c/soap-long-drag.png",
+      "bytes": 788437,
+      "sha256": "fbd69fa48d7f0a2c3086d45924260b6a4728b92d155e051b8acbd0c358e669d9"
+    },
+    {
+      "path": "deliverables/gate-c/soap-match-before.png",
+      "bytes": 845960,
+      "sha256": "cec9b28bdda14a085a9c2760ba5605e21cffb32a6aeaaf2a9c4bbaf690450424"
+    },
+    {
+      "path": "deliverables/gate-c/soap-native-after.png",
+      "bytes": 845795,
+      "sha256": "bba9813bd9825ee1f2ea301dcd2cb99dbdc9dbaad68e124bc53fbf96448918fd"
+    },
+    {
+      "path": "deliverables/gate-c/soap-native-before.png",
+      "bytes": 845722,
+      "sha256": "a4be0afdff88d0767db52c545fd05ba66cc36108e523c98dbeaf444c7f85d71d"
+    },
+    {
+      "path": "deliverables/gate-c/soap-native-logcat.log",
+      "bytes": 4173,
+      "sha256": "26c4171e394c27929e9074871a119b07792b198e23a13550588e56271f4d808e"
+    },
+    {
+      "path": "deliverables/gate-c/soap-panel-closed.png",
+      "bytes": 846840,
+      "sha256": "e6ab933e61a499ba19c90bec389dd542f17098390853eba67f789577cc1c9db5"
+    },
+    {
+      "path": "deliverables/gate-c/soap-ready-recheck.png",
+      "bytes": 844989,
+      "sha256": "fcde0ebdc8dedce8bbdad933f5cdba518ba7c6d11c54ef1aeafa8204a132a780"
+    },
+    {
+      "path": "deliverables/gate-c/soap-rub-after.png",
+      "bytes": 787010,
+      "sha256": "b71aa128663e9418f386f89c96b1249a7e74fb7b89770a2933fc3cafaaa9eedc"
+    },
+    {
+      "path": "deliverables/gate-c/virtual-recheck.png",
+      "bytes": 154434,
+      "sha256": "3dba7d2fd66217253e18c2d645f901834c8d68c2b9f99d47f11d096d248ccb57"
+    },
+    {
+      "path": "deliverables/gate-instrumentation.log",
+      "bytes": 766,
+      "sha256": "bf4479365c116d0a7dab17ef6b86dfa86796ed4ef5269b85e5e249e70222107f"
+    },
+    {
+      "path": "deliverables/gate-logcat.log",
+      "bytes": 249,
+      "sha256": "0e49f51d10359d4fffe538bad628f4442ae6ea5266bf771fad2f7b0b95fd28c3"
+    },
+    {
+      "path": "deliverables/gradle-assemble-final.log",
+      "bytes": 2981,
+      "sha256": "58d2780a867bc2d8667b71615a3884018654cfdb43e3e9873c7067666ad2bd34"
+    },
+    {
+      "path": "deliverables/gradle-gate-build.log",
+      "bytes": 3925,
+      "sha256": "4c9b6447e341bfdc2b5f07290c8e7865b3774c0e70085cc5151bee2c32bfa62a"
+    },
+    {
+      "path": "deliverables/gradle-test-final.log",
+      "bytes": 2507,
+      "sha256": "610e8af11e428a74f932ad57b6436638ee97f2fd6d6bc381390e5935f6e65938"
+    },
+    {
+      "path": "deliverables/hybrid-gates/1791201091159/events.jsonl",
+      "bytes": 2801,
+      "sha256": "ba839b789bc1ec76d732234ee33b47397beb5d14750846890f3e787a11e7f910"
+    },
+    {
+      "path": "deliverables/hybrid-gates/1791201091159/static-0.png",
+      "bytes": 848615,
+      "sha256": "32eedc2528d4d5a6d02dbb69dace4033b11933422edca556594c580eab7fef70"
+    },
+    {
+      "path": "deliverables/hybrid-gates/1791201091159/static-1.png",
+      "bytes": 848672,
+      "sha256": "13f6a4b4d334724da123157cf324a53b04e94b1e8249c754e83a8a8075bcab70"
+    },
+    {
+      "path": "deliverables/hybrid-gates/1791201091159/static-2.png",
+      "bytes": 848246,
+      "sha256": "9b5d1ad15cbf0188c89a83aba271e0887104aebc1c2cbfb7345327a142e39118"
+    },
+    {
+      "path": "deliverables/hybrid-gates/1791201091159/static-3.png",
+      "bytes": 848353,
+      "sha256": "7f91318836e880250978ee2031d760d230034f30bc3f1ba905bcdb32c35fb441"
+    },
+    {
+      "path": "deliverables/hybrid-gates/1791201091159/static-4.png",
+      "bytes": 848595,
+      "sha256": "cc28c069411cd84e24feeac2f01e396fefeba51d41a3e417758a54106df8de03"
+    },
+    {
+      "path": "deliverables/hybrid-gates/1791201091159/static-5.png",
+      "bytes": 848255,
+      "sha256": "b047deb9e758cf77744884538fdbf9631d88fdf83350f36f50983132d2199094"
+    },
+    {
+      "path": "deliverables/hybrid-gates/1791201091159/static-6.png",
+      "bytes": 848031,
+      "sha256": "3a5aa8866ec883c91d2757f559ae2078d240c7f38312d907d08d9c5132cbd108"
+    },
+    {
+      "path": "deliverables/hybrid-gates/1791201091159/static-7.png",
+      "bytes": 843141,
+      "sha256": "c3cb990fe0c8fbd878442f3d8d3aef3f8d439f3d572a8b57b9614949bcc9e7b5"
+    },
+    {
+      "path": "deliverables/hybrid-gates/1791201091159/static-8.png",
+      "bytes": 837284,
+      "sha256": "ed8678afe0580cf36b641d370ace77c8f1875b7f59b90a00412edd0b380f7a52"
+    },
+    {
+      "path": "deliverables/hybrid-gates/1791201091159/static-9.png",
+      "bytes": 847139,
+      "sha256": "4fa5b1c9092157b059bd4e33908c3622c179e5318c7212aae3f720653eaac79e"
+    },
+    {
+      "path": "deliverables/hybrid-gates/1791201091159/verdict.json",
+      "bytes": 155,
+      "sha256": "7c4e93ffd1b735905f30c28fd97d8d07f88753201d3428629bd7face2c172f4c"
+    },
+    {
+      "path": "deliverables/hybrid-gates/1791201186621/0-close-after.png",
+      "bytes": 849146,
+      "sha256": "87af55b6aff739d36e70d7a5f0e268687ba0112b396854d3f9bf855601a89180"
+    },
+    {
+      "path": "deliverables/hybrid-gates/1791201186621/0-close-before.png",
+      "bytes": 824937,
+      "sha256": "7c62b8516a35bd9ea7a990ae46e7f5763b3e7cb73ffc513f9023dd98e16bc0b4"
+    },
+    {
+      "path": "deliverables/hybrid-gates/1791201186621/0-open-after.png",
+      "bytes": 823161,
+      "sha256": "a03eddda89c4e94b10868ed5dbd00a8d98ab7f8050717d7738b249ac3c19c5bb"
+    },
+    {
+      "path": "deliverables/hybrid-gates/1791201186621/0-open-before.png",
+      "bytes": 848983,
+      "sha256": "297bda1dc6e7e44a91ef01e0f43d5f200db9f8082e4921618440590df141b330"
+    },
+    {
+      "path": "deliverables/hybrid-gates/1791201186621/1-close-after.png",
+      "bytes": 848042,
+      "sha256": "dbd3d861ee0e9163409f3ea9f9aa3305ac421562f5c86b1159f7a8894bbeea1c"
+    },
+    {
+      "path": "deliverables/hybrid-gates/1791201186621/1-close-before.png",
+      "bytes": 824444,
+      "sha256": "c348cb71adaa69a5ac32e3e9db640940f88aa5ba0d642590351526e069ff5eb2"
+    },
+    {
+      "path": "deliverables/hybrid-gates/1791201186621/1-open-after.png",
+      "bytes": 824288,
+      "sha256": "ce98428faadc5cc8b8285aec88a59f6e59d321cb702c4303df6d2b0bb1082893"
+    },
+    {
+      "path": "deliverables/hybrid-gates/1791201186621/1-open-before.png",
+      "bytes": 847512,
+      "sha256": "bd70e6b8fe503d0bc8a1e16e8e1d0a6a74b632fae52b61f57f1c8d4997b8b327"
+    },
+    {
+      "path": "deliverables/hybrid-gates/1791201186621/2-close-after.png",
+      "bytes": 837598,
+      "sha256": "ad9be1750b8b881bcdadbfa8ad230718868f86fb98f560fa72edbf9b5a31e607"
+    },
+    {
+      "path": "deliverables/hybrid-gates/1791201186621/2-close-before.png",
+      "bytes": 823928,
+      "sha256": "947c0118721120e7df8e041cdfd13093f4bd83e6b98c189335e9e71c03bcc781"
+    },
+    {
+      "path": "deliverables/hybrid-gates/1791201186621/2-open-after.png",
+      "bytes": 822773,
+      "sha256": "c2bf2c2d70e80767676bae15c891742cb973808ca0b4c188a90de43596419579"
+    },
+    {
+      "path": "deliverables/hybrid-gates/1791201186621/2-open-before.png",
+      "bytes": 848350,
+      "sha256": "3186a1da8ae4962d70b1f0478e6d6ed959741507680efe98dc4b69742d707723"
+    },
+    {
+      "path": "deliverables/hybrid-gates/1791201186621/events.jsonl",
+      "bytes": 3331,
+      "sha256": "6b2bfe379db1231841f6772d0858c29f59cf5ae6cefd796991da9d51013754ee"
+    },
+    {
+      "path": "deliverables/hybrid-gates/1791201186621/verdict.json",
+      "bytes": 159,
+      "sha256": "c07ac89e408beda5107826c9a9741e88db693fe1956b0903b91d7090aa81afb7"
+    },
+    {
+      "path": "deliverables/hybrid-gates/1791201752518/events.jsonl",
+      "bytes": 1230,
+      "sha256": "d69c331d730fd4b700328b0bf88f009c1b3dfb1625c552e58fa5906afc9ed512"
+    },
+    {
+      "path": "deliverables/hybrid-gates/1791201752518/hybrid-close-after.png",
+      "bytes": 848401,
+      "sha256": "769f1391b8a81b6192aea19a3770a105249b10943b45fe7b339c2501baeeafda"
+    },
+    {
+      "path": "deliverables/hybrid-gates/1791201752518/hybrid-close-before.png",
+      "bytes": 824324,
+      "sha256": "58253b1f235f8fae405af4e1ff66081c6d5505c65c4884793c70eae3f91820b3"
+    },
+    {
+      "path": "deliverables/hybrid-gates/1791201752518/hybrid-open-after.png",
+      "bytes": 823021,
+      "sha256": "de9bcf952fe8c9f138310a1ab803fb3ef10e45de49253573917d07c1c0edda36"
+    },
+    {
+      "path": "deliverables/hybrid-gates/1791201752518/hybrid-open-before.png",
+      "bytes": 848649,
+      "sha256": "a1b73f8dac6127c9bc0888b5941f53b63c4d46b13b54d7b095abcb5c15834424"
+    },
+    {
+      "path": "deliverables/hybrid-gates/1791201752518/verdict.json",
+      "bytes": 326,
+      "sha256": "ad8e2fd0e73ad525cb4a790417613c92e39e83a462351bc9c567ff2d9bc78fe9"
+    },
+    {
+      "path": "deliverables/pet_mvp_gates/headless_0.png",
+      "bytes": 30604,
+      "sha256": "3057407ae7424caabbd2bcdcfd94cc7686143ed177d7012ef3f6f474a758dee8"
+    },
+    {
+      "path": "deliverables/pet_mvp_gates/headless_1.png",
+      "bytes": 17565,
+      "sha256": "2c100d11048b8f1552a624e156dcdb8d4e856fff40fc03afed5d46d6a437b019"
+    },
+    {
+      "path": "deliverables/pet_mvp_gates/headless_2.png",
+      "bytes": 17565,
+      "sha256": "2c100d11048b8f1552a624e156dcdb8d4e856fff40fc03afed5d46d6a437b019"
+    },
+    {
+      "path": "deliverables/qqpet-mvp-debug.apk",
+      "bytes": 25989620,
+      "sha256": "13fd7b16793da7eda7d845bde514310762bf30356cd0f98a4ad3c3caea751d10"
+    },
+    {
+      "path": "deliverables/qqpet-mvp-gates.apk",
+      "bytes": 2437218,
+      "sha256": "3d66cbfd99e01a70245d3b0659b15a59c60cd1f0b4ccc1a5fd1fda11a7122c05"
+    },
+    {
+      "path": "deliverables/TEST-com.ynk.virtualdisplay.ExampleUnitTest.xml",
+      "bytes": 432,
+      "sha256": "8c6a9b96cf1e49c2710875b9e55bdfefab7e05c3ef127e2fe5453cce5f61de71"
+    }
+  ],
+  "archive": {
+    "path": "deliverables/frozen-three-round-evidence.zip",
+    "sha256": "d20bd14753f983027768f2e3f59660fea4f0236ee6c0dbfe6f078382d59f0a9a"
+  },
+  "qualifications": [
+    "resumed three rounds, not uninterrupted autonomous run",
+    "round3 supplemental input is DEBUG_ADB",
+    "latest ten-tap build not real-tested"
+  ]
+}

@@ -15,8 +15,8 @@ source = pathlib.Path(sys.argv[1]).resolve()
 target = pathlib.Path(tempfile.gettempdir()) / "QQPetMvpAscii"
 pin = "0390d8f07ac4071658e77bff9b0974c57f16a186"
 for repo in (source, target):
-    if subprocess.check_output(["git", "-C", str(repo), "rev-parse", "HEAD"], text=True).strip() != pin:
-        raise RuntimeError("Build source or prepared mirror is not the pinned baseline")
+    if subprocess.run(["git", "-C", str(repo), "merge-base", "--is-ancestor", pin, "HEAD"]).returncode != 0:
+        raise RuntimeError("Build source or prepared mirror does not descend from the pinned baseline")
 shutil.copytree("\\\\?\\" + str(source), "\\\\?\\" + str(target),
                 dirs_exist_ok=True, ignore=shutil.ignore_patterns("build", ".gradle", ".git", "deliverables"))
 sdk = pathlib.Path(tempfile.gettempdir()) / "QQPetMvpSdk"

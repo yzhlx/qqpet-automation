@@ -15,6 +15,7 @@ import java.util.concurrent.atomic.AtomicInteger
 class GateTestActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        window.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         val id = display?.displayId ?: error("Display missing")
         touches.putIfAbsent(id, AtomicInteger())
         setContentView(TargetView(this, id))

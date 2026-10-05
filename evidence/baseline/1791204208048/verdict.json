@@ -1,0 +1,1 @@
+{"verdict":"STOPPED","completed":1,"stopReason":"PAGE_MISMATCH:RECOVER_IF_NEEDED:23-enter-bath-after:0.9692106935366739","physicalDelta":0,"captureStatistics":{"imageReaderSuccess":38,"imageReaderTimeout":0,"shizukuFallbackCount":0,"shizukuFallbackSuccess":0,"captureLatencyP50Ms":null,"captureLatencyP95Ms":null}}
