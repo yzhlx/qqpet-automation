@@ -14,11 +14,22 @@ class PetInputController(
     private val displayId: Int,
     private val width: Int,
     private val height: Int,
+    private val facts: AutomationFacts,
 ) {
-    init { require(displayId > 0) { "Refuse to inject into default display" } }
+    init { require(displayId > 0 && facts.displayId == displayId) { "Refuse default or mismatched display" } }
+
+    private fun requireTrustedFrame() {
+        facts.requireInput()
+        if(displayId !in repository.managedDisplayIds.value ||
+            repository.connectionStatus.value != com.ynk.virtualdisplay.data.repository.ConnectionStatus.CONNECTED) {
+            facts.frame(FrameLivenessResult(FrameStatus.DISPLAY_UNAVAILABLE),"INPUT_GUARD")
+            error("DISPLAY_UNAVAILABLE")
+        }
+    }
 
     suspend fun tap(x: Float, y: Float, pressMs: Long = 80L) {
         require(x >= 0f && x < width.toFloat() && y >= 0f && y < height.toFloat()) { "tap outside pet display" }
+        requireTrustedFrame()
         val downTime = SystemClock.uptimeMillis()
         var downSent = false
         val down = event(downTime, downTime, MotionEvent.ACTION_DOWN, x, y)
@@ -37,16 +48,21 @@ class PetInputController(
                 }
             }
         }
+        facts.input("TAP",mapOf("x" to x,"y" to y,"pressMs" to pressMs))
     }
 
     /** One continuous, display-scoped gesture, used only for the measured soap interaction. */
     suspend fun drag(points: List<PointF>, stepMs: Long = 250L) {
         require(points.size >= 2)
         points.forEach { require(it.x in 0f..<width.toFloat() && it.y in 0f..<height.toFloat()) }
+        requireTrustedFrame()
         val downTime = SystemClock.uptimeMillis()
         var downSent = false
         var last = points.first()
         suspend fun send(action: Int, point: PointF) {
+            // Preserve the continuous gesture, but inhibit further MOVE after a concurrent invalid capture.
+            // UP remains mandatory cleanup for a DOWN already delivered to this same virtual display.
+            if(action != MotionEvent.ACTION_UP) requireTrustedFrame()
             val e = event(downTime, SystemClock.uptimeMillis(), action, point.x, point.y)
             try { check(repository.injectInputWithDisplayId(e, displayId).getOrThrow()) { "Gesture event rejected" } }
             finally { e.recycle() }
@@ -63,6 +79,7 @@ class PetInputController(
         } finally {
             if (downSent) withContext(NonCancellable) { send(MotionEvent.ACTION_UP, last) }
         }
+        facts.input("CONTINUOUS_DRAG",mapOf("points" to points.size,"stepMs" to stepMs))
     }
 
     private fun event(downTime: Long, whenMs: Long, action: Int, x: Float, y: Float): MotionEvent {

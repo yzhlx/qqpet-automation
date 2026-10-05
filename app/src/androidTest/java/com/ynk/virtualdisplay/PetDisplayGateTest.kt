@@ -79,7 +79,7 @@ class PetDisplayGateTest {
             Log.i(tag, "GATE_A_PASS display=$target preview=false frames=3 size=720x1600")
             val mainBefore = GateTestActivity.touches.getValue(0).get()
             val targetBefore = GateTestActivity.touches.getValue(target).get()
-            PetInputController(repo, target, 720, 1600).tap(360f, 800f)
+            PetInputController(repo, target, 720, 1600, activeCapture.facts).tap(360f, 800f)
             withTimeout(5_000) {
                 while (GateTestActivity.touches.getValue(target).get() == targetBefore) delay(100)
             }

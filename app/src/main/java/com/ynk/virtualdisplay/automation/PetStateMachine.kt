@@ -30,10 +30,13 @@ class PetStateMachine(
         input.tap(profile.startButton.x, profile.startButton.y)
         delay(profile.pageSettleMs)
         verify(State.LEARNING, "start", "after")
+        capture.facts.events.append(EventSource.GAME_OBSERVATION,EventKind.COURSE_STARTED,
+            mapOf("course" to "PHYSICAL_10_MIN"),listOf(evidence.absolutePath))
         CycleResult(true, State.LEARNING, "course started")
     } catch (cancelled: CancellationException) {
         throw cancelled
     } catch (failure: Throwable) {
+        capture.facts.events.append(EventSource.APP_AUTOMATION,EventKind.ERROR,mapOf("reason" to failure.toString()))
         logger(State.STOPPED_ERROR.name, null, "none", "STOP", failure.message)
         CycleResult(false, State.STOPPED_ERROR, failure.message ?: failure.javaClass.simpleName)
     }
@@ -57,6 +60,8 @@ class PetStateMachine(
             val reason = if (matched) null else "$state mismatch: ${best.first.name}"
             logger(state.name, best.second.score, "$action:$phase", if (matched) "PASS" else "FAIL", reason)
             check(matched) { reason!! }
+            if(state==State.LEARNING) capture.facts.events.append(EventSource.GAME_OBSERVATION,EventKind.LEARNING_CONFIRMED,
+                mapOf("score" to best.second.score,"phase" to phase),listOf(evidence.absolutePath))
         } finally { frame.recycle() }
     }
 }

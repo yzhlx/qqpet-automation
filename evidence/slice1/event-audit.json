@@ -1,0 +1,19 @@
+{
+  "streams": 15,
+  "events": 114,
+  "kinds": {
+    "FRAME_VALID": 86,
+    "INPUT_SENT": 14,
+    "HEALTH_OBSERVED": 9,
+    "FRAME_INVALID": 5
+  },
+  "sources": {
+    "GAME_OBSERVATION": 100,
+    "APP_AUTOMATION": 14
+  },
+  "ordered": true,
+  "unique_event_ids": true,
+  "boot_status": [
+    "KNOWN"
+  ]
+}

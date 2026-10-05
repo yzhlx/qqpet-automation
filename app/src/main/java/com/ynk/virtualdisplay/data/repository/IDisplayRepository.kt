@@ -20,6 +20,7 @@ enum class ConnectionStatus {
  * 显示器管理核心仓库接口
  */
 interface IDisplayRepository {
+    val automationEventsDirectory: java.io.File
     /** Current target-display PNG, captured inside the existing Shizuku shell permission. */
     suspend fun captureDisplay(displayId: Int): Result<com.ynk.virtualdisplay.automation.ActiveCapturedFrame>
     /**

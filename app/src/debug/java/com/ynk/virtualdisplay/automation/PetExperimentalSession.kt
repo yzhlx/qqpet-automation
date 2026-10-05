@@ -42,6 +42,12 @@ class PetExperimentalSession(
     private val highFive = probe("high_five",284,344,355,400)
     private val gradeA = probe("grade_a",545,385,695,525)
     private val upgrade = probe("upgrade",245,558,480,610)
+    init {
+        capture.facts.events.append(EventSource.APP_AUTOMATION,EventKind.SESSION_CONFIG,
+            mapOf("runner" to "PetExperimentalSession","legacyRun" to evidence.name,"roundLimit" to 3,
+                "healthMaxAgeMs" to 60000,"healthPolicy" to "EXACT_REQUIRED_WITH_CONSERVATIVE_BAR_BOUNDARY"),
+            listOf(evidence.absolutePath))
+    }
 
     private fun safety() {
         guard()
@@ -49,6 +55,8 @@ class PetExperimentalSession(
     }
     private fun emit(action: String, score: Double? = null, result: String = "PASS", reason: String? = null) {
         logger(state, score, "round-$round:$action", result, reason)
+        if(reason!=null) capture.facts.events.append(EventSource.APP_AUTOMATION,EventKind.ERROR,
+            mapOf("state" to state,"action" to action,"reason" to reason),listOf(evidence.absolutePath))
     }
     private fun save(frame: Bitmap, name: String) {
         evidence.mkdirs()
@@ -126,12 +134,18 @@ class PetExperimentalSession(
     }
     private fun healthJson(h: PetHealthCheck.Health) = JSONObject().put("stamina",h.energy)
         .put("cleanliness",h.cleanliness).put("mood",h.mood).put("measurement","conservative_bar_estimate")
-        .put("attr1","UNKNOWN").put("attr2","UNKNOWN").put("attr3","UNKNOWN")
+        .put("observations",h.observations?.let { JSONObject(it.fields()) } ?: JSONObject.NULL)
+        .put("attr1","UNSUPPORTED").put("attr2","UNSUPPORTED").put("attr3","UNSUPPORTED")
     private suspend fun readHealth(label: String): PetHealthCheck.Health {
         val started = SystemClock.elapsedRealtime()
         tap(home,PointF(516f,160f),healthPanel,"open-health")
         val f = frame(true)
-        val h = try { save(f,label); PetHealthCheck.read(f) } finally { f.recycle() }
+        val h = try {
+            save(f,label)
+            val snapshot=PetHealthCheck.observe(context,f,System.currentTimeMillis(),File(evidence,"round-$round-$label.png").absolutePath)
+            capture.facts.health(snapshot)
+            PetHealthCheck.forBusiness(snapshot,System.currentTimeMillis())
+        } finally { f.recycle() }
         check(h.energy in 10..100 && h.cleanliness in 10..100 && h.mood in 10..100) { "HEALTH_VALUE_ABNORMAL" }
         emit(label,result=healthJson(h).put("read_duration_ms",SystemClock.elapsedRealtime()-started).toString())
         tap(healthPanel,PointF(355f,454f),home,"close-health")
@@ -146,24 +160,24 @@ class PetExperimentalSession(
         var feeds=0
         while(h.energy<90) {
             check(feeds<5) { "FEED_RETRY_LIMIT" }
-            val before=h; val started=SystemClock.elapsedRealtime(); val wall=System.currentTimeMillis()
+            val before=h.energy; val started=SystemClock.elapsedRealtime(); val wall=System.currentTimeMillis()
             tap(room,PointF(638f,720f),cookie,"enter-food")
             verify(listOf(cookie),"feed-before",latest=true)
             safety(); input.tap(360f,1287f); delay(2500)
             verify(listOf(cookie),"feed-after")
             h=readHealth("feed-health")
-            check(h.energy>before.energy && h.energy-before.energy in 5..12) { "FEED_NO_EXPECTED_GAIN_OR_EMPTY" }
+            check(h.energy>before && h.energy-before in 5..12) { "FEED_NO_EXPECTED_GAIN_OR_EMPTY" }
             tap(cookie,PointF(80f,160f),room,"leave-food")
             feeds++; recovery.put("feed_count",feeds)
             recovery.put("feed_duration_ms",recovery.getLong("feed_duration_ms")+SystemClock.elapsedRealtime()-started)
             emit("feed",result=JSONObject().put("feed_start_ts",wall).put("feed_end_ts",System.currentTimeMillis())
-                .put("feed_duration_ms",SystemClock.elapsedRealtime()-started).put("stamina_before",before.energy)
+                .put("feed_duration_ms",SystemClock.elapsedRealtime()-started).put("stamina_before",before)
                 .put("stamina_after",h.energy).put("inventory_before","UNKNOWN").put("inventory_after","UNKNOWN").toString())
         }
         var cleans=0
         while(h.cleanliness<90) {
             check(cleans<3) { "CLEAN_RETRY_LIMIT" }
-            val before=h; val started=SystemClock.elapsedRealtime()
+            val before=h.cleanliness; val started=SystemClock.elapsedRealtime()
             tap(room,PointF(638f,868f),soap,"enter-bath")
             verify(listOf(soap),"clean-before",latest=true)
             val points=buildList {
@@ -173,11 +187,11 @@ class PetExperimentalSession(
             safety(); input.drag(points,150); delay(2000)
             verify(listOf(soap),"clean-after")
             h=readHealth("clean-health")
-            check(h.cleanliness>before.cleanliness) { "CLEAN_NO_GAIN_OR_EMPTY" }
+            check(h.cleanliness>before) { "CLEAN_NO_GAIN_OR_EMPTY" }
             tap(soap,PointF(80f,160f),room,"leave-bath")
             cleans++;recovery.put("clean_count",cleans)
             recovery.put("clean_duration_ms",recovery.getLong("clean_duration_ms")+SystemClock.elapsedRealtime()-started)
-            emit("clean",result=JSONObject().put("cleanliness_before",before.cleanliness).put("cleanliness_after",h.cleanliness)
+            emit("clean",result=JSONObject().put("cleanliness_before",before).put("cleanliness_after",h.cleanliness)
                 .put("clean_duration_ms",SystemClock.elapsedRealtime()-started).put("inventory_before","UNKNOWN")
                 .put("inventory_after","UNKNOWN").toString())
         }
@@ -326,7 +340,9 @@ class PetExperimentalSession(
                     .put("roundLimit",3).put("experimental_mood_override",true)
                 verify(listOf(room),"initial-home")
                 val before=readHealth("before")
-                record.put("before",healthJson(before))
+                // Historical delta evidence is not a current authorization value ten minutes later.
+                val beforeRecord=healthJson(before)
+                record.put("before",beforeRecord)
                 val precheckMs=SystemClock.elapsedRealtime()-roundStart
                 recover(before)
                 state="VERIFY_READY"
@@ -341,6 +357,7 @@ class PetExperimentalSession(
                 tap(profile.courseListProbe,profile.courseButton,profile.courseDetailProbe,"select-fixed-course")
                 state="START_COURSE"
                 verify(listOf(profile.courseDetailProbe),"course-before-start",latest=true)
+                check(ready.energy>=90 && ready.cleanliness>=90) { "HEALTH_NOT_READY_OR_STALE_BEFORE_START" }
                 safety();val start=SystemClock.elapsedRealtime();val startWall=System.currentTimeMillis()
                 input.tap(profile.startButton.x,profile.startButton.y);delay(profile.pageSettleMs)
                 // Actual run: the first fresh frame after Start was an academy transition.
@@ -360,6 +377,8 @@ class PetExperimentalSession(
                     delay(300)
                 }
                 check(learningConfirmed) { "LEARNING_NOT_CONFIRMED_AFTER_START" }
+                capture.facts.events.append(EventSource.GAME_OBSERVATION,EventKind.COURSE_STARTED,mapOf("round" to round,"course" to "PHYSICAL_10_MIN"),listOf(evidence.absolutePath))
+                capture.facts.events.append(EventSource.GAME_OBSERVATION,EventKind.LEARNING_CONFIRMED,mapOf("round" to round),listOf(evidence.absolutePath))
                 val course=JSONObject().put("name","蹦蹦跳跳体能课").put("courseStartElapsedRealtime",start)
                     .put("start_ts",startWall).put("enter_course_ms",start-navigationStart)
                 record.put("course",course)
@@ -397,8 +416,9 @@ class PetExperimentalSession(
                 val transitionStart=SystemClock.elapsedRealtime()
                 returnHomeFromResult("result")
                 val after=readHealth("after")
-                record.put("after",healthJson(after)).put("delta_stamina",after.energy-before.energy)
-                    .put("delta_cleanliness",after.cleanliness-before.cleanliness).put("delta_mood",after.mood-before.mood)
+                record.put("after",healthJson(after)).put("delta_stamina",after.energy-beforeRecord.getInt("stamina"))
+                    .put("delta_cleanliness",after.cleanliness-beforeRecord.getInt("cleanliness"))
+                    .put("delta_mood",after.mood-beforeRecord.getInt("mood"))
                     .put("attributes","NOT MEASURED")
                 record.put("timing",JSONObject().put("precheck_ms",precheckMs).put("course_ms",courseMs)
                     .put("result_wait_ms",waitMs).put("round_transition_ms",SystemClock.elapsedRealtime()-transitionStart)

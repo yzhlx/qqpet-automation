@@ -28,8 +28,9 @@ $env:JAVA_HOME = (Get-ChildItem (Join-Path $taskTools 'jdk') -Directory | Select
 $env:GRADLE_USER_HOME = Join-Path $taskTools 'cache'
 $env:ANDROID_USER_HOME = Join-Path $taskTools 'android-user'
 $env:JAVA_TOOL_OPTIONS = '-Dfile.encoding=UTF-8 -Djava.net.preferIPv4Stack=true'
+$env:QQPET_SOURCE_REPO = $PSScriptRoot
 foreach ($taskName in $Tasks) {
-    & (Join-Path $taskProject 'gradlew.bat') -p $taskProject $taskName --no-daemon --console=plain
+    & (Join-Path $taskProject 'gradlew.bat') -p $taskProject $taskName '-Pkotlin.incremental=false' --no-daemon --console=plain
     if ($LASTEXITCODE -ne 0) { throw "Gradle $taskName failed: $LASTEXITCODE" }
 }
 $taskDeliverables = Join-Path $PSScriptRoot 'deliverables'
@@ -37,4 +38,8 @@ New-Item -ItemType Directory -Path $taskDeliverables -Force | Out-Null
 $taskApk = Join-Path $taskProject 'app\build\outputs\apk\debug\app-debug.apk'
 if (Test-Path -LiteralPath $taskApk) {
     Copy-Item -LiteralPath $taskApk -Destination (Join-Path $taskDeliverables 'qqpet-mvp-debug.apk') -Force
+}
+$taskTestApk = Join-Path $taskProject 'app\build\outputs\apk\androidTest\debug\app-debug-androidTest.apk'
+if (Test-Path -LiteralPath $taskTestApk) {
+    Copy-Item -LiteralPath $taskTestApk -Destination (Join-Path $taskDeliverables 'qqpet-mvp-gates.apk') -Force
 }

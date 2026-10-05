@@ -1,0 +1,250 @@
+{
+  "training": [
+    {
+      "file": "deliverables/gate-c/health-values-before.png",
+      "sha256": "0d4b89445ad20e83535e289461eea76247902a0c9fbf7986cd17a98ac63a084e",
+      "visually_checked": [
+        67,
+        66,
+        74
+      ],
+      "split": "training"
+    },
+    {
+      "file": "deliverables/experimental/1791192749747/round-1-before.png",
+      "sha256": "107babd6ab48f376fb4e807d18fccf656564f4e9ce3f0731e95408ac8e59a896",
+      "visually_checked": [
+        95,
+        98,
+        83
+      ],
+      "split": "training"
+    },
+    {
+      "file": "deliverables/experimental/1791203090192/round-1-ready.png",
+      "sha256": "1c8490e2bbcecada8c3b4c57fb7f5a834926424e7d99b7833f5e9115032e925a",
+      "visually_checked": [
+        94,
+        92,
+        79
+      ],
+      "split": "training"
+    },
+    {
+      "file": "deliverables/experimental/1791204552957/round-2-ready.png",
+      "sha256": "faac1f9fd8fae19bae26d4c658dacf2e16aad977b7c6d084421ae8a9b4b47344",
+      "visually_checked": [
+        99,
+        100,
+        81
+      ],
+      "split": "training"
+    }
+  ],
+  "heldout": [
+    {
+      "file": "deliverables\\experimental\\1791197823237\\round-1-ready.png",
+      "sha256": "9d39957c6c2206e6795fc2a95f05601caa441b76484279249a5b91de148f64ce",
+      "visually_checked": [
+        91,
+        96,
+        79
+      ],
+      "split": "heldout"
+    },
+    {
+      "file": "deliverables\\experimental\\1791198749090\\round-1-ready.png",
+      "sha256": "a1926c0a14f817e17883151e207025a20f9e2b20e61beeb870573f02a01c7532",
+      "visually_checked": [
+        91,
+        96,
+        79
+      ],
+      "split": "heldout"
+    },
+    {
+      "file": "deliverables\\experimental\\1791201870302\\round-1-ready.png",
+      "sha256": "4526f25815a918ccadd4821742031a61d9114e7327b9897312f9b82b18296133",
+      "visually_checked": [
+        99,
+        94,
+        79
+      ],
+      "split": "heldout"
+    },
+    {
+      "file": "deliverables\\experimental\\1791202276391\\round-1-ready.png",
+      "sha256": "69bfbc3aad5bc2902c04da93b34bdad6c410e5a74223883bc19ee0ede9b72c84",
+      "visually_checked": [
+        99,
+        94,
+        79
+      ],
+      "split": "heldout"
+    },
+    {
+      "file": "deliverables\\experimental\\1791203355328\\round-1-ready.png",
+      "sha256": "8d6770051de8f48aaae8de01110f7985fdb9eea04c038e8c1228dd97d7b0ec55",
+      "visually_checked": [
+        94,
+        92,
+        79
+      ],
+      "split": "heldout"
+    },
+    {
+      "file": "deliverables\\experimental\\1791192978270\\round-1-before.png",
+      "sha256": "4d318cbcd47c15d5fc7f0d743da1884cce1fb2c995dbdb261384f8bea81d6dd5",
+      "visually_checked": [
+        95,
+        98,
+        83
+      ],
+      "split": "heldout"
+    },
+    {
+      "file": "deliverables\\experimental\\1791195439383\\round-1-before.png",
+      "sha256": "762936587619af1155c3f0986fd0e2a0d117f7d6ef6678f3e8005a354b656238",
+      "visually_checked": [
+        93,
+        96,
+        81
+      ],
+      "split": "heldout"
+    },
+    {
+      "file": "deliverables\\experimental\\1791196162375\\round-1-before.png",
+      "sha256": "83626b8c038233e6ee2f39ffdfea11d84b2bf67dc0088b8d1c418437809caa07",
+      "visually_checked": [
+        93,
+        96,
+        81
+      ],
+      "split": "heldout"
+    },
+    {
+      "file": "deliverables\\experimental\\1791196488723\\round-1-before.png",
+      "sha256": "6ce12423dac6bdcd9d1bce6807c7f90fc1ee79370fc04a8ec4338765fc2c0d6e",
+      "visually_checked": [
+        93,
+        96,
+        81
+      ],
+      "split": "heldout"
+    },
+    {
+      "file": "deliverables\\experimental\\1791196952114\\round-1-before.png",
+      "sha256": "53089a7cfd533c4102cad0217d9ad1e32c03096d90d36c0cb1c950df499a7d03",
+      "visually_checked": [
+        93,
+        96,
+        79
+      ],
+      "split": "heldout"
+    },
+    {
+      "file": "deliverables\\experimental\\1791197823237\\round-1-before.png",
+      "sha256": "fdc629712db62ef785653890529326eb61a33d3fdb4f6919f94b15266363d38f",
+      "visually_checked": [
+        91,
+        96,
+        79
+      ],
+      "split": "heldout"
+    },
+    {
+      "file": "deliverables\\experimental\\1791198749090\\round-1-before.png",
+      "sha256": "7b25e7007c4e21bc80798d4cf715f88dcb2bb2624afea58e67fad07b33468707",
+      "visually_checked": [
+        91,
+        96,
+        79
+      ],
+      "split": "heldout"
+    },
+    {
+      "file": "deliverables\\experimental\\1791199799477\\round-1-before.png",
+      "sha256": "9f36c7cad739fd063641749e38af0c66c8466a7aeb96740ba73c977d7e9d8567",
+      "visually_checked": [
+        91,
+        94,
+        79
+      ],
+      "split": "heldout"
+    },
+    {
+      "file": "deliverables\\experimental\\1791201870302\\round-1-before.png",
+      "sha256": "e39d31c1978f824dbe964bbca7c00e92ef8d9a59d1f3a37fd9b63cac69b858e8",
+      "visually_checked": [
+        89,
+        94,
+        78
+      ],
+      "split": "heldout"
+    },
+    {
+      "file": "deliverables\\experimental\\1791202276391\\round-1-before.png",
+      "sha256": "02f5cc45bfb34aa734d6ab7ac96425b287bf1cc493517f023a67b9ea77af98b7",
+      "visually_checked": [
+        99,
+        94,
+        79
+      ],
+      "split": "heldout"
+    },
+    {
+      "file": "deliverables\\experimental\\1791203355328\\round-1-before.png",
+      "sha256": "7ce33169f703f39e5b4dd1bf6916d15cbcbbb6dd9dc7bf03f90baa282be1fa83",
+      "visually_checked": [
+        94,
+        92,
+        79
+      ],
+      "split": "heldout"
+    },
+    {
+      "file": "deliverables\\experimental\\1791205436000\\round-2-after-resume.png",
+      "sha256": "edfe0f604aecff19e440dc83bacf3fae56f4fea17a789056cb3ced116335e88f",
+      "visually_checked": [
+        94,
+        98,
+        81
+      ],
+      "split": "heldout"
+    },
+    {
+      "file": "deliverables\\experimental\\1791205436000\\round-3-before.png",
+      "sha256": "28fd8a1b3c79ab5724e73db783abcc6ecc0925237f5ada3bf57bfb5ad1bd19cd",
+      "visually_checked": [
+        94,
+        98,
+        81
+      ],
+      "split": "heldout"
+    },
+    {
+      "file": "deliverables\\experimental\\1791205436000\\round-3-after.png",
+      "sha256": "905a945368f6920604055ad9ddfcc79bc24c2da8dfd6350b57b4ddc80f6903b7",
+      "visually_checked": [
+        89,
+        96,
+        81
+      ],
+      "split": "heldout"
+    }
+  ],
+  "roi": [
+    256,
+    228,
+    308,
+    259
+  ],
+  "dark_threshold": "max(R,G,B)<100",
+  "normalization": "24x32 nearest binary",
+  "minimum_score": 0.98,
+  "minimum_digit_margin": 0.08,
+  "bank_sha256": "1cae3c5a56deb8d9358c33f88e67d2ed4977aed48c9812e69500a30eccc98f75",
+  "template_count": 10,
+  "limitations": "Fixed QQ 9.3.70 (16410), FOA-AL00 Android 12, 720x1600 @ 320dpi. Same font evidence; not population accuracy.",
+  "bank_hash_normalization": "CRLF to LF"
+}

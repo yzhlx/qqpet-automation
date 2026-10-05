@@ -78,7 +78,7 @@ class PetAutomationService : Service() {
 
             val budget = DailyBudgetStore(this)
             val capture = HeadlessDisplayCapture(app.displayRepository, displayId, profile.displayWidth, profile.displayHeight)
-            val input = PetInputController(app.displayRepository, displayId, profile.displayWidth, profile.displayHeight)
+            val input = PetInputController(app.displayRepository, displayId, profile.displayWidth, profile.displayHeight, capture.facts)
             val matcher = TemplateMatcher(this)
             val evidence = File(getExternalFilesDir(null), "pet_mvp_session/${System.currentTimeMillis()}")
             val fsm = PetStateMachine(capture, input, matcher, profile, evidence, ::logEvent)

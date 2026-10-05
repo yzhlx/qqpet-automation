@@ -17,6 +17,7 @@ import kotlinx.coroutines.flow.*
 import rikka.shizuku.Shizuku
 
 class ShizukuDisplayRepository(private val context: Context) : IDisplayRepository {
+    override val automationEventsDirectory = java.io.File(context.filesDir, "pet-events")
     private val activeCapture = com.ynk.virtualdisplay.automation.ShizukuActiveCapture(context)
     override suspend fun captureDisplay(displayId: Int) = runCatching { activeCapture.captureDisplay(displayId) }
 

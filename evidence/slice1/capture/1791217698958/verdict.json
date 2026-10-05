@@ -1,0 +1,1 @@
+{"verdict":"SHIZUKU_CAPTURE_PASS","gate":"hybrid","success":4,"total":4,"transitionActions":2,"displayId":4,"physicalDelta":0,"captureStatistics":{"imageReaderSuccess":0,"imageReaderTimeout":2,"shizukuFallbackCount":2,"shizukuFallbackSuccess":2,"captureLatencyP50Ms":638,"captureLatencyP95Ms":749},"p50_ms":1082,"p95_ms":1243}

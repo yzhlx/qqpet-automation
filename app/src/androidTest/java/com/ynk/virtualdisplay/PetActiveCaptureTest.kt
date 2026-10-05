@@ -29,6 +29,7 @@ class PetActiveCaptureTest {
         val inst = InstrumentationRegistry.getInstrumentation()
         val app = inst.targetContext.applicationContext as MyApplication
         val repo = app.displayRepository
+        val gateFacts=AutomationFacts(repo.automationEventsDirectory,id)
         var hybrid: HeadlessDisplayCapture? = null
         val dir = File(app.getExternalFilesDir(null), "pet_capture_gate/${System.currentTimeMillis()}").apply { mkdirs() }
         val events = File(dir, "events.jsonl")
@@ -55,11 +56,18 @@ class PetActiveCaptureTest {
             val frame = repo.captureDisplay(id).getOrThrow()
             try {
                 assertEquals(720, frame.bitmap.width); assertEquals(1600, frame.bitmap.height)
+                gateFacts.frame(FrameLiveness.inspect(id,frame.bitmap.width,frame.bitmap.height,720,1600,pixel=frame.bitmap::getPixel),frame.source)
                 val rs = matcher.match(frame.bitmap, room, 0.97).score
                 val hs = matcher.match(frame.bitmap, health, 0.97).score
                 val valid = if (expected == "HEALTH") hs >= 0.97 else rs >= 0.97 && hs < 0.97
                 val score = if (expected == "HEALTH") hs else rs
                 File(dir, "$name.png").outputStream().use { frame.bitmap.compress(Bitmap.CompressFormat.PNG,100,it) }
+                if(expected=="HEALTH" && hs>=0.97) {
+                    val observation=PetHealthCheck.observe(app,frame.bitmap,System.currentTimeMillis(),File(dir,"$name.png").absolutePath)
+                    gateFacts.health(observation)
+                    File(dir,"health-$name.json").writeText(EventJson.encode(observation.fields()))
+                    println("LIVE_HEALTH $name ${EventJson.encode(observation.fields())}")
+                }
                 events.appendText(JSONObject().put("timestamp", System.currentTimeMillis()).put("action", name)
                     .put("displayId", id).put("source", frame.source).put("uid", frame.uid)
                     .put("width", frame.bitmap.width).put("height", frame.bitmap.height)
@@ -82,11 +90,12 @@ class PetActiveCaptureTest {
             else if (mode == "hybrid") {
                 check(args.getString("capture_navigation_authorized") == "yes") { "NAVIGATION_AUTH_REQUIRED" }
                 val c = HeadlessDisplayCapture(repo,id,720,1600); hybrid = c; c.start()
-                val input = PetInputController(repo,id,720,1600)
+                val input = PetInputController(repo,id,720,1600,gateFacts)
                 suspend fun forcedAfter(name: String, expected: String) {
                     val began = SystemClock.elapsedRealtime()
                     val f = c.awaitFrame(0) // Deterministic ImageReader timeout, never a stale-cache PASS.
                     try {
+                        gateFacts.frame(FrameLiveness.inspect(id,f.width,f.height,720,1600,pixel=f::getPixel),"SHIZUKU_FALLBACK")
                         val hs=matcher.match(f,health,0.97).score
                         val rs=matcher.match(f,room,0.97).score
                         val valid=if(expected=="HEALTH") hs>=0.97 else rs>=0.97 && hs<0.97
@@ -108,7 +117,7 @@ class PetActiveCaptureTest {
             }
             else {
                 check(args.getString("capture_navigation_authorized") == "yes") { "NAVIGATION_AUTH_REQUIRED" }
-                val input = PetInputController(repo,id,720,1600)
+                val input = PetInputController(repo,id,720,1600,gateFacts)
                 repeat(3) { n ->
                     capture("$n-open-before", "HOME")
                     guard(true); input.tap(516f,160f); delay(900)

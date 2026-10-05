@@ -27,15 +27,20 @@ android {
         targetSdk = 35 // targetSdk 36 is not yet stable, 35 is recommended for now
 
         // 自动计算版本号与获取构建信息
+        // ASCII build mirrors must report the actual source repository, not the mirror's old HEAD.
+        val sourceGitDirectory = System.getenv("QQPET_SOURCE_REPO") ?: rootProject.projectDir.absolutePath
         val commitCount = providers.exec {
+            workingDir(sourceGitDirectory)
             commandLine("git", "rev-list", "--count", "HEAD")
         }.standardOutput.asText.map { it.trim().toIntOrNull() ?: 1 }.getOrElse(1)
 
         val gitHash = providers.exec {
+            workingDir(sourceGitDirectory)
             commandLine("git", "rev-parse", "--short", "HEAD")
         }.standardOutput.asText.map { it.trim() }.getOrElse("unknown")
 
         val isDirty = providers.exec {
+            workingDir(sourceGitDirectory)
             commandLine("git", "status", "--porcelain")
         }.standardOutput.asText.map { it.trim().isNotEmpty() }.getOrElse(false)
 

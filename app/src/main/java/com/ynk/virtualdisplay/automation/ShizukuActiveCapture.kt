@@ -24,6 +24,8 @@ data class ActiveCapturedFrame(val bitmap: Bitmap, val displayId: Int, val byteC
 
 /** Binary FD transport. The existing display-owning UserService is never restarted. */
 class ShizukuActiveCapture(private val context: Context) {
+    private val events by lazy { SessionEventStore(java.io.File(context.filesDir,"pet-events"),
+        "capture-"+java.util.UUID.randomUUID(),AndroidEventClock()) }
     private var service: ICaptureService? = null
     private var ready = CompletableDeferred<ICaptureService>()
     private var bound = false
@@ -40,6 +42,17 @@ class ShizukuActiveCapture(private val context: Context) {
     }
 
     suspend fun captureDisplay(displayId: Int): ActiveCapturedFrame {
+        try { return captureChecked(displayId) }
+        catch(t: Exception) {
+            if(t is kotlinx.coroutines.CancellationException) throw t
+            events.append(EventSource.GAME_OBSERVATION,EventKind.FRAME_INVALID,
+                mapOf("displayId" to displayId,"captureSource" to "SHIZUKU_SCREENCAP",
+                    "status" to FrameLiveness.failure(t.toString()).status.name,"error" to t.toString()))
+            throw t
+        }
+    }
+
+    private suspend fun captureChecked(displayId: Int): ActiveCapturedFrame {
         require(displayId > 0) { "DEFAULT_DISPLAY_REFUSED" }
         check(Shizuku.checkSelfPermission() == PackageManager.PERMISSION_GRANTED) { "SHIZUKU_PERMISSION_DENIED" }
         val began = SystemClock.elapsedRealtime()
@@ -61,11 +74,12 @@ class ShizukuActiveCapture(private val context: Context) {
             val bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.size) ?: error("CAPTURE_DECODE_FAILED")
             try {
                 check(bitmap.width == r.getInt("width") && bitmap.height == r.getInt("height")) { "CAPTURE_SIZE_MISMATCH" }
-                var visible = false
-                for (y in 0 until bitmap.height step 16) for (x in 0 until bitmap.width step 16) {
-                    if ((bitmap.getPixel(x, y) and 0x00ffffff) != 0) visible = true
-                }
-                check(visible) { "CAPTURE_BLACK_FRAME" }
+                val live=FrameLiveness.inspect(displayId,bitmap.width,bitmap.height,r.getInt("width"),r.getInt("height"),
+                    pixel=bitmap::getPixel)
+                check(live.valid) { "CAPTURE_${live.status}" }
+                events.append(EventSource.GAME_OBSERVATION,EventKind.FRAME_VALID,
+                    mapOf("displayId" to displayId,"status" to live.status.name,"captureSource" to "SHIZUKU_SCREENCAP",
+                        "width" to bitmap.width,"height" to bitmap.height,"byteCount" to bytes.size))
                 ActiveCapturedFrame(bitmap, displayId, bytes.size, r.getLong("captureDurationMs"),
                     SystemClock.elapsedRealtime() - began, r.getString("source")!!, r.getInt("uid"))
             } catch (t: Throwable) { bitmap.recycle(); throw t }

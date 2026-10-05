@@ -99,7 +99,7 @@ class PetExperimentalSessionTest {
                         else priorEvents.last {it.getString("action").endsWith(":SESSION_STOP")}
                         saved.getJSONObject("result").put("resume_run",resumeId)
                     } else null
-                    val session=PetExperimentalSession(app,c,PetInputController(repo,id,720,1600),runDir,::guard,::log,resumeRecord)
+                    val session=PetExperimentalSession(app,c,PetInputController(repo,id,720,1600,c.facts),runDir,::guard,::log,resumeRecord)
                     val verdict=session.run()
                     File(runDir,"verdict.json").writeText(JSONObject().put("verdict",verdict).put("completed",session.completed)
                         .put("stopReason",session.stopReason?:JSONObject.NULL).put("physicalDelta",GateTestActivity.touches.getValue(0).get()-physical)
@@ -115,7 +115,7 @@ class PetExperimentalSessionTest {
                     val m = TemplateMatcher(app).match(frame, p, 0.97)
                     assertTrue("CALIBRATION_PAGE_MISMATCH ${m.score}", m.matched)
                 } finally { frame.recycle() }
-                PetInputController(repo,id,720,1600).tap(args.getString("x")!!.toFloat(),args.getString("y")!!.toFloat())
+                PetInputController(repo,id,720,1600,c.facts).tap(args.getString("x")!!.toFloat(),args.getString("y")!!.toFloat())
                 delay(1200); save("after.png")
             }
             assertEquals("Physical screen received input",physical,GateTestActivity.touches.getValue(0).get())

@@ -68,7 +68,7 @@ class PetCalibrationGateTest {
             repeat(40) {
                 points += listOf(PointF(280f, 800f), PointF(430f, 950f), PointF(280f, 950f), PointF(430f, 800f))
             }
-            val gesture = async { PetInputController(repo, id, 720, 1600).drag(points, 150) }
+            val gesture = async { PetInputController(repo, id, 720, 1600, c.facts).drag(points, 150) }
             delay(3000)
             save("during.png")
             gesture.await()

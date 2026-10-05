@@ -16,6 +16,9 @@ import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicLong
 import java.util.concurrent.atomic.AtomicReference
 import org.json.JSONObject
+import com.ynk.virtualdisplay.data.repository.ConnectionStatus
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.delay
 
 /**
  * Headless capture for one VirtualDisplay. No MediaProjection / Accessibility / network.
@@ -28,6 +31,8 @@ class HeadlessDisplayCapture(
     private val width: Int,
     private val height: Int,
 ) {
+    val facts = AutomationFacts(repository.automationEventsDirectory, displayId)
+    private class InvalidFrame(message: String): IllegalStateException(message)
     private val thread = HandlerThread("pet-headless-capture-$displayId").apply { start() }
     private val reader = ImageReader.newInstance(width, height, PixelFormat.RGBA_8888, 2)
     private val latestImage = AtomicReference<Image?>(null)
@@ -62,10 +67,19 @@ class HeadlessDisplayCapture(
     }
 
     private fun remember(frame: Bitmap): Bitmap {
+        validate(frame)
         renderedSnapshot?.recycle()
         renderedSnapshot = frame.copy(Bitmap.Config.ARGB_8888, false)
         renderedAtMs = SystemClock.elapsedRealtime()
         return frame
+    }
+
+    private fun validate(frame: Bitmap) {
+        val result=FrameLiveness.inspect(displayId,frame.width,frame.height,width,height,
+            repository.connectionStatus.value==ConnectionStatus.CONNECTED && displayId in repository.managedDisplayIds.value,
+            pixel=frame::getPixel)
+        facts.frame(result,lastTelemetry.optString("captureSource"))
+        if(!result.valid || facts.frames.stopped) {frame.recycle();throw InvalidFrame("FRAME_INVALID:${result.status}")}
     }
 
     /** For an immediate pre-action check of an unchanged page. After an input,
@@ -74,12 +88,17 @@ class HeadlessDisplayCapture(
         check(started.get())
         latestImage.getAndSet(null)?.let { img ->
             setTelemetry("IMAGEREADER_RECENT", "RECENT", 0)
-            return try { remember(img.toBitmap()) } finally { img.close() }
+            try { return remember(img.toBitmap()) }
+            catch(t: Exception) {
+                if(t !is InvalidFrame) facts.frame(FrameLivenessResult(FrameStatus.INVALID_DECODE,t.toString()),"IMAGEREADER_RECENT")
+            } finally { img.close() }
+            return awaitFrame()
         }
         val snapshot = renderedSnapshot
         if (snapshot != null && SystemClock.elapsedRealtime() - renderedAtMs <= maxAgeMs) {
             setTelemetry("RECENT_CACHE", "NOT_REQUESTED", 0)
-            return snapshot.copy(Bitmap.Config.ARGB_8888, false)
+            val frame=snapshot.copy(Bitmap.Config.ARGB_8888, false)
+            try { validate(frame);return frame } catch(_: InvalidFrame) { return awaitFrame() }
         }
         return awaitFrame()
     }
@@ -136,6 +155,26 @@ class HeadlessDisplayCapture(
     }
 
     suspend fun awaitFrame(timeoutMs: Long = 350L): Bitmap {
+        check(!facts.frames.stopped) { "FRAME_FAILURE_LIMIT" }
+        var failure: Throwable?=null
+        repeat(3) {
+            try { return awaitSingleFrame(timeoutMs) }
+            catch(cancelled: CancellationException) {
+                facts.frame(FrameLiveness.failure(cancelled.toString()),lastTelemetry.optString("captureSource"))
+                throw cancelled
+            }
+            catch(t: Exception) {
+                failure=t
+                if(t !is InvalidFrame) facts.frame(FrameLiveness.failure(t.toString()),
+                    lastTelemetry.optString("captureSource"))
+                if(facts.frames.stopped) throw IllegalStateException("FRAME_FAILURE_LIMIT",t)
+                delay(100)
+            }
+        }
+        throw IllegalStateException("FRAME_UNCONFIRMED",failure)
+    }
+
+    private suspend fun awaitSingleFrame(timeoutMs: Long): Bitmap {
         check(started.get()) { "capture not started" }
         val began = SystemClock.elapsedRealtime()
         val img = try {
@@ -147,16 +186,15 @@ class HeadlessDisplayCapture(
             val fallbackBegan = SystemClock.elapsedRealtime()
             try {
                 val captured = repository.captureDisplay(displayId).getOrThrow()
-                check(captured.bitmap.width == width && captured.bitmap.height == height) {
-                    captured.bitmap.recycle(); "CAPTURE_SIZE_CHANGED"
-                }
-                fallbackSuccess++; fallbackLatencies.add(captured.durationMs)
                 lastTelemetry.put("fallbackResult", "OK").put("fallbackDurationMs", captured.durationMs)
                     .put("source", captured.source).put("byteCount", captured.byteCount)
-                return remember(captured.bitmap)
+                val accepted=remember(captured.bitmap)
+                fallbackSuccess++; fallbackLatencies.add(captured.durationMs)
+                return accepted
             } catch(t: Throwable) {
                 lastTelemetry.put("fallbackResult", "FAILED").put("error", t.toString())
                     .put("fallbackDurationMs", SystemClock.elapsedRealtime() - fallbackBegan)
+                if(t is InvalidFrame || t is CancellationException) throw t
                 throw IllegalStateException("CAPTURE_UNCONFIRMED:${t.message}", t)
             }
         }
