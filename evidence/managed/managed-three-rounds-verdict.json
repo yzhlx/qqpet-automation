@@ -1,0 +1,1 @@
+{"verdict":"STOPPED","sessionId":"3a5cc23e-7aba-4c86-8489-cf5c707757f3","error":"java.lang.AssertionError: Managed session stopped: RECOVERY_WINDOW_EXHAUSTED expected:<3> but was:<0>","states":["RUNNING","PAUSED","STOPPED"]}

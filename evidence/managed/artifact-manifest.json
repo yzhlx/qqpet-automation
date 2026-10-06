@@ -1,0 +1,9 @@
+{
+  "sourceSha": "6dfa13adb1e503196966e10beb80f10e67c027fd",
+  "apk": "deliverables/qqpet-managed-debug.apk",
+  "apkSha256": "51E2617E0F7CD2E7400CA7ACAE17FB611907217943C71F339B973ECBE3753FA5",
+  "testsApk": "deliverables/qqpet-managed-gates.apk",
+  "testsApkSha256": "115EA456DF9FA9235E39F9EFB06D088F8AE05247AA69383F86DC862B299F4CC7",
+  "verdict": "REWORK",
+  "reason": "RECOVERY_WINDOW_EXHAUSTED; continuous three-course acceptance incomplete"
+}

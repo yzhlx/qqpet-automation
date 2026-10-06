@@ -44,3 +44,19 @@ Device acceptance: pending explicit batch authorization and execution. No three-
 - Checkpoint reconciliation is phase- and round-specific; an unrelated result page cannot authorize resume.
 
 Final source SHA / artifacts / actual acceptance outcome will be recorded after device acceptance.
+
+## Formal Service acceptance: current outcome (2026-10-06)
+
+Tested source: `6dfa13a` (full SHA recorded in Git / artifact manifest). Three real failures were found and bounded fixes were committed:
+
+1. `b323f46`: Service consumed CONNECTED before managed-display ownership was ready. Wait for both within the existing seven-second startup bound; refresh ownership when the service binder arrives. Never remove the display ownership guard. Test startup now has its own fifteen-second bound. No course or care action occurred in this failed attempt.
+2. `fae88c5`: the second cookie triggered a Lv.2 care upgrade overlay, unlike the existing study-upgrade overlay. Two measured fixed ROIs positively identify it at unchanged 0.97, then dismiss via the visible blank-area instruction. Do not press reward/purchase. Re-read health after dismissal. The failed attempt consumed cookies but opened no course.
+3. `6dfa13a`: health observation inside the bathroom incorrectly verified the bedroom header. Use the actual cookie/soap parent probe before opening health and after closing it. Thresholds remain unchanged. The failed attempt performed a soap gesture but opened no course.
+
+Formal batch evidence: session `3a5cc23e-7aba-4c86-8489-cf5c707757f3`, acceptance `1791261203181`, capture directory `1791261204560`. Exact digits before start: energy 95 / cleanliness 100 / mood 81. Formal App started one course, sent ten encouragement taps, reached WAIT_RESULT, automatically PAUSED on manual lock. Unlock was not confirmed within the existing 120-second bound; STOP reason RECOVERY_WINDOW_EXHAUSTED. Recovery attempt count zero because the phone stayed locked. The course may continue inside the game independently of stopped automation. No RESUMING or successful three-round completion is claimed.
+
+All twenty game inputs in this batch were APP_AUTOMATION on display 4. No input after PAUSED; physical-display touch delta zero. No PC/ADB supplementary taps. Initial navigation and observations account for the other ten inputs. The batch used no care items because fresh values were already ready; earlier failed attempts' consumptions are separate and must not be hidden.
+
+Latest full unit run: 31 tests, zero failures; main and AndroidTest APK assembly successful. Original nine phone regressions, two deterministic faults and forced Hybrid gate passed on `a470ce0`; they have not been rerun on final care fixes. Real manual lock proves PAUSE plus bounded STOP, not successful RESUME. Final verdict currently REWORK, pending unlock and authorization for a new uninterrupted three-course acceptance.
+
+Evidence: `evidence/managed/managed-session-events.jsonl`, acceptance status/verdict, individual build/test logs; raw before/after frames under `deliverables/managed-evidence/pet_mvp_session/`. APK `deliverables/qqpet-managed-debug.apk`.
