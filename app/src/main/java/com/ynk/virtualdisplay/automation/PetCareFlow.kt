@@ -14,9 +14,9 @@ import java.io.File
 class PetCareFlow(private val flow: PetFlowContext,private val navigation: PetNavigation,
     private val onHealth: (HealthObservations)->Unit={}) {
     var careStatistics=JSONObject();private set
-    suspend fun readHealth(label: String): PetCareReading = with(flow) {
+    suspend fun readHealth(label: String, parent: PetProfile.Probe = flow.home): PetCareReading = with(flow) {
         val started = SystemClock.elapsedRealtime()
-        navigation.tap(home,PointF(516f,160f),healthPanel,"open-health")
+        navigation.tap(parent,PointF(516f,160f),healthPanel,"open-health")
         val f = frame(true)
         val h = try {
             save(f,label)
@@ -28,7 +28,7 @@ class PetCareFlow(private val flow: PetFlowContext,private val navigation: PetNa
         } finally { f.recycle() }
         check(h.energy in 10..100 && h.cleanliness in 10..100) { "HEALTH_VALUE_ABNORMAL" }
         emit(label,result=healthJson(h).put("read_duration_ms",SystemClock.elapsedRealtime()-started).toString())
-        navigation.tap(healthPanel,PointF(355f,454f),home,"close-health")
+        navigation.tap(healthPanel,PointF(355f,454f),parent,"close-health")
         h
     }
     suspend fun recover(initial: PetCareReading): PetCareReading = with(flow) {
@@ -46,7 +46,7 @@ class PetCareFlow(private val flow: PetFlowContext,private val navigation: PetNa
             safety(); input.tap(360f,1287f); delay(2500)
             navigation.dismissCareUpgradeIfPresent()
             verify(listOf(cookie),"feed-after")
-            h=readHealth("feed-health")
+            h=readHealth("feed-health",cookie)
             check(h.energy>before && h.energy-before in 5..12) { "FEED_NO_EXPECTED_GAIN_OR_EMPTY" }
             navigation.tap(cookie,PointF(80f,160f),room,"leave-food")
             feeds++; recovery.put("feed_count",feeds)
@@ -68,7 +68,7 @@ class PetCareFlow(private val flow: PetFlowContext,private val navigation: PetNa
             safety(); input.drag(points,150); delay(2000)
             navigation.dismissCareUpgradeIfPresent()
             verify(listOf(soap),"clean-after")
-            h=readHealth("clean-health")
+            h=readHealth("clean-health",soap)
             check(h.cleanliness>before) { "CLEAN_NO_GAIN_OR_EMPTY" }
             navigation.tap(soap,PointF(80f,160f),room,"leave-bath")
             cleans++;recovery.put("clean_count",cleans)
