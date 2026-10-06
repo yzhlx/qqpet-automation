@@ -59,7 +59,10 @@ class PetStudyFlow(private val flow: PetFlowContext,private val navigation: PetN
         val began=SystemClock.elapsedRealtime()
         while(sent<10) {
             check(sent>0 || SystemClock.elapsedRealtime()-began<8000) { "HIGH_FIVE_TARGET_NOT_FOUND" }
-            val f=frame()
+            // The live learning panel can move vertically between captures.
+            // Reuse the same bounded settling verification as other page transitions.
+            verifySettled(profile.learningProbes,"high-five-${sent+1}-before")
+            val f=frame(latest=true)
             val s=try {
                 check(score(f,profile.learningProbes)>=profile.matchThreshold) { "LEARNING_PAGE_LOST" }
                 if(sent==0) save(f,"before-high-five")
@@ -80,7 +83,7 @@ class PetStudyFlow(private val flow: PetFlowContext,private val navigation: PetN
                 .put("displayId",4).put("tapIndex",sent).put("tapLimit",10)
                 .put("targetSelected",true).put("currentTargetScore",s).put("offsetMs",offset)
                 .put("result","INPUT_SENT_BUSINESS_UNCONFIRMED").toString())
-            verify(profile.learningProbes,"high-five-$sent-after",false)
+            verifySettled(profile.learningProbes,"high-five-$sent-after")
             delay(80)
         }
         verify(profile.learningProbes,"after-high-five")
