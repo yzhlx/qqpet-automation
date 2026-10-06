@@ -23,7 +23,9 @@ class SessionRecovery(val sessionId: String,private val store: CheckpointStore,
     private val transition: (SessionRunState,String,Int)->Unit,
     private val blockInput: ()->Unit,private val rearmCapture: ()->Unit,private val allowInput: ()->Unit,
     private val maxAttempts: Int=3,private val windowMs: Long=120000,
-    private val wait: suspend (Long)->Unit={delay(it)}) {
+    private val wait: suspend (Long)->Unit={delay(it)},
+    private val reconcile: (SessionCheckpoint,String)->Boolean={_,_->false},
+    private val validateHealth: (HealthObservations,Long)->Unit={health,at -> health.current(at);Unit}) {
     init {require(maxAttempts in 1..3 && windowMs in 1..120000)}
     var state=SessionRunState.RUNNING;private set
     var checkpoint: SessionCheckpoint?=null;private set
@@ -67,13 +69,14 @@ class SessionRecovery(val sessionId: String,private val store: CheckpointStore,
                 if(!observation.displayValid || !observation.frameValid) throw IllegalStateException("RECOVERY_ENVIRONMENT_INVALID")
                 if(locked()) {blockInput();change(SessionRunState.PAUSED,"PHONE_RELOCKED",attempt);continue}
                 if(observation.page==null) stop("RECOVERY_PAGE_UNKNOWN")
-                if(observation.page!=cp.trustedPage) stop("RECOVERY_PAGE_MISMATCH:${cp.trustedPage}:${observation.page}")
+                if(observation.page!=cp.trustedPage && !reconcile(cp,observation.page))
+                    stop("RECOVERY_PAGE_MISMATCH:${cp.trustedPage}:${observation.page}")
                 if(cp.healthRequired) {
                     val health=observation.health ?: stop("RECOVERY_HEALTH_REOBSERVATION_REQUIRED")
-                    try {health.current(wall())} catch(t: Exception) {stop("RECOVERY_HEALTH_UNCONFIRMED:${t.message}")}
+                    try {validateHealth(health,wall())} catch(t: Exception) {stop("RECOVERY_HEALTH_UNCONFIRMED:${t.message}")}
                 }
                 if(mono()>=deadline) stop("RECOVERY_WINDOW_EXHAUSTED")
-                val rebuilt=cp.copy(health=observation.health ?: cp.health,observedAt=wall())
+                val rebuilt=cp.copy(trustedPage=observation.page,health=observation.health ?: cp.health,observedAt=wall())
                 store.save(rebuilt);checkpoint=rebuilt
                 change(SessionRunState.RUNNING,"RESUME_VERIFIED",attempt);allowInput();return
             } catch(cancelled: kotlinx.coroutines.TimeoutCancellationException) {

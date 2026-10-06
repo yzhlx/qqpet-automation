@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.ynk.virtualdisplay.PetManagedReconcileTest" tests="1" skipped="0" failures="0" errors="0" timestamp="2026-10-06T04:11:10.203Z" hostname="YZHLX_C" time="0.039">
+  <properties/>
+  <testcase name="onlyOwnedWaitingCourseMayReconcileToConfirmedResult" classname="com.ynk.virtualdisplay.PetManagedReconcileTest" time="0.039"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

@@ -64,10 +64,10 @@ class PetAutomationService : Service() {
     }
 
     private suspend fun runSession(displayId: Int, rounds: Int) {
-        val errors = profile.validate()
+        val errors = profile.validate(healthGuardInstalled=true)
         if (errors.isNotEmpty()) return stopSession("配置未完成：${errors.joinToString()}")
         if (displayId <= 0) return stopSession("拒绝默认/无效 displayId")
-        if (rounds !in listOf(1, 5, 10)) return stopSession("只允许1/5/10轮测试批次")
+        if (rounds !in 1..3) return stopSession("Only finite 1..3 round batches are supported")
 
         try {
             withTimeout(7_000L) {
@@ -81,37 +81,19 @@ class PetAutomationService : Service() {
             val input = PetInputController(app.displayRepository, displayId, profile.displayWidth, profile.displayHeight, capture.facts)
             val matcher = TemplateMatcher(this)
             val evidence = File(getExternalFilesDir(null), "pet_mvp_session/${System.currentTimeMillis()}")
-            val fsm = PetStateMachine(capture, input, matcher, profile, evidence, ::logEvent, this) {verifyDisplay(displayId)}
-
+            val controller=PetSessionController(this,capture,input,evidence,{verifyDisplay(displayId)},::logEvent,rounds,
+                beforeCourse={check(budget.usedMinutes()+10<=DailyBudgetStore.HARD_STOP_MINUTES) {"DAILY_BUDGET_LIMIT"}},
+                onRoundCompleted={round ->budget.addCourse(10);PetRuntime.update {it.copy(cycles=round)}})
             capture.start()
             try {
-                PetRuntime.update { it.copy(running = true, runState = SessionRunState.RUNNING, displayId = displayId, cycles = 0, status = "验证成绩单") }
-                logEvent("SESSION", null, "none", "START display=$displayId rounds=$rounds", null)
-                repeat(rounds) { index ->
-                    if (budget.usedMinutes() + 10 > DailyBudgetStore.HARD_STOP_MINUTES) {
-                        stopSession("达到8小时MVP保护线")
-                        return
-                    }
-                    fsm.round=index+1
-                    val result = fsm.runOneCycle()
-                    if (!result.ok) {
-                        stopSession("识别/操作失败：${result.message}")
-                        return
-                    }
-                    val next = System.currentTimeMillis() + profile.courseDurationMs + profile.courseFinishGraceMs
-                    PetRuntime.update { it.copy(nextCheckAtMs = next, status = "学习中，等待到点") }
-                    updateNotification("第${index + 1}/${rounds}节学习中")
-                    fsm.waitForCourse(profile.courseDurationMs + profile.courseFinishGraceMs)
-                    fsm.verify(PetStateMachine.State.RESULT, "wait", "after")
-                    budget.addCourse(10)
-                    PetRuntime.update { it.copy(cycles = index + 1, nextCheckAtMs = null, status = "第${index + 1}轮完成") }
-                    logEvent("RESULT", null, "none", "ROUND_PASS ${index + 1}/$rounds", null)
-                }
-                stopReason = "BATCH_PASS $rounds/$rounds"
-            } finally {
-                fsm.finish()
-                capture.stop()
-            }
+                PetRuntime.update {it.copy(running=true,runState=SessionRunState.RUNNING,displayId=displayId,cycles=0,status="Managed session")}
+                val verdict=controller.run()
+                stopReason=if(verdict=="MANAGED_BATCH_PASS") "BATCH_PASS ${controller.completed}/$rounds" else controller.stopReason ?: "STOPPED"
+                File(evidence,"verdict.json").writeText(JSONObject().put("verdict",verdict)
+                    .put("completed",controller.completed).put("requested",rounds)
+                    .put("stopReason",controller.stopReason ?: JSONObject.NULL)
+                    .put("captureStatistics",capture.statistics()).toString())
+            } finally {capture.stop()}
         } catch (ce: CancellationException) {
             throw ce
         } catch (t: Throwable) {

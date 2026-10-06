@@ -26,8 +26,8 @@ data class PetProfile(
 ) {
     data class Probe(val name: String, val rect: Rect, val assetPath: String)
 
-    fun validate(): List<String> = buildList {
-        add("健康前置检查尚未校准：每次开课前三项必须≥90")
+    fun validate(healthGuardInstalled:Boolean=false): List<String> = buildList {
+        if(!healthGuardInstalled) add("健康前置检查未接入：每次开课前体力与清洁必须≥90")
         if (displayWidth != 720 || displayHeight != 1600 || displayDpi != 320) {
             add("MVP只允许720x1600@320dpi")
         }
