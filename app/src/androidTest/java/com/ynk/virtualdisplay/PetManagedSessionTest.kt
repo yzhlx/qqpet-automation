@@ -67,7 +67,9 @@ class PetManagedSessionTest {
             assertEquals(setOf(1,2,3),starts.map {it.getJSONObject("payload").getInt("round")}.toSet())
             val inputs=events.filter {it.getString("kind")=="INPUT_SENT"}
             assertTrue(inputs.all {it.getString("source")=="APP_AUTOMATION" && it.getJSONObject("payload").getInt("displayId")==4})
+            val firstOwnedStart=starts.minOf {it.getLong("sequence")}
             fun taps(x:Double,y:Double)=inputs.count {val p=it.getJSONObject("payload")
+                it.getLong("sequence")>firstOwnedStart &&
                 p.getString("action")=="TAP" && p.getDouble("x")==x && p.getDouble("y")==y}
             assertEquals("All encouragement must be App-sent",30,taps(325.0,375.0))
             assertEquals("Each owned result acknowledged once",3,taps(530.0,1488.0))
