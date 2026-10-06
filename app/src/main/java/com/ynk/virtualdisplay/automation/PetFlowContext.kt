@@ -34,6 +34,8 @@ class PetFlowContext(val context: Context, val capture: HeadlessDisplayCapture,
     val highFive = probe("high_five",284,344,355,400)
     val gradeA = probe("grade_a",545,385,695,525)
     val upgrade = probe("upgrade",245,558,480,610)
+    val careUpgradeHint = probe("care_upgrade_hint",250,1160,478,1200)
+    val careUpgradeReward = probe("care_upgrade_reward",240,1020,480,1080)
     val recovery=PetRecoveryBoundary(context,capture,guard,
         (listOf(home,room,healthPanel,cookie,soap,outdoor,academy,highFive,profile.resultProbe,
             profile.courseListProbe,profile.courseDetailProbe)).associate {it.name to listOf(it)}+

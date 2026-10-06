@@ -12,6 +12,18 @@ import java.io.File
 
 /** Only measured page edges, not a general path finder. */
 class PetNavigation(private val flow: PetFlowContext) {
+    suspend fun dismissCareUpgradeIfPresent(): Boolean = with(flow) {
+        val current=frame()
+        val matched=try {
+            score(current,listOf(careUpgradeHint))>=profile.matchThreshold &&
+                score(current,listOf(careUpgradeReward))>=profile.matchThreshold
+        } finally {current.recycle()}
+        if (!matched) return@with false
+        verify(listOf(careUpgradeHint),"care-upgrade-before")
+        safety();input.tap(360f,1180f);delay(profile.pageSettleMs)
+        verifySettled(listOf(cookie,soap,room),"care-upgrade-after")
+        true
+    }
     suspend fun tap(before: PetProfile.Probe, point: PointF, after: PetProfile.Probe, action: String) = with(flow) {
         verify(listOf(before),"${serial++}-$action-before",latest=true)
         safety(); input.tap(point.x,point.y)
@@ -68,10 +80,13 @@ class PetNavigation(private val flow: PetFlowContext) {
         verifySettled(listOf(profile.courseListProbe),"enter-primary-academy-after")
     }
     suspend fun initialise() = with(flow) {
+        dismissCareUpgradeIfPresent()
         dismissUpgradeIfPresent("initial")
         val current=frame()
         val page=try {
             when {
+                score(current,listOf(cookie))>=profile.matchThreshold -> "cookie"
+                score(current,listOf(soap))>=profile.matchThreshold -> "soap"
                 score(current,listOf(profile.resultProbe))>=profile.matchThreshold -> "result"
                 score(current,profile.learningProbes)>=profile.matchThreshold -> "LEARNING"
                 score(current,listOf(room))>=profile.matchThreshold && score(current,listOf(healthPanel))<profile.matchThreshold -> "room"
@@ -82,6 +97,8 @@ class PetNavigation(private val flow: PetFlowContext) {
             }
         } finally {current.recycle()}
         when(page) {
+            "cookie" -> tap(cookie,PointF(80f,160f),room,"initial-leave-food")
+            "soap" -> tap(soap,PointF(80f,160f),room,"initial-leave-bath")
             "result" -> returnHomeFromResult("initial-unowned-result")
             "room" -> verify(listOf(room),"initial-home")
             "course_list" -> {tap(profile.courseListProbe,PointF(80f,160f),academy,"initial-close-panel")

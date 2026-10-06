@@ -44,6 +44,7 @@ class PetCareFlow(private val flow: PetFlowContext,private val navigation: PetNa
             navigation.tap(room,PointF(638f,720f),cookie,"enter-food")
             verify(listOf(cookie),"feed-before",latest=true)
             safety(); input.tap(360f,1287f); delay(2500)
+            navigation.dismissCareUpgradeIfPresent()
             verify(listOf(cookie),"feed-after")
             h=readHealth("feed-health")
             check(h.energy>before && h.energy-before in 5..12) { "FEED_NO_EXPECTED_GAIN_OR_EMPTY" }
@@ -65,6 +66,7 @@ class PetCareFlow(private val flow: PetFlowContext,private val navigation: PetNa
                 repeat(40) { add(PointF(280f,800f));add(PointF(430f,950f));add(PointF(280f,950f));add(PointF(430f,800f)) }
             }
             safety(); input.drag(points,150); delay(2000)
+            navigation.dismissCareUpgradeIfPresent()
             verify(listOf(soap),"clean-after")
             h=readHealth("clean-health")
             check(h.cleanliness>before) { "CLEAN_NO_GAIN_OR_EMPTY" }
