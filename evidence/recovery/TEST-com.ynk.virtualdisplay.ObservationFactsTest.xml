@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.ynk.virtualdisplay.ObservationFactsTest" tests="13" skipped="0" failures="0" errors="0" timestamp="2026-10-06T03:21:35.184Z" hostname="YZHLX_C" time="0.177">
+  <properties/>
+  <testcase name="invalidFrameImmediatelyInhibitsAndThreeMissesLatch" classname="com.ynk.virtualdisplay.ObservationFactsTest" time="0.011"/>
+  <testcase name="eventOrderPersistsAcrossReopenAndSourcesStayDistinct" classname="com.ynk.virtualdisplay.ObservationFactsTest" time="0.09"/>
+  <testcase name="incompleteEventJournalRefusesSilentContinuation" classname="com.ynk.virtualdisplay.ObservationFactsTest" time="0.003"/>
+  <testcase name="livenessChecksNormalBlackSizeDecodeAndDisplay" classname="com.ynk.virtualdisplay.ObservationFactsTest" time="0.006"/>
+  <testcase name="blankAndUnexpectedRoiAreUnknown" classname="com.ynk.virtualdisplay.ObservationFactsTest" time="0.006"/>
+  <testcase name="staleAndReversedClockCannotAuthorize" classname="com.ynk.virtualdisplay.ObservationFactsTest" time="0.001"/>
+  <testcase name="unknownNeverBecomesZero" classname="com.ynk.virtualdisplay.ObservationFactsTest" time="0.001"/>
+  <testcase name="fixedDigitsHaveKnownSourceAndConfidence" classname="com.ynk.virtualdisplay.ObservationFactsTest" time="0.012"/>
+  <testcase name="concurrentEventAppendIsOrderedAndDurable" classname="com.ynk.virtualdisplay.ObservationFactsTest" time="0.039"/>
+  <testcase name="lowConfidenceReturnsUnknown" classname="com.ynk.virtualdisplay.ObservationFactsTest" time="0.003"/>
+  <testcase name="confusingSixEightCannotForceGuess" classname="com.ynk.virtualdisplay.ObservationFactsTest" time="0.003"/>
+  <testcase name="unsupportedDiffersFromAttemptedUnknown" classname="com.ynk.virtualdisplay.ObservationFactsTest" time="0.001"/>
+  <testcase name="knownHealthEntersSafetyDecisionWithConservativeBoundary" classname="com.ynk.virtualdisplay.ObservationFactsTest" time="0.0"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

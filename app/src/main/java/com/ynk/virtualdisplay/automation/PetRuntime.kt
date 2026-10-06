@@ -7,6 +7,7 @@ import kotlinx.coroutines.flow.asStateFlow
 object PetRuntime {
     data class Snapshot(
         val running: Boolean = false,
+        val runState: SessionRunState = SessionRunState.STOPPED,
         val displayId: Int? = null,
         val status: String = "未运行",
         val cycles: Int = 0,

@@ -29,7 +29,9 @@ class PetInputController(
 
     suspend fun tap(x: Float, y: Float, pressMs: Long = 80L) {
         require(x >= 0f && x < width.toFloat() && y >= 0f && y < height.toFloat()) { "tap outside pet display" }
+        facts.beforeInput()
         requireTrustedFrame()
+        facts.markActionPending()
         val downTime = SystemClock.uptimeMillis()
         var downSent = false
         val down = event(downTime, downTime, MotionEvent.ACTION_DOWN, x, y)
@@ -55,7 +57,9 @@ class PetInputController(
     suspend fun drag(points: List<PointF>, stepMs: Long = 250L) {
         require(points.size >= 2)
         points.forEach { require(it.x in 0f..<width.toFloat() && it.y in 0f..<height.toFloat()) }
+        facts.beforeInput()
         requireTrustedFrame()
+        facts.markActionPending()
         val downTime = SystemClock.uptimeMillis()
         var downSent = false
         var last = points.first()

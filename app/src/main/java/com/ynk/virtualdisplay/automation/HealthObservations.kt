@@ -11,7 +11,7 @@ data class HealthObservations(val energy: ObservedValue<Int>, val cleanliness: O
             minOf(c,barCleanliness.requireCurrent(now,maxAgeMs)),minOf(m,barMood.requireCurrent(now,maxAgeMs)),barReady)
     }
     fun fields(): Map<String,Any?> = mapOf("energy" to energy.fields(),"cleanliness" to cleanliness.fields(),
-        "mood" to mood.fields(),"barEstimate" to mapOf("energy" to barEnergy.fields(),
+        "mood" to mood.fields(),"evidence" to evidence,"barReady" to barReady,"barEstimate" to mapOf("energy" to barEnergy.fields(),
             "cleanliness" to barCleanliness.fields(),"mood" to barMood.fields()),
         "strength" to ObservedValue.Unsupported("NO_READER_IN_SLICE1").fields(),
         "intelligence" to ObservedValue.Unsupported("NO_READER_IN_SLICE1").fields(),

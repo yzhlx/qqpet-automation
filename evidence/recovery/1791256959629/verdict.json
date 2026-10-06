@@ -1,0 +1,1 @@
+{"verdict":"PASS","gate":"capture","states":"[PAUSED, RESUMING, PAUSED, RESUMING, RUNNING]","physicalDelta":0,"appInputs":0,"displayId":4,"captureRequests":10}

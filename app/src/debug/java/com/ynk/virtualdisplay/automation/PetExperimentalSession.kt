@@ -49,7 +49,13 @@ class PetExperimentalSession(
             listOf(evidence.absolutePath))
     }
 
-    private fun safety() {
+    private val recovery=PetRecoveryBoundary(context,capture,guard,
+        (listOf(home,room,healthPanel,cookie,soap,outdoor,academy,highFive,profile.resultProbe,
+            profile.courseListProbe,profile.courseDetailProbe)).associate {it.name to listOf(it)}+
+            mapOf("LEARNING" to profile.learningProbes))
+    private suspend fun safety() {
+        recovery.boundary(round,state,state=="START_COURSE")
+        recovery.beforeBoundary()
         guard()
         check(!(context.getSystemService(Context.KEYGUARD_SERVICE) as KeyguardManager).isKeyguardLocked) { "PHONE_LOCKED" }
     }
@@ -65,7 +71,7 @@ class PetExperimentalSession(
     private suspend fun frame(latest: Boolean = false): Bitmap {
         safety()
         return try {
-            val f = if(latest) capture.latestRenderedFrame() else capture.awaitFrame()
+            val f = recovery.current(latest)
             emit("FRAME", result=capture.telemetry().toString())
             f
         } catch (t: TimeoutCancellationException) {
@@ -84,6 +90,7 @@ class PetExperimentalSession(
             emit(name,s,capture.telemetry().put("action",name).put("templateName",best.first.name)
                 .put("matchScore",s).put("result",if(s>=profile.matchThreshold) "PASS" else "FAIL").toString())
             check(s>=profile.matchThreshold) { "PAGE_MISMATCH:$state:$name:$s" }
+            recovery.confirm(round,state,if(best.first in profile.learningProbes) "LEARNING" else best.first.name,state=="START_COURSE")
             return s
         } finally { f.recycle() }
     }
@@ -98,7 +105,10 @@ class PetExperimentalSession(
                 val matched=lastScore>=profile.matchThreshold
                 emit(name,lastScore,capture.telemetry().put("templateName",best.first.name)
                     .put("result",if(matched) "PASS" else "SETTLING").toString())
-                if(matched) {save(current,name);return lastScore}
+                if(matched) {
+                    recovery.confirm(round,state,if(best.first in profile.learningProbes) "LEARNING" else best.first.name,state=="START_COURSE")
+                    save(current,name);return lastScore
+                }
             } finally {current.recycle()}
             delay(300)
         }
@@ -144,6 +154,7 @@ class PetExperimentalSession(
             save(f,label)
             val snapshot=PetHealthCheck.observe(context,f,System.currentTimeMillis(),File(evidence,"round-$round-$label.png").absolutePath)
             capture.facts.health(snapshot)
+            recovery.health(snapshot)
             PetHealthCheck.forBusiness(snapshot,System.currentTimeMillis())
         } finally { f.recycle() }
         check(h.energy in 10..100 && h.cleanliness in 10..100 && h.mood in 10..100) { "HEALTH_VALUE_ABNORMAL" }
@@ -371,7 +382,7 @@ class PetExperimentalSession(
                         emit("course-start-observe",learningScore,capture.telemetry()
                             .put("result",if(learningScore>=profile.matchThreshold) "PASS" else "SETTLING").toString())
                         if(learningScore>=profile.matchThreshold) {
-                            save(current,"course-start");learningConfirmed=true;break
+                            save(current,"course-start");recovery.confirm(round,"LEARNING","LEARNING");learningConfirmed=true;break
                         }
                     } finally {current.recycle()}
                     delay(300)
@@ -392,14 +403,14 @@ class PetExperimentalSession(
                     try {
                         val rs=score(f,listOf(profile.resultProbe))
                         if(rs>=profile.matchThreshold) {
-                            save(f,"result");emit("result",rs)
+                            save(f,"result");recovery.confirm(round,state,profile.resultProbe.name);emit("result",rs)
                             // Grade is optional. A+ must not be labelled A through
                             // a loose match against a mostly white grade region.
                             val grade=if(score(f,listOf(gradeA))>=0.999) "A" else "UNKNOWN"
                             record.put("result",JSONObject().put("grade",grade));found=true;break
                         }
                         val learningScore=score(f,profile.learningProbes)
-                        if(learningScore>=profile.matchThreshold) unconfirmedSince=null
+                        if(learningScore>=profile.matchThreshold) {recovery.confirm(round,state,"LEARNING");unconfirmedSince=null}
                         else {
                             val now=SystemClock.elapsedRealtime()
                             if(unconfirmedSince==null) unconfirmedSince=now
@@ -437,6 +448,8 @@ class PetExperimentalSession(
                 .put("total_duration_ms",SystemClock.elapsedRealtime()-totalStart).toString(),reason=stopReason)
             if(t is CancellationException && t !is TimeoutCancellationException) throw t
             return "STOPPED"
+        } finally {
+            recovery.recovery.finish(stopReason ?: "SESSION_COMPLETE")
         }
     }
 }

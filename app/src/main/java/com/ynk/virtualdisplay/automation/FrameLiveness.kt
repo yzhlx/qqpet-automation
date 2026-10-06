@@ -46,4 +46,6 @@ class FrameTrustGate(private val failureLimit: Int = 3) {
         else { consecutiveFailures++;inputAllowed=false;stopped=consecutiveFailures>=failureLimit }
     }
     @Synchronized fun requireInputAllowed() {check(inputAllowed && !stopped) {"FRAME_NOT_TRUSTED:$consecutiveFailures"}}
+    /** Only an explicit RESUMING attempt may reacquire; the session input barrier remains closed. */
+    @Synchronized fun rearmForRecovery() {consecutiveFailures=0;stopped=false;inputAllowed=false}
 }

@@ -81,17 +81,18 @@ class PetAutomationService : Service() {
             val input = PetInputController(app.displayRepository, displayId, profile.displayWidth, profile.displayHeight, capture.facts)
             val matcher = TemplateMatcher(this)
             val evidence = File(getExternalFilesDir(null), "pet_mvp_session/${System.currentTimeMillis()}")
-            val fsm = PetStateMachine(capture, input, matcher, profile, evidence, ::logEvent)
+            val fsm = PetStateMachine(capture, input, matcher, profile, evidence, ::logEvent, this) {verifyDisplay(displayId)}
 
             capture.start()
             try {
-                PetRuntime.update { it.copy(running = true, displayId = displayId, cycles = 0, status = "验证成绩单") }
+                PetRuntime.update { it.copy(running = true, runState = SessionRunState.RUNNING, displayId = displayId, cycles = 0, status = "验证成绩单") }
                 logEvent("SESSION", null, "none", "START display=$displayId rounds=$rounds", null)
                 repeat(rounds) { index ->
                     if (budget.usedMinutes() + 10 > DailyBudgetStore.HARD_STOP_MINUTES) {
                         stopSession("达到8小时MVP保护线")
                         return
                     }
+                    fsm.round=index+1
                     val result = fsm.runOneCycle()
                     if (!result.ok) {
                         stopSession("识别/操作失败：${result.message}")
@@ -100,7 +101,7 @@ class PetAutomationService : Service() {
                     val next = System.currentTimeMillis() + profile.courseDurationMs + profile.courseFinishGraceMs
                     PetRuntime.update { it.copy(nextCheckAtMs = next, status = "学习中，等待到点") }
                     updateNotification("第${index + 1}/${rounds}节学习中")
-                    delay(profile.courseDurationMs + profile.courseFinishGraceMs)
+                    fsm.waitForCourse(profile.courseDurationMs + profile.courseFinishGraceMs)
                     fsm.verify(PetStateMachine.State.RESULT, "wait", "after")
                     budget.addCourse(10)
                     PetRuntime.update { it.copy(cycles = index + 1, nextCheckAtMs = null, status = "第${index + 1}轮完成") }
@@ -108,6 +109,7 @@ class PetAutomationService : Service() {
                 }
                 stopReason = "BATCH_PASS $rounds/$rounds"
             } finally {
+                fsm.finish()
                 capture.stop()
             }
         } catch (ce: CancellationException) {
@@ -155,7 +157,7 @@ class PetAutomationService : Service() {
     private fun finalizeStop() {
         val reason = stopReason
         logLine("SESSION_STOP $reason")
-        PetRuntime.update { it.copy(running = false, status = reason, nextCheckAtMs = null) }
+        PetRuntime.update { it.copy(running = false, runState = SessionRunState.STOPPED, status = reason, nextCheckAtMs = null) }
         runCatching { updateNotification(reason) }
         wakeLock?.let { if (it.isHeld) it.release() }
         wakeLock = null
@@ -210,7 +212,7 @@ class PetAutomationService : Service() {
         job?.cancel(); job = null
         wakeLock?.let { if (it.isHeld) it.release() }
         wakeLock = null
-        PetRuntime.update { it.copy(running = false, nextCheckAtMs = null) }
+        PetRuntime.update { it.copy(running = false, runState = SessionRunState.STOPPED, nextCheckAtMs = null) }
         app.releaseDisplayRepository("PetAutomationService")
         scope.cancel()
         super.onDestroy()

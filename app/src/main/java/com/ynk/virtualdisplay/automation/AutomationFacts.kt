@@ -17,11 +17,17 @@ class AndroidEventClock : EventClock {
 class AutomationFacts(directory: File, val displayId: Int, val clock: EventClock = AndroidEventClock()) {
     val events=SessionEventStore(directory,UUID.randomUUID().toString(),clock)
     val frames=FrameTrustGate(3)
+    @Volatile private var recoveryBlocked=false
+    var beforeInput: suspend ()->Unit={}
+    var markActionPending: ()->Unit={}
+    fun inhibitInput() {recoveryBlocked=true}
+    fun rearmCapture() {check(recoveryBlocked);frames.rearmForRecovery()}
+    fun resumeInput() {frames.requireInputAllowed();recoveryBlocked=false}
     fun frame(result: FrameLivenessResult, source: String) {
         try { events.append(EventSource.GAME_OBSERVATION,if(result.valid) EventKind.FRAME_VALID else EventKind.FRAME_INVALID,
             mapOf("displayId" to displayId,"status" to result.status.name,"detail" to result.detail,
                 "captureSource" to source,"consecutiveFailures" to if(result.valid) 0 else frames.consecutiveFailures+1,
-                "inputAllowed" to (result.valid && !frames.stopped))) }
+                "inputAllowed" to (result.valid && !frames.stopped && !recoveryBlocked))) }
         catch(t: Exception) { frames.observe(FrameLivenessResult(FrameStatus.CAPTURE_FAILED,"EVENT_WRITE_FAILED"));throw t }
         frames.observe(result)
     }
@@ -30,7 +36,7 @@ class AutomationFacts(directory: File, val displayId: Int, val clock: EventClock
         events.append(EventSource.GAME_OBSERVATION,if(values.all {it is ObservedValue.Known})
             EventKind.HEALTH_OBSERVED else EventKind.HEALTH_UNKNOWN,snapshot.fields(),listOf(snapshot.evidence))
     }
-    fun requireInput()=frames.requireInputAllowed()
+    fun requireInput() {check(!recoveryBlocked) {"SESSION_INPUT_PAUSED"};frames.requireInputAllowed()}
     fun input(action: String, payload: Map<String,Any?>) {
         events.append(EventSource.APP_AUTOMATION,EventKind.INPUT_SENT,mapOf("displayId" to displayId,"action" to action)+payload)
     }

@@ -12,10 +12,27 @@ class PetStateMachine(
     private val profile: PetProfile,
     private val evidence: File,
     private val logger: (String, Double?, String, String, String?) -> Unit,
+    context: android.content.Context,
+    displayCheck: ()->Unit,
 ) {
     enum class State { RESULT, COURSE_LIST, COURSE_DETAIL, LEARNING, STOPPED_ERROR }
     data class CycleResult(val ok: Boolean, val finalState: State, val message: String)
     private var frameIndex = 0
+    var round=1
+    private val recovery=PetRecoveryBoundary(context,capture,displayCheck,mapOf(
+        "RESULT" to listOf(profile.resultProbe),"COURSE_LIST" to listOf(profile.courseListProbe),
+        "COURSE_DETAIL" to listOf(profile.courseDetailProbe),"LEARNING" to profile.learningProbes))
+    fun finish()=recovery.recovery.finish("SESSION_ENDED")
+
+    suspend fun waitForCourse(durationMs: Long) {
+        val deadline=android.os.SystemClock.elapsedRealtime()+durationMs
+        recovery.boundary(round,"WAIT_RESULT")
+        while(android.os.SystemClock.elapsedRealtime()<deadline) {
+            delay(minOf(1000L,deadline-android.os.SystemClock.elapsedRealtime()).coerceAtLeast(1))
+            val frame=recovery.current()
+            frame.recycle()
+        }
+    }
 
     suspend fun runOneCycle(): CycleResult = try {
         verify(State.RESULT, "continue", "before")
@@ -42,7 +59,8 @@ class PetStateMachine(
     }
 
     suspend fun verify(state: State, action: String, phase: String) {
-        val frame = capture.awaitFrame()
+        recovery.boundary(round,state.name,state==State.COURSE_DETAIL)
+        val frame = recovery.current()
         try {
             evidence.mkdirs()
             File(evidence, "%03d_%s_%s_%s.png".format(frameIndex++, state, action, phase))
@@ -60,6 +78,7 @@ class PetStateMachine(
             val reason = if (matched) null else "$state mismatch: ${best.first.name}"
             logger(state.name, best.second.score, "$action:$phase", if (matched) "PASS" else "FAIL", reason)
             check(matched) { reason!! }
+            recovery.confirm(round,state.name,state.name,state==State.COURSE_DETAIL)
             if(state==State.LEARNING) capture.facts.events.append(EventSource.GAME_OBSERVATION,EventKind.LEARNING_CONFIRMED,
                 mapOf("score" to best.second.score,"phase" to phase),listOf(evidence.absolutePath))
         } finally { frame.recycle() }

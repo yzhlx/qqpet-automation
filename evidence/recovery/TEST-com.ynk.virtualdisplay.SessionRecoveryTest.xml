@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.ynk.virtualdisplay.SessionRecoveryTest" tests="9" skipped="0" failures="0" errors="0" timestamp="2026-10-06T03:21:35.363Z" hostname="YZHLX_C" time="0.067">
+  <properties/>
+  <testcase name="repeatedFailureStopsAfterThree" classname="com.ynk.virtualdisplay.SessionRecoveryTest" time="0.055"/>
+  <testcase name="lockPausesWaitsForUnlockAndVerifiesBeforeResume" classname="com.ynk.virtualdisplay.SessionRecoveryTest" time="0.002"/>
+  <testcase name="swappedSessionCheckpointStops" classname="com.ynk.virtualdisplay.SessionRecoveryTest" time="0.001"/>
+  <testcase name="unknownPageInvalidDisplayAndInvalidFrameNeverResume" classname="com.ynk.virtualdisplay.SessionRecoveryTest" time="0.001"/>
+  <testcase name="requiredHealthMustBeNewlyObservedAndFresh" classname="com.ynk.virtualdisplay.SessionRecoveryTest" time="0.002"/>
+  <testcase name="differentKnownPageStopsWithoutRetryOrGuess" classname="com.ynk.virtualdisplay.SessionRecoveryTest" time="0.002"/>
+  <testcase name="outageRecoversWithBoundedAttemptsAndNoInput" classname="com.ynk.virtualdisplay.SessionRecoveryTest" time="0.002"/>
+  <testcase name="permanentlyLockedHasFiniteDeadline" classname="com.ynk.virtualdisplay.SessionRecoveryTest" time="0.001"/>
+  <testcase name="pendingActionIsNotReplayed" classname="com.ynk.virtualdisplay.SessionRecoveryTest" time="0.001"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>
