@@ -73,6 +73,8 @@ class ShizukuDisplayRepository(private val context: Context) : IDisplayRepositor
         scope.launch {
             binder.service.collect { service ->
                 displayService = service
+                // The status collector may refresh before this collector receives the binder.
+                if (service != null) refreshManagedDisplays()
             }
         }
     }

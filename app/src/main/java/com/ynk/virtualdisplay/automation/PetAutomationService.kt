@@ -72,6 +72,8 @@ class PetAutomationService : Service() {
         try {
             withTimeout(7_000L) {
                 app.displayRepository.connectionStatus.first { it == ConnectionStatus.CONNECTED }
+                // CONNECTED is published before the asynchronous ownership snapshot.
+                app.displayRepository.managedDisplayIds.first { displayId in it }
             }
             verifyDisplay(displayId)
             acquireWakeLock()

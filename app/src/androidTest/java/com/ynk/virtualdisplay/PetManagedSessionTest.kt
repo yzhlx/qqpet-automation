@@ -34,6 +34,13 @@ class PetManagedSessionTest {
         var currentId:String?=null;var previous="";val states=mutableListOf<String>()
         withContext(Dispatchers.Main) {app.startForegroundService(PetAutomationService.startIntent(app,4,3))}
         try {
+            withTimeout(15_000L) {
+                while (PetManagedRuntime.state.value.sessionId == null) {
+                    val startup = PetRuntime.state.value
+                    check(!startup.status.startsWith("会话异常")) { startup.status }
+                    delay(100)
+                }
+            }
             withTimeout(40*60*1000L) {
                 while(true) {
                     val state=PetManagedRuntime.state.value
