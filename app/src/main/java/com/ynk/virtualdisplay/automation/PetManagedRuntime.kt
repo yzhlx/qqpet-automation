@@ -6,7 +6,7 @@ import kotlinx.coroutines.flow.asStateFlow
 
 data class ManagedRuntimeState(
     val sessionId:String?=null,
-    val runState:SessionRunState=SessionRunState.STOPPED,
+    val runState:SessionRunState=SessionRunState.IDLE,
     val currentFlow:String="IDLE",
     val currentStep:String="IDLE",
     val round:Int=0,
@@ -17,6 +17,7 @@ data class ManagedRuntimeState(
     val lastConfirmedAt:Long?=null,
     val nextStep:String="等待启动",
     val pauseReason:String?=null,
+    val pauseCount:Int=0,
     val runtimeMs:Long=0,
     val energy:ObservedValue<Int> = ObservedValue.Unknown("NOT_OBSERVED",0,"session not started"),
     val cleanliness:ObservedValue<Int> = ObservedValue.Unknown("NOT_OBSERVED",0,"session not started"),
@@ -40,6 +41,9 @@ class PetRoundLedger {
     private val completed=mutableSetOf<Int>()
     private val encouragement=mutableMapOf<Int,Int>()
     val completedCount get()=completed.size
+    val startedCount get()=started.size
+    val attemptCount get()=attempts.size
+    val encouragementTotal get()=encouragement.values.sum()
     fun startAttempt(round:Int) {check(round>0 && attempts.add(round)) {"DUPLICATE_COURSE_START"}}
     fun started(round:Int) {check(round in attempts && started.add(round)) {"DUPLICATE_START_CONFIRMATION"}}
     fun complete(round:Int):Boolean {check(round in started) {"COURSE_NOT_STARTED"};return completed.add(round)}

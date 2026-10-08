@@ -79,12 +79,32 @@ class PetRecoveryGateTest {
             }
         }
         var physical=0
+        var lockSamples: MutableList<String>?=null
         withContext(Dispatchers.Main) {app.acquireDisplayRepository("PetRecoveryGate")}
         try {
             withTimeout(15000) {original.connectionStatus.first {it==ConnectionStatus.CONNECTED}}
             shell("am start --display 0 -f 0x18000000 -n com.ynk.virtualdisplay/.automation.GateTestActivity")
             withTimeout(5000) {while(!GateTestActivity.touches.containsKey(0)) delay(100)}
             physical=GateTestActivity.touches.getValue(0).get()
+            // The gate observes the room page, but a previous run can leave the game on the
+            // result page. Reach the room with the production navigation on a throw-away
+            // capture, so the gate's own event log still contains no game input.
+            // Those setup inputs are pre-checkpoint and land on the virtual display only;
+            // count them so the verdict can state them instead of hiding them.
+            var navigationInputs=0
+            if(args.getString("reset_home")!="no") {
+                val navCapture=HeadlessDisplayCapture(original,id,720,1600)
+                try {
+                    navCapture.start()
+                    val navFlow=PetFlowContext(app,navCapture,
+                        PetInputController(original,id,720,1600,navCapture.facts),File(dir,"nav"),::guard,
+                        {_,_,_,_,_->})
+                    PetNavigation(navFlow).initialise()
+                } finally {navCapture.stop()}
+                val navEvents=File(app.filesDir,"pet-events/${navCapture.facts.events.sessionId}.jsonl")
+                navigationInputs=if(navEvents.exists())
+                    navEvents.readLines().count {it.contains("\"kind\":\"INPUT_SENT\"")} else 0
+            }
             capture.start()
             repeat(2) {n ->
                 val frame=boundary.current()
@@ -98,8 +118,30 @@ class PetRecoveryGateTest {
             val checkpoint=boundary.recovery.checkpoint!!
             if(mode=="lock") {
                 status("READY_FOR_MANUAL_LOCK")
-                withTimeout(90000) {while(!boundary.locked()) delay(100)}
-                capture.facts.events.append(EventSource.USER,EventKind.SESSION_STATE,mapOf("action" to "MANUAL_LOCK_OBSERVED"))
+                // The lock is a HUMAN action: the operator has to read the READY status with the
+                // phone already past its initial page confirmation. A fixed 90s window turned a
+                // simple reaction-time race into a false STOPPED (verified once: verdict
+                // states=[] after Readiness reached the operator late). The window is therefore
+                // operator-tunable, but stays finite and defaults to the previous 90s.
+                val lockWaitMs=args.getString("lock_wait_ms")?.toLong() ?: 90000L
+                require(lockWaitMs in 10000L..600000L) {"LOCK_WAIT_OUT_OF_RANGE"}
+                // Sample the app-side detector while waiting. Two runs previously timed out with
+                // an empty state list while a host-side watcher observed deviceLocked=1, so the
+                // gate must record its own samples to distinguish "operator locked outside the
+                // window" from "KeyguardManager.isKeyguardLocked missed the lock".
+                val samples=mutableListOf<String>()
+                lockSamples=samples
+                val waitStartedAt=System.currentTimeMillis()
+                withTimeout(lockWaitMs) {
+                    while(!boundary.locked()) {
+                        samples.add("${System.currentTimeMillis()-waitStartedAt}:${boundary.locked()}")
+                        delay(100)
+                    }
+                }
+                samples.add("${System.currentTimeMillis()-waitStartedAt}:true")
+                File(dir,"lock-samples.jsonl").writeText(samples.joinToString("\n"))
+                capture.facts.events.append(EventSource.USER,EventKind.SESSION_STATE,mapOf("action" to "MANUAL_LOCK_OBSERVED",
+                    "latencyMs" to (System.currentTimeMillis()-waitStartedAt)))
             } else broken=true
             val result=runCatching {boundary.current()}
             if(mode=="mismatch") {
@@ -130,9 +172,11 @@ class PetRecoveryGateTest {
             boundary.file.copyTo(File(dir,"checkpoint.json"),true)
             File(dir,"verdict.json").writeText(JSONObject().put("verdict","PASS").put("gate",mode)
                 .put("states",states).put("physicalDelta",delta).put("appInputs",0)
+                .put("setupNavigationInputs",navigationInputs)
                 .put("displayId",id).put("captureRequests",captureRequests).toString())
             status("PASS")
         } catch(t:Throwable) {
+            lockSamples?.let {File(dir,"lock-samples.jsonl").writeText(it.joinToString("\n"))}
             File(dir,"verdict.json").writeText(JSONObject().put("verdict","STOPPED").put("gate",mode)
                 .put("states",states).put("error",t.toString()).toString());status("STOPPED:${t.message}");throw t
         } finally {

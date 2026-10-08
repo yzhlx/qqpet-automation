@@ -41,14 +41,14 @@ class PetCareFlow(private val flow: PetFlowContext,private val navigation: PetNa
         while(h.energy<90) {
             check(feeds<5) { "FEED_RETRY_LIMIT" }
             val before=h.energy; val started=SystemClock.elapsedRealtime(); val wall=System.currentTimeMillis()
-            navigation.tap(room,PointF(638f,720f),cookie,"enter-food")
-            verify(listOf(cookie),"feed-before",latest=true)
+            navigation.tap(room,PointF(638f,720f),foodScene,"enter-food")
+            verify(listOf(foodScene),"feed-before",latest=true)
             safety(); input.tap(360f,1287f); delay(2500)
             navigation.dismissCareUpgradeIfPresent()
-            verify(listOf(cookie),"feed-after")
-            h=readHealth("feed-health",cookie)
+            verify(listOf(foodScene),"feed-after")
+            h=readHealth("feed-health",foodScene)
             check(h.energy>before && h.energy-before in 5..12) { "FEED_NO_EXPECTED_GAIN_OR_EMPTY" }
-            navigation.tap(cookie,PointF(80f,160f),room,"leave-food")
+            navigation.tap(foodScene,PointF(80f,160f),room,"leave-food")
             feeds++; recovery.put("feed_count",feeds)
             recovery.put("feed_duration_ms",recovery.getLong("feed_duration_ms")+SystemClock.elapsedRealtime()-started)
             emit("feed",result=JSONObject().put("feed_start_ts",wall).put("feed_end_ts",System.currentTimeMillis())
@@ -59,18 +59,22 @@ class PetCareFlow(private val flow: PetFlowContext,private val navigation: PetNa
         while(h.cleanliness<90) {
             check(cleans<3) { "CLEAN_RETRY_LIMIT" }
             val before=h.cleanliness; val started=SystemClock.elapsedRealtime()
-            navigation.tap(room,PointF(638f,868f),soap,"enter-bath")
-            verify(listOf(soap),"clean-before",latest=true)
+            navigation.tap(room,PointF(638f,868f),bath,"enter-bath")
+            // Page identity is the stable bath scene, never the soap button: the button repaints
+            // to its pale "already clean" state once cleanliness is maxed, which used to fail
+            // clean-after verification (PAGE_MISMATCH ... 0.9538353304284677) with cleanliness
+            // already at 99. The soap probe stays the measured gesture/tap target only.
+            verify(listOf(bath),"clean-before",latest=true)
             val points=buildList {
                 add(PointF(360f,1345f));add(PointF(360f,1100f));add(PointF(360f,900f))
                 repeat(40) { add(PointF(280f,800f));add(PointF(430f,950f));add(PointF(280f,950f));add(PointF(430f,800f)) }
             }
             safety(); input.drag(points,150); delay(2000)
             navigation.dismissCareUpgradeIfPresent()
-            verify(listOf(soap),"clean-after")
-            h=readHealth("clean-health",soap)
+            verify(listOf(bath),"clean-after")
+            h=readHealth("clean-health",bath)
             check(h.cleanliness>before) { "CLEAN_NO_GAIN_OR_EMPTY" }
-            navigation.tap(soap,PointF(80f,160f),room,"leave-bath")
+            navigation.tap(bath,PointF(80f,160f),room,"leave-bath")
             cleans++;recovery.put("clean_count",cleans)
             recovery.put("clean_duration_ms",recovery.getLong("clean_duration_ms")+SystemClock.elapsedRealtime()-started)
             emit("clean",result=JSONObject().put("cleanliness_before",before).put("cleanliness_after",h.cleanliness)

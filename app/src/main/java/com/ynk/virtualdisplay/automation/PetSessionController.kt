@@ -25,7 +25,11 @@ class PetSessionController(context:Context,capture:HeadlessDisplayCapture,input:
                 else -> "OBSERVATION"},lastConfirmedAt=if(score!=null && score>=0.97) System.currentTimeMillis() else snapshot.lastConfirmedAt)
             publish()
         },onRecovery={state,reason,_ ->
-            snapshot=snapshot.copy(runState=state,pauseReason=if(state==SessionRunState.PAUSED || state==SessionRunState.RESUMING) reason else null)
+            // Count a pause once per PAUSED episode, not once per transition into it.
+            val pausing=state==SessionRunState.PAUSED && snapshot.runState!=SessionRunState.PAUSED
+            snapshot=snapshot.copy(runState=state,
+                pauseReason=if(state==SessionRunState.PAUSED || state==SessionRunState.RESUMING) reason else null,
+                pauseCount=if(pausing) snapshot.pauseCount+1 else snapshot.pauseCount)
             publish()
         },reconcile={cp,page -> cp.phase=="WAIT_RESULT" && cp.trustedPage=="LEARNING" && page=="result" && ledger.canReconcileResult(cp.round)})
     private val navigation=PetNavigation(flow)
@@ -35,6 +39,7 @@ class PetSessionController(context:Context,capture:HeadlessDisplayCapture,input:
     private val study=PetStudyFlow(flow,navigation,ledger)
     var completed=0;private set
     var stopReason:String?=null;private set
+    private var cancelled=false
     init {require(totalRounds in 1..3)}
     @Synchronized private fun publish() {
         val value=snapshot.at(System.currentTimeMillis(),SystemClock.elapsedRealtime())
@@ -45,7 +50,7 @@ class PetSessionController(context:Context,capture:HeadlessDisplayCapture,input:
             "step" to value.currentStep,"round" to value.round,"totalRounds" to value.totalRounds,
             "completedRounds" to value.completedRounds,"startedAt" to value.startedAt,
             "lastConfirmedAt" to value.lastConfirmedAt,"nextStep" to value.nextStep,
-            "pauseReason" to value.pauseReason,"runtimeMs" to value.runtimeMs,
+            "pauseReason" to value.pauseReason,"pauseCount" to value.pauseCount,"runtimeMs" to value.runtimeMs,
             "energy" to value.energy.fields(),"cleanliness" to value.cleanliness.fields(),"mood" to value.mood.fields())))
     }
     suspend fun run():String=coroutineScope {
@@ -96,6 +101,7 @@ class PetSessionController(context:Context,capture:HeadlessDisplayCapture,input:
             "MANAGED_BATCH_PASS"
         } catch(t:Throwable) {
             stopReason=t.message ?: t.javaClass.simpleName
+            if(t is CancellationException) cancelled=true
             snapshot=snapshot.copy(pauseReason=stopReason,nextStep="停止输入")
             flow.emit("SESSION_STOP",result="STOP",reason=stopReason)
             if(t is CancellationException) throw t
@@ -103,9 +109,40 @@ class PetSessionController(context:Context,capture:HeadlessDisplayCapture,input:
         } finally {
             withContext(NonCancellable) {
                 ticker.cancelAndJoin()
+                // finish() publishes STOPPED; the terminal lifecycle state is decided below.
                 flow.recovery.recovery.finish(stopReason ?: "BATCH_COMPLETE")
-                snapshot=snapshot.copy(runState=SessionRunState.STOPPED,pauseReason=stopReason);publish()
+                val terminal=when {
+                    stopReason==null && completed==totalRounds -> SessionRunState.COMPLETED
+                    cancelled -> SessionRunState.STOPPED
+                    else -> SessionRunState.FAILED
+                }
+                snapshot=snapshot.copy(runState=terminal,pauseReason=stopReason,
+                    completedRounds=completed,
+                    nextStep=if(terminal==SessionRunState.COMPLETED) "批次完成" else "已安全停止")
+                publish()
+                writeRunRecord(terminal)
             }
         }
+    }
+    /** One consolidated run record per session, written once at termination. */
+    private fun writeRunRecord(terminal:SessionRunState) {
+        val value=snapshot.at(System.currentTimeMillis(),SystemClock.elapsedRealtime())
+        evidence.mkdirs()
+        val record=mapOf<String,Any?>(
+            "sessionId" to value.sessionId,"terminalState" to terminal.name,
+            "runner" to "PetSessionController","rounds" to totalRounds,
+            "completedRounds" to completed,"pauseCount" to value.pauseCount,
+            "startedAt" to value.startedAt,"runtimeMs" to value.runtimeMs,
+            "energy" to value.energy.fields(),"cleanliness" to value.cleanliness.fields(),
+            "mood" to value.mood.fields(),"stopReason" to stopReason,
+            "moodPolicy" to "OBSERVATION_ONLY",
+            "care" to mapOf("feed_count" to care.careStatistics.optInt("feed_count"),
+                "clean_count" to care.careStatistics.optInt("clean_count"),
+                "feed_duration_ms" to care.careStatistics.optLong("feed_duration_ms"),
+                "clean_duration_ms" to care.careStatistics.optLong("clean_duration_ms")),
+            "encouragementSent" to ledger.encouragementTotal,
+            "courseStarts" to ledger.startedCount,
+            "requestedRounds" to ledger.attemptCount)
+        File(evidence,"run-record.json").writeText(EventJson.encode(record))
     }
 }

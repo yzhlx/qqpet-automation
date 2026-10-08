@@ -14,4 +14,12 @@ local.properties
 # Local device evidence and build outputs are retained by hashed baseline archive.
 /deliverables/
 *.log
+/*.apk
+
+# Privacy / hygiene: device screenshots, raw capture logs and local APK copies are
+# never committed. Test fixtures under app/src/**/assets are intentionally kept.
+evidence/**/*.png
+evidence/**/logcat-*.txt
+evidence/**/*-err.txt
+evidence/screencap-err.txt
 

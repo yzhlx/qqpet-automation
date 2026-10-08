@@ -57,27 +57,41 @@ class PetStudyFlow(private val flow: PetFlowContext,private val navigation: PetN
         course.put("high_five_attempted",true).put("high_five_target_count",10)
         var sent=0; var first: Long?=null; var last: Long?=null; var bestScore=0.0
         val began=SystemClock.elapsedRealtime()
+        // `first`/`last` are durations measured from the course start; the burst guard needs an
+        // absolute timestamp. Keep the two in separate variables so their units cannot be mixed.
+        var burstStartedAt=0L
+        // Bounded target-selection window, started only once the learning page is confirmed,
+        // so page settling can never be mistaken for a missing high-five cue.
+        var targetDeadline=0L
         while(sent<10) {
-            check(sent>0 || SystemClock.elapsedRealtime()-began<8000) { "HIGH_FIVE_TARGET_NOT_FOUND" }
-            // The live learning panel can move vertically between captures.
-            // Reuse the same bounded settling verification as other page transitions.
-            verifySettled(profile.learningProbes,"high-five-${sent+1}-before")
-            val f=frame(latest=true)
-            val s=try {
-                check(score(f,profile.learningProbes)>=profile.matchThreshold) { "LEARNING_PAGE_LOST" }
-                if(sent==0) save(f,"before-high-five")
-                score(f,listOf(highFive))
-            } finally { f.recycle() }
+            // The live learning panel can move vertically between captures, and the click
+            // animation of a previous tap can hide it for a moment. Require a positively
+            // matched frame (bounded retry) instead of accepting one transient miss, and
+            // never send the next tap while the learning page is unconfirmed.
+            val f=settleLatest(profile.learningProbes,"high-five-${sent+1}-before",
+                if(sent==0) "before-high-five" else null)
+            if(targetDeadline==0L) targetDeadline=SystemClock.elapsedRealtime()+20000
+            val s=try { score(f,listOf(highFive)) } finally { f.recycle() }
             bestScore=maxOf(bestScore,s)
             // Select the high-five point once from a positively matched target at T+~30s.
             // The user explicitly requests a 10-tap burst; its click animation hides the cue.
             // Subsequent taps retain that selected point, with LEARNING checked before/after each tap.
-            if(sent==0 && s<profile.matchThreshold) { delay(300);continue }
-            check(first==null || SystemClock.elapsedRealtime()-start-first!!<45000) { "HIGH_FIVE_BURST_TIMEOUT" }
+            if(sent==0 && s<profile.matchThreshold) {
+                check(SystemClock.elapsedRealtime()<targetDeadline) { "HIGH_FIVE_TARGET_NOT_FOUND" }
+                delay(300);continue
+            }
+            // Bounded burst: capped by the 10-tap business limit, plus a finite wall clock guard so
+            // encouragement can never run indefinitely if a tap stalls. Measured from the first
+            // tap's absolute timestamp, never from a duration offset (mixing the two is silently
+            // always-true, because uptime is far larger than any burst duration).
+            // Budget: a healthy 10-tap burst costs ~25s (each pre/post capture settles in ~1s),
+            // and every capture verification above is independently hard-bounded at 8s, so this
+            // guard only fires on a genuine stall, never on a healthy burst.
+            check(burstStartedAt==0L || SystemClock.elapsedRealtime()-burstStartedAt<120000) { "HIGH_FIVE_BURST_TIMEOUT" }
             state="HIGH_FIVE"
             safety();input.tap(325f,375f)
             val offset=SystemClock.elapsedRealtime()-start
-            if(first==null) first=offset
+            if(first==null) {first=offset;burstStartedAt=SystemClock.elapsedRealtime()}
             last=offset;sent++;ledger.encouraged(round)
             emit("high-five-$sent",s,JSONObject().put("action","HIGH_FIVE_BURST")
                 .put("displayId",4).put("tapIndex",sent).put("tapLimit",10)

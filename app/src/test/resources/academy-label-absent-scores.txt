@@ -1,0 +1,6 @@
+# Real run that failed to enter the academy. Must yield no label at all.
+# source: C:\Users\lu158\Desktop\dsh\u63d2\u4ef6\\u517b\u5ba0\u81ea\u52a8\u5316\VirtualDisplay\deliverables\slice2-final\academy-failure\round-1-academy-map.png
+# frame: 720x1600, template 177x66, threshold 0.97
+# windows scored: 835040; best anywhere: 0.900996278140886 at (497, 864)
+# QUALIFYING windows only are listed (score >= 0.97): 0
+

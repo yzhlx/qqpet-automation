@@ -22,15 +22,31 @@ shutil.copytree("\\\\?\\" + str(source), "\\\\?\\" + str(target),
 sdk = pathlib.Path(tempfile.gettempdir()) / "QQPetMvpSdk"
 (target / "local.properties").write_text("sdk.dir=" + sdk.as_posix() + "\n", encoding="ascii")
 '@
-& python3.12.exe -c $taskPython $PSScriptRoot
-if ($LASTEXITCODE -ne 0) { throw 'Build mirror synchronization failed' }
+# Windows PowerShell 5.1 strips embedded double quotes from `-c` arguments, which
+# corrupts adjacent PowerShell here-strings. Hand the identical script to Python
+# through a real file so the build works under both 5.1 and 7.x.
+$taskScript = Join-Path $taskTemp 'QQPetMvpMirror.py'
+Set-Content -LiteralPath $taskScript -Value $taskPython -Encoding UTF8
+# Gradle and the JVM write ordinary progress text to stderr. Under
+# $ErrorActionPreference='Stop' Windows PowerShell 5.1 turns that native stderr
+# into a terminating error, so relax the preference around these two calls only.
+$taskStrict = $ErrorActionPreference
+$ErrorActionPreference = 'Continue'
+try {
+    & python3.12.exe $taskScript $PSScriptRoot 2>&1 | ForEach-Object { "$_" }
+    if ($LASTEXITCODE -ne 0) { throw 'Build mirror synchronization failed' }
+} finally { $ErrorActionPreference = $taskStrict }
 $env:JAVA_HOME = (Get-ChildItem (Join-Path $taskTools 'jdk') -Directory | Select-Object -First 1).FullName
 $env:GRADLE_USER_HOME = Join-Path $taskTools 'cache'
 $env:ANDROID_USER_HOME = Join-Path $taskTools 'android-user'
 $env:JAVA_TOOL_OPTIONS = '-Dfile.encoding=UTF-8 -Djava.net.preferIPv4Stack=true'
 $env:QQPET_SOURCE_REPO = $PSScriptRoot
 foreach ($taskName in $Tasks) {
-    & (Join-Path $taskProject 'gradlew.bat') -p $taskProject $taskName '-Pkotlin.incremental=false' --no-daemon --console=plain
+    $ErrorActionPreference = 'Continue'
+    try {
+        & (Join-Path $taskProject 'gradlew.bat') -p $taskProject $taskName '-Pkotlin.incremental=false' --no-daemon --console=plain 2>&1 |
+            ForEach-Object { "$_" } | Tee-Object -FilePath (Join-Path $taskTemp "slice2-$taskName-build.txt")
+    } finally { $ErrorActionPreference = $taskStrict }
     if ($LASTEXITCODE -ne 0) { throw "Gradle $taskName failed: $LASTEXITCODE" }
 }
 $taskDeliverables = Join-Path $PSScriptRoot 'deliverables'

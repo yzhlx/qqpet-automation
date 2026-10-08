@@ -6,7 +6,7 @@ import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 
-enum class SessionRunState { RUNNING, PAUSED, RESUMING, STOPPED }
+enum class SessionRunState { IDLE, RUNNING, PAUSED, RESUMING, COMPLETED, STOPPED, FAILED }
 data class SessionCheckpoint(val sessionId: String,val round: Int,val phase: String,val trustedPage: String,
     val health: HealthObservations?,val observedAt: Long,val healthRequired: Boolean=false,
     val actionPending: Boolean=false)
@@ -58,9 +58,12 @@ class SessionRecovery(val sessionId: String,private val store: CheckpointStore,
         if(cp.actionPending) stop("CHECKPOINT_ACTION_UNCONFIRMED")
         val began=mono();val deadline=began+windowMs
         var attempt=0
+        var lockedWaits=0
+        var unlockedSeen=false
         while(mono()<deadline) {
             if(mono()<began) stop("RECOVERY_CLOCK_REVERSED")
-            if(locked()) {wait(minOf(500,deadline-mono()));continue}
+            if(locked()) {lockedWaits++;wait(minOf(500,deadline-mono()));continue}
+            unlockedSeen=true
             if(attempt>=maxAttempts) stop("RECOVERY_ATTEMPTS_EXHAUSTED")
             attempt++;change(SessionRunState.RESUMING,reason,attempt)
             try {
@@ -90,6 +93,9 @@ class SessionRecovery(val sessionId: String,private val store: CheckpointStore,
             }
             if(attempt<maxAttempts && mono()<deadline) wait(minOf(1000,deadline-mono()))
         }
+        // A device that stayed locked for the whole window never had a probe attempted:
+        // report the actionable cause instead of the generic window expiry.
+        if(!unlockedSeen && lockedWaits>0) stop("RECOVERY_LOCKED_WINDOW_EXHAUSTED")
         stop("RECOVERY_WINDOW_EXHAUSTED")
     }
 }

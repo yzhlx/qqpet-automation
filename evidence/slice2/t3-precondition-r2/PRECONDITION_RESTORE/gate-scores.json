@@ -1,0 +1,47 @@
+{
+ "threshold": 0.97,
+ "runs": [
+  {
+   "run": "attempt1",
+   "local": "2026-10-07 ~12:58-13:00",
+   "score": 0.8209808460421205,
+   "threshold": 0.97,
+   "room": false,
+   "dir": "1791349244795",
+   "binding": "frame<->score UNKNOWN (gate stores no frame)",
+   "numeric_status": "KNOWN (printed in raw device output)"
+  },
+  {
+   "run": "attempt2-pre",
+   "local": "2026-10-07 13:59 (gate dir timestamp 1791351562289)",
+   "score": 0.7670955882352941,
+   "threshold": 0.97,
+   "room": false,
+   "dir": "1791351560832",
+   "binding": "frame<->score UNKNOWN (gate stores no frame)",
+   "numeric_status": "KNOWN (printed in raw device output)"
+  },
+  {
+   "run": "attempt2-after-step2-card-tap",
+   "local": "2026-10-07 14:16:17",
+   "score": 0.8390681735657226,
+   "threshold": 0.97,
+   "room": false,
+   "dir": "1791353772747",
+   "binding": "frame<->score UNKNOWN (gate stores no frame)",
+   "numeric_status": "KNOWN (printed in raw device output)"
+  },
+  {
+   "run": "attempt2-after-step3-return-tap",
+   "local": "2026-10-07 14:18:22",
+   "score": 0.770218318809005,
+   "threshold": 0.97,
+   "room": false,
+   "dir": "1791353897549",
+   "binding": "frame<->score UNKNOWN (gate stores no frame)",
+   "numeric_status": "KNOWN (printed in raw device output)"
+  }
+ ],
+ "final": 0.770218318809005,
+ "note": "All four numbers are KNOWN numeric values printed in raw device output. Only the frame<->score association is UNKNOWN, because the gate stores no frame; that is distinct from an unknown numeric value."
+}

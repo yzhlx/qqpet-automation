@@ -52,9 +52,13 @@ class PetManagedSessionTest {
                             .put("completed",state.completedRounds).put("nextStep",state.nextStep).put("reason",state.pauseReason)
                             .put("physicalDelta",GateTestActivity.touches.getValue(0).get()-physical).toString())
                         check(GateTestActivity.touches.getValue(0).get()==physical) {"PHYSICAL_TOUCH_DETECTED"}
-                        if(state.runState==SessionRunState.STOPPED) {
-                            assertEquals("Managed session stopped: ${state.pauseReason}",3,state.completedRounds)
+                        if(state.runState==SessionRunState.COMPLETED || state.runState==SessionRunState.FAILED
+                            || state.runState==SessionRunState.STOPPED) {
+                            assertEquals("Session ended as ${state.runState.name}: ${state.pauseReason}",
+                                3,state.completedRounds)
+                            assertEquals("A completed batch must report COMPLETED",SessionRunState.COMPLETED,state.runState)
                             assertTrue("A real pause/resume is required",states.containsAll(listOf("PAUSED","RESUMING","RUNNING")))
+                            assertTrue("A real pause must be counted",state.pauseCount>=1)
                             break
                         }
                     }
@@ -78,7 +82,7 @@ class PetManagedSessionTest {
                 if(event.getString("kind")=="SESSION_STATE") {
                     val s=event.getJSONObject("payload").optString("state")
                     if(s=="PAUSED" || s=="RESUMING") paused=true
-                    if(s=="RUNNING" || s=="STOPPED") paused=false
+                    if(s=="RUNNING" || s=="IDLE" || s=="COMPLETED" || s=="FAILED" || s=="STOPPED") paused=false
                 }
                 if(paused) assertNotEquals("INPUT_SENT",event.getString("kind"))
             }
