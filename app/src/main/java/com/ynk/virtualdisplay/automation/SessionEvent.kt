@@ -6,7 +6,11 @@ import java.util.UUID
 
 enum class EventSource { APP_AUTOMATION, GAME_OBSERVATION, USER, DEBUG_ADB }
 enum class EventKind { HEALTH_OBSERVED, HEALTH_UNKNOWN, FRAME_VALID, FRAME_INVALID, INPUT_SENT,
-    COURSE_STARTED, LEARNING_CONFIRMED, ERROR, SESSION_CONFIG, SESSION_STATE, CHECKPOINT }
+    COURSE_STARTED, LEARNING_CONFIRMED, ERROR, SESSION_CONFIG, SESSION_STATE, CHECKPOINT,
+    // Batch-wide consumable allowance ledger. Its own kind on purpose: SESSION_STATE is catalogued by
+    // the runtime-state reader and CHECKPOINT is the page/health recovery ledger, so neither may be
+    // reused to carry budget semantics without corrupting those records.
+    CARE_BUDGET }
 interface EventClock {
     fun wallTimeMs(): Long
     fun monotonicMs(): Long

@@ -9,6 +9,7 @@ import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 
 private val DarkColorScheme = darkColorScheme(
@@ -18,26 +19,32 @@ private val DarkColorScheme = darkColorScheme(
 )
 
 private val LightColorScheme = lightColorScheme(
-    primary = Purple40,
-    secondary = PurpleGrey40,
-    tertiary = Pink40
-
-    /* Other default colors to override
-    background = Color(0xFFFFFBFE),
-    surface = Color(0xFFFFFBFE),
+    primary = PetTokens.Blue,
     onPrimary = Color.White,
+    secondary = PetTokens.Blue,
     onSecondary = Color.White,
+    tertiary = PetTokens.Green,
     onTertiary = Color.White,
-    onBackground = Color(0xFF1C1B1F),
-    onSurface = Color(0xFF1C1B1F),
-    */
+    background = PetTokens.Bg,
+    onBackground = PetTokens.Ink,
+    surface = PetTokens.Surface,
+    onSurface = PetTokens.Ink,
+    surfaceVariant = PetTokens.GraySoft,
+    onSurfaceVariant = PetTokens.Ink2,
+    outline = PetTokens.Line,
+    error = PetTokens.Red,
+    onError = Color.White,
+    errorContainer = PetTokens.RedSoft,
+    onErrorContainer = PetTokens.RedInk,
 )
 
 @Composable
 fun MyApplicationTheme(
-    darkTheme: Boolean = isSystemInDarkTheme(),
-    // Dynamic color is available on Android 12+
-    dynamicColor: Boolean = true,
+    // v0.1 ships the light reference design only; the mock-ups have no dark variant.
+    darkTheme: Boolean = false,
+    // The v0.1 UI is pinned to the approved reference palette (PetTokens), not Material dynamic
+    // colour, so every screen matches 参考ui/redesign-v0.1 exactly on all devices.
+    dynamicColor: Boolean = false,
     content: @Composable () -> Unit
 ) {
     val colorScheme = when {

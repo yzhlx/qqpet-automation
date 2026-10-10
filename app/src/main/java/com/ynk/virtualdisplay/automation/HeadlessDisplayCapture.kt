@@ -40,6 +40,8 @@ class HeadlessDisplayCapture(
     private val started = AtomicBoolean(false)
     private val receivedFrameCount = AtomicLong(0)
     private val lastFrameAtMs = AtomicLong(0)
+    /** Receipt instant paired with the frame in [latestImage], guarded by [frameLock]. */
+    @Volatile private var latestImageAtMs = 0L
     private var renderedSnapshot: Bitmap? = null
     private var renderedAtMs = 0L
     private var lastTelemetry = JSONObject()
@@ -66,18 +68,21 @@ class HeadlessDisplayCapture(
             .put("fallbackDurationMs", 0).put("captureSource", source).put("frameDeliveryMiss", false)
     }
 
-    private fun remember(frame: Bitmap): Bitmap {
-        validate(frame)
+    private fun remember(frame: Bitmap, observedAtMs: Long): Bitmap {
+        validate(frame, observedAtMs)
         renderedSnapshot?.recycle()
         renderedSnapshot = frame.copy(Bitmap.Config.ARGB_8888, false)
-        renderedAtMs = SystemClock.elapsedRealtime()
+        // The receipt instant of the frame, NOT the instant of this copy: a re-validated cache
+        // entry or a queued buffer must keep its original, older instant so that age is measured
+        // from when the pixels were captured rather than from when someone looked at them.
+        renderedAtMs = observedAtMs
         return frame
     }
 
-    private fun validate(frame: Bitmap) {
+    private fun validate(frame: Bitmap, observedAtMs: Long) {
         val result=FrameLiveness.inspect(displayId,frame.width,frame.height,width,height,
             repository.connectionStatus.value==ConnectionStatus.CONNECTED && displayId in repository.managedDisplayIds.value,
-            pixel=frame::getPixel)
+            pixel=frame::getPixel).copy(observedAtMs=observedAtMs)
         facts.frame(result,lastTelemetry.optString("captureSource"))
         if(!result.valid || facts.frames.stopped) {frame.recycle();throw InvalidFrame("FRAME_INVALID:${result.status}")}
     }
@@ -86,9 +91,18 @@ class HeadlessDisplayCapture(
      * callers must use awaitFrame(), which still requires a newly rendered frame. */
     suspend fun latestRenderedFrame(maxAgeMs: Long = 1500L): Bitmap {
         check(started.get())
-        latestImage.getAndSet(null)?.let { img ->
+        // The queue entry and its receipt instant are taken together under the frame lock that the
+        // reader listener also holds, so a frame can never be paired with a newer frame's instant.
+        // Withdrawing both rather than reading them separately keeps age an over-estimate.
+        val queued = synchronized(frameLock) {
+            val img = latestImage.getAndSet(null)
+            val atMs = latestImageAtMs
+            latestImageAtMs = 0L
+            img?.let { it to atMs }
+        }
+        queued?.let { (img, rawAt) ->
             setTelemetry("IMAGEREADER_RECENT", "RECENT", 0)
-            try { return remember(img.toBitmap()) }
+            try { return remember(img.toBitmap(), rawAt) }
             catch(t: Exception) {
                 if(t !is InvalidFrame) facts.frame(FrameLivenessResult(FrameStatus.INVALID_DECODE,t.toString()),"IMAGEREADER_RECENT")
             } finally { img.close() }
@@ -98,7 +112,9 @@ class HeadlessDisplayCapture(
         if (snapshot != null && SystemClock.elapsedRealtime() - renderedAtMs <= maxAgeMs) {
             setTelemetry("RECENT_CACHE", "NOT_REQUESTED", 0)
             val frame=snapshot.copy(Bitmap.Config.ARGB_8888, false)
-            try { validate(frame);return frame } catch(_: InvalidFrame) { return awaitFrame() }
+            // Re-validating the cache entry carries its ORIGINAL receipt instant forward, so a
+            // cache hit neither renews the frame nor passes the start-of-action freshness gate.
+            try { validate(frame, renderedAtMs);return frame } catch(_: InvalidFrame) { return awaitFrame() }
         }
         return awaitFrame()
     }
@@ -109,9 +125,13 @@ class HeadlessDisplayCapture(
             synchronized(frameLock) {
             val image = try { r.acquireLatestImage() } catch (_: Throwable) { null }
             if (image == null) return@setOnImageAvailableListener
+            val receivedAt = SystemClock.elapsedRealtime()
             receivedFrameCount.incrementAndGet()
-            lastFrameAtMs.set(SystemClock.elapsedRealtime())
+            lastFrameAtMs.set(receivedAt)
             latestImage.getAndSet(image)?.close()
+            // Kept beside the image under the same lock so the receipt instant can never be
+            // attributed to a different, newer frame than the pixels it belongs to.
+            latestImageAtMs = receivedAt
             pendingSignal.getAndSet(null)?.complete(Unit)
             }
         }, Handler(thread.looper))
@@ -188,7 +208,9 @@ class HeadlessDisplayCapture(
                 val captured = repository.captureDisplay(displayId).getOrThrow()
                 lastTelemetry.put("fallbackResult", "OK").put("fallbackDurationMs", captured.durationMs)
                     .put("source", captured.source).put("byteCount", captured.byteCount)
-                val accepted=remember(captured.bitmap)
+                // Conservative receipt: the instant this capture BEGAN, so the measured age can
+                // only overstate the frame's true age, never understate it.
+                val accepted=remember(captured.bitmap,fallbackBegan)
                 fallbackSuccess++; fallbackLatencies.add(captured.durationMs)
                 return accepted
             } catch(t: Throwable) {
@@ -200,7 +222,9 @@ class HeadlessDisplayCapture(
         }
         imageReaderSuccess++
         setTelemetry("IMAGEREADER", "OK", SystemClock.elapsedRealtime() - began)
-        return try { remember(img.toBitmap()) } finally { img.close() }
+        // Conservative receipt: the instant this frame was REQUESTED. The listener's own receipt
+        // instant is never later than this, so the frame can never look fresher than it is.
+        return try { remember(img.toBitmap(),began) } finally { img.close() }
     }
 
     suspend fun stop() {

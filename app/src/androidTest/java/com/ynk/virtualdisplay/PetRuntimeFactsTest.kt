@@ -3,6 +3,7 @@ package com.ynk.virtualdisplay
 import android.graphics.PointF
 import android.graphics.Bitmap
 import android.graphics.Color
+import android.os.SystemClock
 import android.view.Surface
 import android.view.InputEvent
 import android.view.MotionEvent
@@ -85,12 +86,18 @@ class PetRuntimeFactsTest {
             val facts=AutomationFacts(dir,4)
             val input=PetInputController(repo,4,720,1600,facts)
             assertTrue(runCatching {input.tap(360f,800f,0)}.isFailure);assertTrue(sent.isEmpty())
-            facts.frame(FrameLivenessResult(FrameStatus.VALID),"TEST")
+            // A VALID frame with NO capture receipt is trusted for liveness but must not authorise a
+            // new action: the freshness barrier refuses it instead of assuming it was just received.
+            facts.frame(FrameLivenessResult(FrameStatus.VALID),"TEST_UNKNOWN_RECEIPT")
+            assertTrue(facts.frames.inputAllowed)
+            assertTrue(runCatching {input.tap(360f,800f,0)}.isFailure);assertTrue(sent.isEmpty())
+            // A real capture receipt is what authorises the action.
+            facts.frame(FrameLivenessResult(FrameStatus.VALID,"TEST",SystemClock.elapsedRealtime()),"TEST")
             input.tap(360f,800f,0)
             assertEquals(2,sent.size);sent.clear()
             facts.frame(FrameLivenessResult(FrameStatus.INVALID_BLACK_FRAME),"TEST")
             assertTrue(runCatching {input.tap(360f,800f,0)}.isFailure);assertTrue(sent.isEmpty())
-            facts.frame(FrameLivenessResult(FrameStatus.VALID),"TEST")
+            facts.frame(FrameLivenessResult(FrameStatus.VALID,"TEST",SystemClock.elapsedRealtime()),"TEST")
             input.drag(listOf(PointF(360f,1345f),PointF(360f,900f),PointF(280f,800f),PointF(430f,950f)),0)
             assertEquals(listOf(MotionEvent.ACTION_DOWN,MotionEvent.ACTION_MOVE,MotionEvent.ACTION_MOVE,
                 MotionEvent.ACTION_MOVE,MotionEvent.ACTION_UP),sent.map {it.first})
@@ -114,6 +121,64 @@ class PetRuntimeFactsTest {
             facts.events.append(EventSource.DEBUG_ADB,EventKind.INPUT_SENT,mapOf("fixture" to true))
             assertEquals("DEBUG_ADB",JSONObject(facts.events.file.readLines().last()).getString("source"))
             println("RUNTIME_FACTS_PASS invalidInputCount=0 continuousMoves=3 defaultDisplayRefused=true")
+        } finally {dir.deleteRecursively()}
+    }
+
+    /**
+     * Compile-only here: this file is built into the instrumentation APK but is NOT executed in this
+     * round (no device authorisation). It exists so the fail-stop rule is also expressed against the
+     * REAL controller with real MotionEvents, not only against the Android-free helper in the JVM
+     * suite. A refused UP acknowledgement must fail the action and latch the session, so nothing is
+     * journaled as sent and no later tap can press the display again.
+     */
+    @Test fun anUnconfirmedUpFailsTheRealActionAndLatchesTheSession(): Unit = runBlocking {
+        val app=InstrumentationRegistry.getInstrumentation().targetContext.applicationContext as MyApplication
+        val dir=File(app.cacheDir,"up-failstop-${UUID.randomUUID()}")
+        val sent=mutableListOf<Int>()
+        // The game is pressed, then refuses to confirm the UP - both as a refused ack and as a throw.
+        var upMode="false"
+        val repo=object: IDisplayRepository by app.displayRepository {
+            override val connectionStatus=MutableStateFlow(ConnectionStatus.CONNECTED)
+            override val managedDisplayIds=MutableStateFlow(setOf(4))
+            override suspend fun injectInputWithDisplayId(event: InputEvent,displayId: Int): Result<Boolean> {
+                val action=(event as MotionEvent).action;sent.add(action)
+                if(action!=MotionEvent.ACTION_UP) return Result.success(true)
+                if(upMode=="throw") throw IllegalStateException("UP transport fault")
+                return Result.failure(IllegalStateException("ACTION_UP rejected"))
+            }
+        }
+        try {
+            val facts=AutomationFacts(dir,4)
+            val input=PetInputController(repo,4,720,1600,facts)
+            facts.frame(FrameLivenessResult(FrameStatus.VALID,"TEST",SystemClock.elapsedRealtime()),"TEST")
+            val failed=runCatching {input.tap(360f,800f,0)}
+            assertTrue("a refused UP acknowledgement must fail the action",failed.isFailure)
+            assertTrue(failed.exceptionOrNull()?.message?.contains("ACTION_UP rejected")==true)
+            // The release was attempted on the same display even though its ack failed.
+            assertEquals(listOf(MotionEvent.ACTION_DOWN,MotionEvent.ACTION_UP),sent)
+            assertEquals("ACTION_UP_CLEANUP_FAILED",facts.inputHalted)
+            var events=facts.events.file.readLines().map {JSONObject(it)}
+            assertEquals("a failed action must not claim an INPUT_SENT",0,events.count {it.getString("kind")=="INPUT_SENT"})
+            assertTrue(events.any {it.getString("kind")=="ERROR" && it.getString("reason")=="ACTION_UP_CLEANUP_FAILED"})
+            // A fresh, authorising frame must NOT re-enable input: the latch outranks the frame gate.
+            sent.clear()
+            facts.frame(FrameLivenessResult(FrameStatus.VALID,"TEST",SystemClock.elapsedRealtime()),"TEST")
+            val refused=runCatching {input.tap(360f,800f,0)}
+            assertTrue("the session latch must keep refusing",refused.isFailure)
+            assertTrue(refused.exceptionOrNull()?.message?.contains("SESSION_INPUT_HALTED_BY_UNCONFIRMED_UP")==true)
+            assertTrue("no further DOWN may reach the display",sent.isEmpty())
+            // The same rule for a UP that fails by throwing: a new session, because the first is latched.
+            upMode="throw";sent.clear()
+            val facts2=AutomationFacts(dir,4)
+            val input2=PetInputController(repo,4,720,1600,facts2)
+            facts2.frame(FrameLivenessResult(FrameStatus.VALID,"TEST",SystemClock.elapsedRealtime()),"TEST")
+            val thrown=runCatching {input2.tap(360f,800f,0)}
+            assertTrue(thrown.isFailure)
+            assertTrue(thrown.exceptionOrNull()?.message?.contains("UP transport fault")==true)
+            assertEquals(listOf(MotionEvent.ACTION_DOWN,MotionEvent.ACTION_UP),sent)
+            assertEquals("ACTION_UP_CLEANUP_FAILED",facts2.inputHalted)
+            assertEquals(0,facts2.events.file.readLines().map {JSONObject(it)}.count {it.getString("kind")=="INPUT_SENT"})
+            println("UP_FAILSTOP_PASS refusedAckFailed=true latched=true laterDownCount=0")
         } finally {dir.deleteRecursively()}
     }
 }

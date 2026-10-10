@@ -13,10 +13,24 @@ data class DisplayInfoModel(
     val height: Int
 )
 
+/** The three user-facing tabs of the v0.1 redesign: 托管 / 记录 / 设置. */
 enum class ScreenTab {
-    CONSOLE,
-    PET_MVP,
+    HOST,
+    RECORDS,
     SETTINGS
+}
+
+/**
+ * Screens that are real but not tabs. They are reached from 设置 (console / developer tools) or
+ * stack over 托管 (the plan sheet and the full log). Keeping them out of [ScreenTab] means the tab
+ * bar always shows the three user-facing destinations.
+ */
+enum class OverlayScreen {
+    NONE,
+    PLAN_SHEET,
+    LOGS,
+    CONSOLE,
+    CALIBRATION,
 }
 
 /**
@@ -29,7 +43,9 @@ data class MainUiState(
     val orphanDisplayIds: List<Int> = emptyList(),
     val statusMessage: String = "Ready",
     val isLoading: Boolean = false,
-    val currentTab: ScreenTab = ScreenTab.CONSOLE,
+    val currentTab: ScreenTab = ScreenTab.HOST,
+    /** A real screen stacked over the tabs; [OverlayScreen.NONE] shows the current tab. */
+    val overlay: OverlayScreen = OverlayScreen.NONE,
     
     // 输入相关状态
     val inputWidth: String = "",

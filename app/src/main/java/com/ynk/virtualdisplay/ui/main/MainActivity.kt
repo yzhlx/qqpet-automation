@@ -6,36 +6,44 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.lifecycleScope
-import androidx.lifecycle.repeatOnLifecycle
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.ynk.virtualdisplay.MyApplication
 import com.ynk.virtualdisplay.data.model.ShizukuState
 import com.ynk.virtualdisplay.data.repository.ShizukuDisplayRepository
-import com.ynk.virtualdisplay.data.repository.IDisplayRepository
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material3.Icon
-import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarItem
-import androidx.compose.material3.Text
-import com.ynk.virtualdisplay.ui.screens.SettingsScreen
+import com.ynk.virtualdisplay.ui.kit.PetGlyph
+import com.ynk.virtualdisplay.ui.kit.PetIcon
+import com.ynk.virtualdisplay.ui.screens.PetCalibrationScreen
+import com.ynk.virtualdisplay.ui.screens.PetHomeScreen
+import com.ynk.virtualdisplay.ui.screens.PetLogScreen
+import com.ynk.virtualdisplay.ui.screens.PetPlanSheetScreen
+import com.ynk.virtualdisplay.ui.screens.PetRecordsScreen
+import com.ynk.virtualdisplay.ui.screens.PetSettingsScreen
 import com.ynk.virtualdisplay.ui.screens.ShizukuPermissionScreen
 import com.ynk.virtualdisplay.ui.screens.VirtualDisplayScreen
-import com.ynk.virtualdisplay.ui.screens.PetMvpScreen
 import com.ynk.virtualdisplay.ui.theme.MyApplicationTheme
-import kotlinx.coroutines.launch
+import com.ynk.virtualdisplay.ui.theme.PetTokens
 import rikka.shizuku.Shizuku
 import rikka.sui.Sui
 
@@ -47,7 +55,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        
+
         try {
             if (Sui.init(packageName)) {
                 Log.i("MainActivity", "Sui initialized successfully")
@@ -63,65 +71,37 @@ class MainActivity : ComponentActivity() {
         setContent {
             MyApplicationTheme {
                 val uiState by viewModel.uiState.collectAsState()
-                
+
                 Scaffold(
                     modifier = Modifier.fillMaxSize(),
-                    bottomBar = {
-                        if (uiState.shizukuState is ShizukuState.Ready) {
-                            NavigationBar {
-                                NavigationBarItem(
-                                    selected = uiState.currentTab == ScreenTab.CONSOLE,
-                                    onClick = { viewModel.switchTab(ScreenTab.CONSOLE) },
-                                    icon = { Icon(Icons.Default.Home, contentDescription = "控制台") },
-                                    label = { Text("控制台") }
-                                )
-                                NavigationBarItem(
-                                    selected = uiState.currentTab == ScreenTab.PET_MVP,
-                                    onClick = { viewModel.switchTab(ScreenTab.PET_MVP) },
-                                    icon = { Icon(Icons.Default.PlayArrow, contentDescription = "宠物MVP") },
-                                    label = { Text("宠物MVP") }
-                                )
-                                NavigationBarItem(
-                                    selected = uiState.currentTab == ScreenTab.SETTINGS,
-                                    onClick = { viewModel.switchTab(ScreenTab.SETTINGS) },
-                                    icon = { Icon(Icons.Default.Settings, contentDescription = "设置") },
-                                    label = { Text("设置") }
-                                )
-                            }
-                        }
-                    }
+                    containerColor = PetTokens.Bg,
                 ) { innerPadding ->
-                    Box(modifier = Modifier.padding(innerPadding)) {
+                    Box(Modifier.padding(innerPadding).fillMaxSize()) {
                         when (val state = uiState.shizukuState) {
-                            is ShizukuState.Checking -> {
-                                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                                    CircularProgressIndicator()
-                                }
-                            }
-                            is ShizukuState.Ready -> {
-                                when (uiState.currentTab) {
-                                    ScreenTab.CONSOLE -> VirtualDisplayScreen(viewModel = viewModel)
-                                    ScreenTab.PET_MVP -> PetMvpScreen(viewModel = viewModel)
-                                    ScreenTab.SETTINGS -> SettingsScreen(viewModel = viewModel)
-                                }
-                            }
-                            else -> {
-                                ShizukuPermissionScreen(
-                                    state = state,
-                                    onRetry = { viewModel.checkShizukuStatus(this@MainActivity) },
-                                    onRequestPermission = {
-                                        try {
-                                            Shizuku.requestPermission(ShizukuDisplayRepository.REQUEST_CODE)
-                                        } catch (e: Exception) {
-                                            Log.e("MainActivity", "Failed to request permission", e)
-                                        }
+                            is ShizukuState.Checking -> Box(
+                                Modifier.fillMaxSize(), contentAlignment = Alignment.Center,
+                            ) { CircularProgressIndicator() }
+
+                            is ShizukuState.Ready -> PetApp(
+                                uiState = uiState,
+                                viewModel = viewModel,
+                            )
+
+                            else -> ShizukuPermissionScreen(
+                                state = state,
+                                onRetry = { viewModel.checkShizukuStatus(this@MainActivity) },
+                                onRequestPermission = {
+                                    try {
+                                        Shizuku.requestPermission(ShizukuDisplayRepository.REQUEST_CODE)
+                                    } catch (e: Exception) {
+                                        Log.e("MainActivity", "Failed to request permission", e)
                                     }
-                                )
-                            }
+                                },
+                            )
                         }
-                        
+
                         if (uiState.isLoading) {
-                            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                                 CircularProgressIndicator()
                             }
                         }
@@ -135,5 +115,122 @@ class MainActivity : ComponentActivity() {
         super.onDestroy()
         Log.d("MainActivity", "onDestroy: releasing repository lease")
         (application as MyApplication).releaseDisplayRepository("MainActivity")
+    }
+}
+
+/**
+ * The app shell: a stacked real screen when one is open, otherwise the selected tab. The tab bar is
+ * the reference's own custom bar (icon + label, blue when active) rather than a Material
+ * NavigationBar, so the three destinations match the approved mock-ups exactly.
+ */
+@Composable
+private fun PetApp(uiState: MainUiState, viewModel: MainViewModel) {
+    Column(Modifier.fillMaxSize()) {
+        Box(Modifier.weight(1f)) {
+            when (uiState.overlay) {
+                OverlayScreen.PLAN_SHEET -> PetPlanSheetScreen(
+                    onClose = { viewModel.closeOverlay() },
+                    onOpenConsole = { viewModel.openOverlay(OverlayScreen.CONSOLE) },
+                )
+
+                OverlayScreen.LOGS -> PetLogScreen(onClose = { viewModel.closeOverlay() })
+
+                OverlayScreen.CONSOLE -> Column(Modifier.fillMaxSize()) {
+                    PetOverlayHeader("虚拟屏控制台", onBack = { viewModel.closeOverlay() })
+                    VirtualDisplayScreen(viewModel = viewModel)
+                }
+
+                OverlayScreen.CALIBRATION -> Column(Modifier.fillMaxSize()) {
+                    PetOverlayHeader("模板校准", onBack = { viewModel.closeOverlay() })
+                    PetCalibrationScreen(viewModel = viewModel)
+                }
+
+                OverlayScreen.NONE -> when (uiState.currentTab) {
+                    ScreenTab.HOST -> Column(Modifier.fillMaxSize()) {
+                        PetTitleBar("宠物托管")
+                        PetHomeScreen(
+                            viewModel = viewModel,
+                            onOpenPlanSheet = { viewModel.openOverlay(OverlayScreen.PLAN_SHEET) },
+                            onOpenLogs = { viewModel.openOverlay(OverlayScreen.LOGS) },
+                        )
+                    }
+
+                    ScreenTab.RECORDS -> Column(Modifier.fillMaxSize()) {
+                        PetTitleBar("记录")
+                        PetRecordsScreen()
+                    }
+
+                    ScreenTab.SETTINGS -> Column(Modifier.fillMaxSize()) {
+                        PetTitleBar("设置")
+                        PetSettingsScreen(
+                            viewModel = viewModel,
+                            onOpenConsole = { viewModel.openOverlay(OverlayScreen.CONSOLE) },
+                            onOpenLogs = { viewModel.openOverlay(OverlayScreen.LOGS) },
+                            onOpenPlanSheet = { viewModel.openOverlay(OverlayScreen.PLAN_SHEET) },
+                            onOpenCalibration = { viewModel.openOverlay(OverlayScreen.CALIBRATION) },
+                        )
+                    }
+                }
+            }
+        }
+        if (uiState.overlay == OverlayScreen.NONE) {
+            PetTabBar(uiState.currentTab) { viewModel.switchTab(it) }
+        }
+    }
+}
+
+/** Reference `.ab` title bar: 19px/700, left-aligned, on the app background. */
+@Composable
+fun PetTitleBar(title: String, onBack: (() -> Unit)? = null) {
+    Row(
+        Modifier.fillMaxWidth().padding(horizontal = 15.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        if (onBack != null) {
+            Box(Modifier.clickable { onBack() }.padding(end = 10.dp)) {
+                PetIcon(PetGlyph.ArrowBack, 20.dp, PetTokens.Ink)
+            }
+        }
+        Text(title, fontSize = 19.sp, fontWeight = FontWeight.Bold, color = PetTokens.Ink)
+    }
+}
+
+@Composable
+private fun PetOverlayHeader(title: String, onBack: () -> Unit) {
+    PetTitleBar(title, onBack)
+}
+
+/** Reference `.tabbar`: 3 items, icon over label, blue when selected. */
+@Composable
+private fun PetTabBar(current: ScreenTab, onSelect: (ScreenTab) -> Unit) {
+    Column {
+        Box(Modifier.fillMaxWidth().height(1.dp).background(PetTokens.Line))
+        Row(
+            Modifier.fillMaxWidth().background(PetTokens.Surface)
+                .padding(horizontal = 15.dp, vertical = 8.dp),
+            horizontalArrangement = Arrangement.SpaceEvenly,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            TabItem("托管", PetGlyph.TabHome, current == ScreenTab.HOST) { onSelect(ScreenTab.HOST) }
+            TabItem("记录", PetGlyph.TabRec, current == ScreenTab.RECORDS) { onSelect(ScreenTab.RECORDS) }
+            TabItem("设置", PetGlyph.TabSet, current == ScreenTab.SETTINGS) { onSelect(ScreenTab.SETTINGS) }
+        }
+    }
+}
+
+@Composable
+private fun TabItem(label: String, glyph: PetGlyph, selected: Boolean, onClick: () -> Unit) {
+    val tint = if (selected) PetTokens.Blue else PetTokens.TabInactive
+    Column(
+        Modifier.clickable { onClick() }.padding(horizontal = 18.dp, vertical = 2.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        PetIcon(glyph, 21.dp, tint)
+        Spacer(Modifier.height(3.dp))
+        Text(
+            label, fontSize = 10.5.sp,
+            fontWeight = if (selected) FontWeight(650) else FontWeight.Normal,
+            color = tint,
+        )
     }
 }

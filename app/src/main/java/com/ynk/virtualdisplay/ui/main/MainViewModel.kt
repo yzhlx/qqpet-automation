@@ -71,10 +71,20 @@ class MainViewModel(
     }
 
     fun switchTab(tab: ScreenTab) {
-        _uiState.update { it.copy(currentTab = tab) }
-        if (tab == ScreenTab.CONSOLE) {
+        _uiState.update { it.copy(currentTab = tab, overlay = OverlayScreen.NONE) }
+    }
+
+    /** Opens a real stacked screen (plan sheet / full log / display console). */
+    fun openOverlay(screen: OverlayScreen) {
+        _uiState.update { it.copy(overlay = screen) }
+        if (screen == OverlayScreen.CONSOLE) {
             reloadDefaultInputsFromSettings(appContext)
         }
+    }
+
+    /** Returns to the tab that opened the overlay. */
+    fun closeOverlay() {
+        _uiState.update { it.copy(overlay = OverlayScreen.NONE) }
     }
 
     @Suppress("DEPRECATION")

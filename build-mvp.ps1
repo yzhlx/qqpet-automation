@@ -19,6 +19,21 @@ for repo in (source, target):
         raise RuntimeError("Build source or prepared mirror does not descend from the pinned baseline")
 shutil.copytree("\\\\?\\" + str(source), "\\\\?\\" + str(target),
                 dirs_exist_ok=True, ignore=shutil.ignore_patterns("build", ".gradle", ".git", "deliverables"))
+# copytree merges but never deletes, so a file removed from the source would linger in the mirror
+# and still be compiled. Prune only the source trees that are actually mirrored this way.
+prune_roots = (pathlib.Path("app") / "src",)
+for root in prune_roots:
+    src_root = source / root
+    dst_root = target / root
+    if not dst_root.is_dir():
+        continue
+    for path in sorted(dst_root.rglob("*"), key=lambda p: len(p.parts), reverse=True):
+        rel = path.relative_to(dst_root)
+        if path.is_dir():
+            if not path.iterdir():
+                path.rmdir()
+        elif not (src_root / rel).exists():
+            path.unlink()
 sdk = pathlib.Path(tempfile.gettempdir()) / "QQPetMvpSdk"
 (target / "local.properties").write_text("sdk.dir=" + sdk.as_posix() + "\n", encoding="ascii")
 '@
