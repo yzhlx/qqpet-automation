@@ -1,0 +1,4 @@
+label=aftercard local=2026-10-07 14:16:17 took=4.9s
+dir=1791353772747
+  verdict={"verdict":"STOPPED","gate":"capture","states":"[]","error":"java.lang.IllegalStateException: INITIAL_PAGE_UNKNOWN:0.8390681735657226"}
+  status={"gate":"capture","status":"STOPPED:INITIAL_PAGE_UNKNOWN:0.8390681735657226","timestamp":1791353774620}

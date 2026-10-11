@@ -1,0 +1,65 @@
+=== QQ package: activity / alias / scheme inventory ===
+  distinct QQ component refs: 125
+  pet/study/game-ish components (18):
+    com.tencent.mobileqq/.gamecenter.appwidget.GameCenterAppWidgetProviderV2
+    com.tencent.mobileqq/.minigame.metafarm.widget.MetaFarmAppWidgetProvider
+    com.tencent.mobileqq/.vas.novelspecies.VasNovelSpeciesMini
+    com.tencent.mobileqq/com.tencent.minibox.loader.MiniBoxProvider
+    com.tencent.mobileqq/com.tencent.minibox.loader.delegator.MiniBoxActivity
+    com.tencent.mobileqq/com.tencent.minibox.loader.stub.StubActivity$A00
+    com.tencent.mobileqq/com.tencent.minibox.loader.stub.StubActivity$A01
+    com.tencent.mobileqq/com.tencent.minibox.loader.stub.StubActivity$A02
+    com.tencent.mobileqq/com.tencent.minibox.loader.stub.StubActivity$A03
+    com.tencent.mobileqq/com.tencent.minibox.loader.stub.StubProvider$StubProviderP00
+    com.tencent.mobileqq/com.tencent.minibox.loader.stub.StubProvider$StubProviderP01
+    com.tencent.mobileqq/com.tencent.minibox.loader.stub.StubProvider$StubProviderP02
+    com.tencent.mobileqq/com.tencent.minibox.loader.stub.StubProvider$StubProviderP03
+    com.tencent.mobileqq/com.tencent.minibox.loader.stub.StubService$StubServiceP00
+    com.tencent.mobileqq/com.tencent.minibox.loader.stub.StubService$StubServiceP01
+    com.tencent.mobileqq/com.tencent.minibox.loader.stub.StubService$StubServiceP02
+    com.tencent.mobileqq/com.tencent.minibox.loader.stub.StubService$StubServiceP03
+    com.tencent.mobileqq/com.tencent.qqmini.minigame.utils.ConsoleLogFileProvider
+
+=== QQ URI schemes ===
+  distinct schemes: 0
+  pet-ish schemes: NONE
+
+=== chat title-bar status row (from rehearsal.xml, display-4 dump) ===
+  TextView         bounds=[20,136][68,184]       clickable=true  rid=ivTitleBtnLeft     desc='返回消息未读5' text=''
+  ImageView        bounds=[157,132][189,164]     clickable=false rid=pt1                desc='听筒模式' text=''
+  TextView         bounds=[129,175][243,199]     clickable=false rid=j64                desc='' text='在线 - 5G'
+  TextView         bounds=[261,175][371,199]     clickable=false rid=2yc                desc='' text='学习中'
+
+=== non-consuming read-only gate on the CURRENT frame ===
+  (already recorded: 0.770218318809005 at 14:18:22 -> NOT ROOM)
+
+=== CONCLUSION ===
+  No app-route from the QQ chat reaches the pet home: the pet H5 page is stacked
+  directly on SplashActivity (chat), and PetNavigation.initialise() has no branch
+  entering the pet from QQ's chat/message list. Setup-tap budget (3/3) is exhausted.
+
+=== CORRECTION APPENDED 2026-10-07 (supersedes parts of the above; original lines kept verbatim) ===
+  The machine output ABOVE is genuine, but two things drawn from it were wrong and are
+  WITHDRAWN per the captain's correction. See step3-structural-CORRECTION.txt for the
+  re-derived numbers.
+
+  1) "distinct schemes: 0" / "pet-ish schemes: NONE" is a PARSING ARTIFACT, not a fact.
+     The regex actually used was  scheme="([^"]+)"  , but `dumpsys package` prints
+        Scheme: "file"
+     so 0 matches was guaranteed. Re-run with an accepting regex (Scheme:\s*"...") :
+        - 144 scheme lines, 34 distinct schemes
+        - apollo, content, file, http, imto, kandianugc, mqq, mqqapi, ... , wtloginmqq
+        - pet-ish among them: NONE
+     The "no pet scheme" conclusion therefore rests on the ACCEPTING regex, not on 0 matches.
+     It still does NOT establish that no native pet entry exists.
+
+  2) The CONCLUSION overreached. It is supported only that:
+        - the TESTED route (chat -> promo card -> its 返回) does not reach ROOM;
+        - PetNavigation.initialise() has no branch entering the pet FROM QQ's chat.
+     It is NOT supported that reaching ROOM is structurally impossible, nor that the user
+     must hand-tap the entry. Also note:
+        - the non-clickable '学习中' TextView sits inside a CLICKABLE parent
+          LinearLayout [129,175][371,199] (see titlebar.txt L55) -- never exercised;
+        - the title-bar ImageView rid=1fv [568,136][616,184] IS clickable and DOES carry a
+          resource ID -- "no text/content-desc" does not mean "unidentifiable"; never resolved.
+     Those remain UNRESOLVED, not refuted.

@@ -1,0 +1,18 @@
+=== authoritative dump: rehearsal.xml (136 nodes) ===
+  root bounds=None pkg=None
+
+=== FACT 1: '学习中' node and its ancestors' clickability ===
+  self: class=android.widget.TextView bounds=[261,175][371,199] clickable=false text='学习中'
+  [0] TextView         bounds=[261,175][371,199]     clickable=false rid=2yc         
+  [1] LinearLayout     bounds=[129,175][371,199]     clickable=true  rid=-           
+      ^^ CLICKABLE ANCESTOR FOUND -> the 'not clickable' child does NOT
+         imply the entry is unclickable.
+
+=== FACT 2: title-bar icons -- clickable + resource-id ===
+  ImageView        bounds=[157,132][189,164]     clickable=false rid=pt1    desc='听筒模式' text=''
+  ImageView        bounds=[568,136][616,184]     clickable=true  rid=1fv    desc='' text=''
+  ImageView        bounds=[640,136][688,184]     clickable=true  rid=1ft    desc='聊天设置' text=''
+
+=== SCOPE ===
+  Facts only: clickability/ids as recorded in the dump. No input sent, no state change.
+  This does NOT prove what those controls do, nor that ROOM is reachable.

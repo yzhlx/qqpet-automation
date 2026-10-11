@@ -1,0 +1,15 @@
+device=DKS9K23420020242 stamp=20261007-141741 host_local=2026-10-07 14:17:41
+cumulative authorized setup taps before this step = 2 (limit 3)
+dump-validated reference frame step2b-after-4-20261007-141033.png size=(720, 1600)
+fresh frame step3b-before-20261007-141741.png bytes=1541451 signature_ok=True size=(720, 1600) capture_ms=984
+返回 control re-match MAE=0.000 shift=(0,0) top5=[('0.00', 0, 0), ('2.00', 0, -1), ('2.01', 0, 1), ('2.23', 1, 0), ('2.55', 1, -1)]
+unique peak vs rival >4px: True (nearest rival=6.25 @ (2,-5))
+target box on FRESH frame=(0, 110, 117, 210) centre=(58,160)
+TAP cmd=adb -s DKS9K23420020242 shell input -d 4 tap 58 160
+source=com.android.shell (NOT APP_AUTOMATION)  display=-d 4
+capture_begin_local=14:17:41 input_local=14:17:43 capture_to_input_ms=1459
+count_cumulative_setup=3
+after[+ 3s] step3b-after-0-20261007-141741.png bytes=271622 ok=True mean|diff|vs-prev=6398/100
+after[+ 8s] step3b-after-1-20261007-141741.png bytes=271068 ok=True mean|diff|vs-prev=36/100
+after[+15s] step3b-after-2-20261007-141741.png bytes=270578 ok=True mean|diff|vs-prev=40/100
+after[+25s] step3b-after-3-20261007-141741.png bytes=271266 ok=True mean|diff|vs-prev=44/100

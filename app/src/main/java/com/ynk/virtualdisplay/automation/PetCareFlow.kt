@@ -66,7 +66,9 @@ class ConsumableReservation internal constructor(private val budget: CareConsuma
  * The per-recover retry limits (5 feeds / 3 cleans) are NOT the batch limit: recover() runs once
  * per round, so on their own they would permit up to 15 cookies and 9 soaps in a 3-round run. This
  * budget is owned by one PetCareFlow instance, which PetSessionController constructs once per
- * session, so it accumulates across rounds.
+ * session, so it accumulates across rounds. Measured on-device: a stock-out gesture can burn one
+ * allowance with zero gain before the restock lands, and 90-reach from the 60s needs 3 soaps
+ * (+10 each), so the soap budget carries one spare (4) and the cookie budget one spare (6).
  *
  * An allowance is counted the moment it is RESERVED, before any consumable input, so
  * [cookiesUsed]/[soapsUsed] mean "spent or possibly spent" and can never regress on a failed or
@@ -74,7 +76,7 @@ class ConsumableReservation internal constructor(private val budget: CareConsuma
  * budget can never be disclosed only after the fact as an overrun. Pure Kotlin, no Android types:
  * unit-testable on JVM.
  */
-class CareConsumableBudget(val cookies: Int = 5, val soaps: Int = 3) {
+class CareConsumableBudget(val cookies: Int = 6, val soaps: Int = 4) {
     init { require(cookies > 0 && soaps > 0) { "CARE_BUDGET_INVALID:$cookies/$soaps" } }
     var cookiesUsed = 0; private set
     var soapsUsed = 0; private set
@@ -145,7 +147,10 @@ internal fun consumableDeliveryEvidence(consumableAttempted: Boolean, injectionC
 /** Extracted measured cookie / soap flow. Unknown is never converted to a number. */
 class PetCareFlow(private val flow: PetFlowContext,private val navigation: PetNavigation,
     private val budget: CareConsumableBudget = CareConsumableBudget(),
+    private val exchangeBudget: ExchangeBudget = ExchangeBudget(),
     private val onHealth: (HealthObservations)->Unit={}) {
+    /** Stock-out purchase branch: created lazily so JVM tests without assets never touch it. */
+    val exchange: PetExchangeFlow by lazy { PetExchangeFlow(flow,navigation,exchangeBudget) }
     var careStatistics=JSONObject();private set
     /**
      * Allowance-transition sink. Defaults to the session journal, which fsyncs every append; JVM
@@ -209,6 +214,7 @@ class PetCareFlow(private val flow: PetFlowContext,private val navigation: PetNa
             .put("clean_count",0).put("clean_duration_ms",0L)
         careStatistics=recovery
         var feeds=0
+        var restocks=0
         while(h.energy<90) {
             check(feeds<5) { "FEED_RETRY_LIMIT" }
             // The batch-wide limit, checked BEFORE the action begins, and then reserved on the spot:
@@ -222,7 +228,9 @@ class PetCareFlow(private val flow: PetFlowContext,private val navigation: PetNa
             var callsBefore=0
             try {
                 val before=h.energy; val started=SystemClock.elapsedRealtime(); val wall=System.currentTimeMillis()
-                navigation.tap(room,PointF(638f,720f),foodScene,"enter-food")
+                // After a stock-out restock the flow is already standing on the food scene
+                // (the purchase closes back onto it); only enter from the room otherwise.
+                if(feeds>0 || restocks>0) enterSceneIfAbsent(foodScene,"enter-food",PointF(638f,720f)) else navigation.tap(room,PointF(638f,720f),foodScene,"enter-food")
                 verify(listOf(foodScene),"feed-before",latest=true)
                 consuming=true
                 // Read immediately before the cookie action, which owns every inject call started
@@ -248,10 +256,39 @@ class PetCareFlow(private val flow: PetFlowContext,private val navigation: PetNa
             }
             catch(t: Throwable) {
                 settle(reservation,"feed",consuming,callsBefore)
+                // Stock-out repair: a measured zero-gain feed means the cookie inventory ran out.
+                // One autonomous purchase (1 cookie, verified qty and total), then one retry; a
+                // second zero-gain failure propagates unmasked.
+                val message=t.message.orEmpty()
+                // A stock-out feed opens the EXCHANGE dialog instead of showing an eaten-cookie
+                // scene, so the FIRST symptom is PAGE_MISMATCH on feed-after, not a measured
+                // zero-gain. If the dialog is verifiably open, use it as the restock entry (no
+                // further input); anything else propagates fail-closed. Each restock buys ONE
+                // verified cookie; a 90-reach may need several, bounded by FEED_RETRY_LIMIT and
+                // the exchange budget (still fully qty/total-verified per purchase).
+                // Symmetry with the soap path: a measured zero-gain feed with the dialog already
+                // open is handled above; a zero-gain feed WITHOUT a dialog also means an empty
+                // inventory (the eat animation simply never played) - restock from the scene,
+                // bounded, every purchase fully verified.
+                if(message.startsWith("FEED_NO_EXPECTED_GAIN_OR_EMPTY") && restocks<4) {
+                    restocks++
+                    emit("feed-stockout-restock",reason=message)
+                    ensureFoodScene()
+                    exchange.buy(Consumable.COOKIE,1,"feed-stockout")
+                    continue
+                }
+                if(message.startsWith("PAGE_MISMATCH:") && message.contains(":feed-after:")
+                    && exchange.dialogOpen(Consumable.COOKIE) && restocks<4) {
+                    restocks++
+                    emit("feed-stockout-restock",reason="dialog-on-feed-after#$restocks")
+                    exchange.buy(Consumable.COOKIE,1,"feed-stockout",dialogAlreadyOpen=true)
+                    continue
+                }
                 throw t
             }
         }
         var cleans=0
+        var soapRestocks=0
         while(h.cleanliness<90) {
             check(cleans<3) { "CLEAN_RETRY_LIMIT" }
             // Batch-wide soap limit, checked before the gesture begins and reserved on the spot.
@@ -261,7 +298,7 @@ class PetCareFlow(private val flow: PetFlowContext,private val navigation: PetNa
             var callsBefore=0
             try {
                 val before=h.cleanliness; val started=SystemClock.elapsedRealtime()
-                navigation.tap(room,PointF(638f,868f),bath,"enter-bath")
+                if(cleans>0 || soapRestocks>0) enterSceneIfAbsent(bath,"enter-bath",PointF(638f,868f)) else navigation.tap(room,PointF(638f,868f),bath,"enter-bath")
                 // Page identity is the stable bath scene, never the soap button: the button repaints
                 // to its pale "already clean" state once cleanliness is maxed, which used to fail
                 // clean-after verification (PAGE_MISMATCH ... 0.9538353304284677) with cleanliness
@@ -296,10 +333,51 @@ class PetCareFlow(private val flow: PetFlowContext,private val navigation: PetNa
             }
             catch(t: Throwable) {
                 settle(reservation,"clean",consuming,callsBefore)
+                // Stock-out repair for soap: measured zero-gain clean -> buy 1 soap, retry once.
+                val message=t.message.orEmpty()
+                // One measured soap = +10; reaching 90 from the 60s may need 3 soaps, so both
+                // stock-out symptoms (measured zero-gain, or the dialog opened by the failed
+                // gesture) may recur. Each restock buys ONE verified soap; the count is bounded
+                // by CLEAN_RETRY_LIMIT and the exchange budget; every purchase is fully
+                // qty/total-verified, so nothing here blind-buys.
+                if(message.startsWith("CLEAN_NO_GAIN_OR_EMPTY") && soapRestocks<4) {
+                    soapRestocks++
+                    emit("clean-stockout-restock",reason=message)
+                    ensureBathScene()
+                    exchange.buy(Consumable.SOAP,1,"clean-stockout")
+                    continue
+                }
+                // A stock-out clean opens the EXCHANGE dialog instead of a scrubbed scene: the
+                // first symptom is PAGE_MISMATCH on clean-after. Reuse that open dialog (no
+                // further input) for the restock; bounded like the cookie path, every purchase
+                // fully verified; anything else propagates fail-closed.
+                if(message.startsWith("PAGE_MISMATCH:") && message.contains(":clean-after:")
+                    && exchange.dialogOpen(Consumable.SOAP) && soapRestocks<4) {
+                    soapRestocks++
+                    emit("clean-stockout-restock",reason="dialog-on-clean-after#$soapRestocks")
+                    exchange.buy(Consumable.SOAP,1,"clean-stockout",dialogAlreadyOpen=true)
+                    continue
+                }
                 throw t
             }
         }
         h
+    }
+
+    /**
+     * Guarantees the flow is standing on the food scene before an exchange buy: the failed feed
+     * may have stopped anywhere between room entry and the health panel. Room -> food is the
+     * measured scene entry (638,720); scene -> room is the measured leave (80,160).
+     */
+    private suspend fun ensureFoodScene() = enterSceneIfAbsent(flow.foodScene,"restock-enter-food",PointF(638f,720f))
+    private suspend fun ensureBathScene() = enterSceneIfAbsent(flow.bath,"restock-enter-bath",PointF(638f,868f))
+
+    private suspend fun enterSceneIfAbsent(scene: PetProfile.Probe, action: String, point: PointF) = with(flow) {
+        val f=frame(latest=true)
+        val onScene=try { matcher.match(f,scene,profile.matchThreshold).score>=profile.matchThreshold } finally { f.recycle() }
+        if(onScene) return@with
+        verifySettled(listOf(room),"$action-find-room")
+        navigation.tap(room,point,scene,action)
     }
 
 }

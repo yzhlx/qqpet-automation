@@ -1,0 +1,38 @@
+=== tree with depth (nodes overlapping card-C band y 1060..1387) ===
+0   FrameLayout      [0,0][1084,2186]       click=false desc='' text=''
+  1   LinearLayout     [0,0][1084,2186]       click=false desc='' text=''
+    2   FrameLayout      [0,0][1084,2186]       click=false desc='' text=''
+      3   FrameLayout      [0,0][1084,2186]       click=false desc='' text=''
+        4   FrameLayout      [0,0][1084,2186]       click=false desc='' text=''
+          5   ScrollView       [0,0][1084,2186]       click=false desc='第 1 屏，共 7 屏' text=''
+            6   ViewGroup        [0,14][1084,1978]      click=false desc='' text=''
+              7   ViewGroup        [34,70][1050,1960]     click=false desc='' text=''
+                8   LinearLayout     [34,780][542,1370]     click=true  desc='购物 大文件夹 5 个应用,' text=''
+                  9   FrameLayout      [64,807][512,1264]     click=false desc='' text=''
+                    10  ScrollView       [64,807][512,1264]     click=false desc='' text=''
+                      11  ViewGroup        [64,807][511,1264]     click=false desc='' text=''
+                        12  ViewGroup        [79,820][496,1252]     click=false desc='' text=''
+                          13  TextView         [79,964][218,1108]     click=true  desc='拼多多' text=''
+                          13  TextView         [218,964][357,1108]    click=true  desc='京东' text=''
+                          13  LinearLayout     [357,1108][496,1252]   click=false desc='更多应用' text=''
+                  9   TextView         [40,1282][536,1370]    click=false desc='' text='购物'
+                8   TextView         [542,780][796,1075]    click=true  desc='小红书' text='小红书'
+                8   TextView         [796,780][1050,1075]   click=true  desc='微软必应' text='微软必应'
+                8   TextView         [542,1075][796,1370]   click=true  desc='学信网' text='学信网'
+                8   TextView         [796,1075][1050,1370]  click=true  desc='剪映' text='剪映'
+                8   TextView         [34,1370][288,1665]    click=true  desc='正气' text='正气'
+                8   TextView         [288,1370][542,1665]   click=true  desc='质感文件' text='质感文件'
+                8   TextView         [542,1370][796,1665]   click=true  desc='网易有道词典' text='网易有道词典'
+                8   TextView         [796,1370][1050,1665]  click=true  desc='番茄ToDo' text='番茄ToDo'
+              7   RelativeLayout   [34,70][1050,1960]     click=false desc='' text=''
+
+=== document order: which subtree contains the sprites vs the list ===
+  sprite nodes at doc index: []
+  list container mh2 at doc index: []
+
+=== card-C clickable box (122, 1080, 590, 1341) ; overlay children [(303, 1170, 543, 1329)] ===
+  card centre = (356.0, 1210.5)  -> inside overlay clickable child? True
+  card title box (146, 1104, 566, 1144) centre=(356.0,1124.0) inside child? False
+  safe candidate count = 14430
+  safe region x 123..589  y 1081..1339
+  chosen = (355, 1169)  (inside card True, inside overlay-child False)

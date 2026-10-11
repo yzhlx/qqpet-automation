@@ -1,0 +1,15 @@
+device=DKS9K23420020242 stamp=20261007-141033 host_local=2026-10-07 14:10:33
+display 4 declared: 720x1600 density 320 rotation 0  (ro.sf.lcd_density=480 is display 0)
+reference frame state-now.png size=(720, 1600)
+captured step2b-before-20261007-141033.png bytes=271835 signature_ok=True size=(720, 1600) took=355ms
+card-1 re-match: MAE=0.000 shift=(0,0)   top5=[('0.00', 0, 0), ('5.02', 1, 0), ('5.04', -1, 0), ('5.26', 0, 1), ('5.31', 0, -1)]
+peak unique vs nearest rival >3px away: True (nearest rival=12.00 @ (4,0))
+target box on FRESH frame = (122, 280, 591, 542)  centre=(356,411)  inside=True  outside_overlays=True
+TAP cmd=adb -s DKS9K23420020242 shell input -d 4 tap 356 411
+source=com.android.shell (NOT APP_AUTOMATION)  display=-d 4
+capture_begin_local=14:10:33 input_local=14:10:34 capture_to_input_ms=861
+after[+ 2s] step2b-after-0-20261007-141033.png bytes=913130 ok=True size=(720, 1600) mean|diff|vs-before=4164/100
+after[+ 6s] step2b-after-1-20261007-141033.png bytes=837930 ok=True size=(720, 1600) mean|diff|vs-before=9012/100
+after[+12s] step2b-after-2-20261007-141033.png bytes=878140 ok=True size=(720, 1600) mean|diff|vs-before=8311/100
+after[+20s] step2b-after-3-20261007-141033.png bytes=1541246 ok=True size=(720, 1600) mean|diff|vs-before=6432/100
+after[+30s] step2b-after-4-20261007-141033.png bytes=1541481 ok=True size=(720, 1600) mean|diff|vs-before=6432/100

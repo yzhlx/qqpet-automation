@@ -33,14 +33,14 @@ class PetSessionController(context:Context,capture:HeadlessDisplayCapture,input:
             publish()
         },reconcile={cp,page -> cp.phase=="WAIT_RESULT" && cp.trustedPage=="LEARNING" && page=="result" && ledger.canReconcileResult(cp.round)})
     private val navigation=PetNavigation(flow)
-    private val care=PetCareFlow(flow,navigation) {health ->
+    private val care=PetCareFlow(flow,navigation,exchangeBudget=ExchangeBudget(maxPurchases=10,maxCoins=200)) {health ->
         snapshot=snapshot.copy(energy=health.energy,cleanliness=health.cleanliness,mood=health.mood);publish()
     }
     private val study=PetStudyFlow(flow,navigation,ledger)
     var completed=0;private set
     var stopReason:String?=null;private set
     private var cancelled=false
-    init {require(totalRounds in 1..3)}
+    init {require(totalRounds in 1..10)}
     @Synchronized private fun publish() {
         val value=snapshot.at(System.currentTimeMillis(),SystemClock.elapsedRealtime())
         PetManagedRuntime.publish(value)

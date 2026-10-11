@@ -1,0 +1,1 @@
+﻿adb -s DKS9K23420020242 shell input -d 4 tap 484 1438

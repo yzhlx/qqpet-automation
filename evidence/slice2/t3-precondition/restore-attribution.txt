@@ -1,0 +1,12 @@
+﻿@
+tap_time_local=2026-10-07 12:58:18.825
+tap_time_epoch_ms=1791349098827
+io=adb shell over USB (transport usb), device DKS9K23420020242
+source=com.android.shell (shell input, NOT APP_AUTOMATION)
+display=-d 4 (explicit)
+x=484
+y=1438
+count=1
+label=PRECONDITION_RESTORE
+@mentions_target=bbox(446,1383)-(522,1493) centre (484.0,1438.0) of the single floating-zone component
+

@@ -1,0 +1,17 @@
+=== CORRECTION: scheme parsing ===
+  regex scheme="..."        -> 0 matches   (the WRONG regex used before)
+  regex Scheme:\s*"..."     -> 144 matches   (accepting regex)
+  distinct schemes: 34
+  all distinct schemes: apollo, content, file, http, imto, kandianugc, mqq, mqqapi, mqqaudioassistant, mqqavshare, mqqconferenceflyticket, mqqconnect, mqqdatamigration, mqqdevlock, mqqflyticket, mqqforward, mqqguild, mqqmdpass, mqqopensdkapi, mqqthirdpush, mqqtribe, mqqverifycode, mqqwallet, mqqwpa, mqqzone, mqqzonev2, mqqzonev3, qapp, qqstory, qqwifi, qwallet100703379, txdt0and06a49o0pml4z, txdt0s200mnjt807v3ge, wtloginmqq
+  pet-ish schemes: NONE (with an ACCEPTING regex)
+
+=== exported activities / aliases mentioning pet-ish words (accepting regex) ===
+  matches: 0
+
+=== how many Activity/Activity Alias blocks exist at all ===
+  Activity blocks: 0 ; Activity Alias blocks: 0
+
+=== SCOPE NOTE ===
+  This only corrects a parsing error and reports package metadata.
+  It does NOT establish that no native QQ pet entry exists, and it does NOT
+  test any clickable parent container. Those remain UNRESOLVED.

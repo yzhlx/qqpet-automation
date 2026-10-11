@@ -1,0 +1,46 @@
+=== target node ===
+FrameLayout        [303,1170][543,1329]   idx=1   click=true  desc='' text='' rid=-
+
+=== ancestor chain ===
+FrameLayout        [303,1093][543,1493]   idx=1   click=false desc='Q宠-1000006' text='' rid=-
+FrameLayout        [0,0][720,1600]        idx=2   click=false desc='' text='' rid=-
+RelativeLayout     [0,0][720,1600]        idx=1   click=false desc='' text='' rid=-
+FrameLayout        [0,0][720,1600]        idx=0   click=false desc='' text='' rid=-
+RelativeLayout     [0,0][720,1600]        idx=0   click=false desc='' text='' rid=-
+FrameLayout        [0,0][720,1600]        idx=0   click=false desc='' text='' rid=-
+FrameLayout        [0,0][720,1600]        idx=0   click=false desc='' text='' rid=-
+FrameLayout        [0,0][720,1600]        idx=0   click=false desc='' text='' rid=-
+FrameLayout        [0,0][720,1600]        idx=0   click=false desc='' text='' rid=-
+FrameLayout        [0,0][720,1600]        idx=0   click=false desc='' text='' rid=-
+FrameLayout        [0,0][720,1600]        idx=0   click=false desc='' text='' rid=oat
+FrameLayout        [0,0][720,1600]        idx=0   click=false desc='' text='' rid=-
+FrameLayout        [0,0][720,1600]        idx=2   click=false desc='' text='' rid=r3e
+ViewGroup          [0,0][720,1600]        idx=0   click=false desc='' text='' rid=-
+FrameLayout        [0,0][720,1600]        idx=0   click=false desc='' text='' rid=android:id/content
+LinearLayout       [0,0][720,1600]        idx=1   click=false desc='' text='' rid=-
+FrameLayout        [0,0][720,1600]        idx=0   click=false desc='' text='' rid=-
+
+=== siblings of the target ===
+FrameLayout        [303,1093][543,1493]   idx=0   click=false desc='' text='' rid=-
+FrameLayout        [303,1170][543,1329]   idx=1   click=true  desc='' text='' rid=-
+
+=== sprite Q宠 node ===
+FrameLayout        [303,1093][543,1493]   idx=1   click=false desc='Q宠-1000006' text='' rid=-
+
+=== sprite ancestors ===
+FrameLayout        [0,0][720,1600]        idx=2   click=false desc='' text='' rid=-
+RelativeLayout     [0,0][720,1600]        idx=1   click=false desc='' text='' rid=-
+FrameLayout        [0,0][720,1600]        idx=0   click=false desc='' text='' rid=-
+RelativeLayout     [0,0][720,1600]        idx=0   click=false desc='' text='' rid=-
+FrameLayout        [0,0][720,1600]        idx=0   click=false desc='' text='' rid=-
+FrameLayout        [0,0][720,1600]        idx=0   click=false desc='' text='' rid=-
+FrameLayout        [0,0][720,1600]        idx=0   click=false desc='' text='' rid=-
+FrameLayout        [0,0][720,1600]        idx=0   click=false desc='' text='' rid=-
+FrameLayout        [0,0][720,1600]        idx=0   click=false desc='' text='' rid=-
+FrameLayout        [0,0][720,1600]        idx=0   click=false desc='' text='' rid=oat
+FrameLayout        [0,0][720,1600]        idx=0   click=false desc='' text='' rid=-
+FrameLayout        [0,0][720,1600]        idx=2   click=false desc='' text='' rid=r3e
+ViewGroup          [0,0][720,1600]        idx=0   click=false desc='' text='' rid=-
+FrameLayout        [0,0][720,1600]        idx=0   click=false desc='' text='' rid=android:id/content
+LinearLayout       [0,0][720,1600]        idx=1   click=false desc='' text='' rid=-
+FrameLayout        [0,0][720,1600]        idx=0   click=false desc='' text='' rid=-

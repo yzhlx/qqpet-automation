@@ -67,7 +67,7 @@ class PetAutomationService : Service() {
         val errors = profile.validate(healthGuardInstalled=true)
         if (errors.isNotEmpty()) return stopSession("配置未完成：${errors.joinToString()}")
         if (displayId <= 0) return stopSession("拒绝默认/无效 displayId")
-        if (rounds !in 1..3) return stopSession("Only finite 1..3 round batches are supported")
+        if (rounds !in 1..10) return stopSession("Only finite 1..10 round batches are supported")
 
         try {
             withTimeout(7_000L) {

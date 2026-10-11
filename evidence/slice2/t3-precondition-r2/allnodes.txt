@@ -1,0 +1,173 @@
+#   class            bounds                 click  resource-id                desc                   text
+------------------------------------------------------------------------------------------------------------------------------------------------------
+0   FrameLayout      [0,0][720,1600]        false  -                                                 
+1   FrameLayout      [0,0][720,1600]        false  -                                                 
+2   LinearLayout     [0,0][720,1600]        false  -                                                 
+3   FrameLayout      [0,0][720,1600]        false  A:content                                         
+4   ViewGroup        [0,0][720,1600]        false  -                                                 
+5   FrameLayout      [0,0][720,1600]        false  r3c                                               
+6   FrameLayout      [0,0][720,1600]        false  r3f                                               
+7   FrameLayout      [0,0][720,1600]        false  r3e                                               
+8   FrameLayout      [0,0][720,1600]        false  -                                                 
+9   FrameLayout      [0,0][720,1600]        false  oat                                               
+10  FrameLayout      [0,0][720,1600]        false  -                                                 
+11  FrameLayout      [0,0][720,1600]        false  -                                                 
+12  FrameLayout      [0,0][720,1600]        false  -                                                 
+13  FrameLayout      [0,0][720,1600]        false  -                                                 
+14  FrameLayout      [0,0][720,1600]        false  -                                                 
+15  RelativeLayout   [0,0][720,1600]        false  -                                                 
+16  FrameLayout      [0,0][720,1600]        false  -                                                 
+17  ViewGroup        [0,0][720,1600]        false  mko                                               
+18  RelativeLayout   [0,0][720,1600]        false  -                                                 
+19  FrameLayout      [0,210][720,1600]      false  -                                                 
+20  View             [359,1401][361,1403]   false  mn1                                               
+21  FrameLayout      [0,1403][720,1600]     false  nep                                               
+22  View             [0,1403][720,1600]     false  -                                                 
+23  RelativeLayout   [0,0][720,1600]        false  -                                                 
+24  RelativeLayout   [0,0][720,1600]        false  mh3                                               
+25  FrameLayout      [0,0][720,1600]        false  -                                                 
+26  FrameLayout      [0,0][720,1600]        false  -                                                 
+27  FrameLayout      [183,1093][423,1493]   false  -                          Q宠-1000001             
+28  FrameLayout      [183,1093][423,1493]   false  -                                                 
+29  View             [183,1093][423,1493]   false  -                                                 
+30  FrameLayout      [303,1093][543,1493]   false  -                          Q宠-1000006             
+31  FrameLayout      [303,1093][543,1493]   false  -                                                 
+32  View             [303,1093][543,1493]   false  -                                                 
+33  FrameLayout      [303,1170][543,1329]   true   -                                                 
+34  FrameLayout      [0,210][720,1600]      false  -                                                 
+35  ViewGroup        [0,210][720,1403]      false  mh2                                               
+36  FrameLayout      [0,210][720,1403]      false  -                                                 
+37  FrameLayout      [0,0][720,1600]        false  -                                                 
+38  FrameLayout      [0,210][720,1600]      true   -                                                 
+39  FrameLayout      [0,210][720,1403]      false  -                                                 
+40  FrameLayout      [0,210][720,1403]      false  -                                                 
+41  RecyclerView     [0,210][720,1403]      false  -                                                 
+42  ViewGroup        [0,210][720,587]       false  root                                              
+43  FrameLayout      [273,210][447,260]     false  f24                                               
+44  TextView         [273,210][447,236]     true   -                          星期一 下午3:52             星期一 下午3:52
+45  FrameLayout      [24,276][104,356]      false  wgh                                               
+46  RelativeLayout   [24,276][104,356]      true   mh_                                               
+47  FrameLayout      [24,276][104,356]      false  -                          1的资料卡                  
+48  ImageView        [24,276][104,356]      false  -                                                 
+49  LinearLayout     [104,260][608,587]     false  p2q                                               
+50  ViewGroup        [104,260][608,587]     false  ml3                        发来宠物名画之旅               
+51  LinearLayout     [122,280][590,541]     true   -                                                 
+52  LinearLayout     [146,304][566,344]     false  -                                                 
+53  TextView         [146,304][566,344]     false  -                                                 宠物名画之旅
+54  LinearLayout     [146,352][566,472]     false  -                                                 
+55  TextView         [146,352][426,418]     false  -                                                 旅行环线攻略已就位，等你一起出发！
+56  ImageView        [462,360][566,464]     false  -                                                 
+57  ImageView        [122,496][590,497]     false  -                                                 
+58  LinearLayout     [146,497][566,541]     false  -                                                 
+59  ImageView        [146,507][170,531]     false  -                                                 
+60  TextView         [178,497][566,541]     false  -                                                 宠物
+61  ViewGroup        [0,587][720,987]       false  root                                              
+62  FrameLayout      [285,587][435,660]     false  f24                                               
+63  TextView         [285,603][435,636]     true   -                          昨天 凌晨1:59              昨天 凌晨1:59
+64  FrameLayout      [24,676][104,756]      false  wgh                                               
+65  RelativeLayout   [24,676][104,756]      true   mh_                                               
+66  FrameLayout      [24,676][104,756]      false  -                          1的资料卡                  
+67  ImageView        [24,676][104,756]      false  -                                                 
+68  LinearLayout     [104,660][608,987]     false  p2q                                               
+69  ViewGroup        [104,660][608,987]     false  ml3                        发来宠物名画之旅               
+70  LinearLayout     [122,680][590,941]     true   -                                                 
+71  LinearLayout     [146,704][566,744]     false  -                                                 
+72  TextView         [146,704][566,744]     false  -                                                 宠物名画之旅
+73  LinearLayout     [146,752][566,872]     false  -                                                 
+74  TextView         [146,752][426,818]     false  -                                                 旅行环线攻略已就位，等你一起出发！
+75  ImageView        [462,760][566,864]     false  -                                                 
+76  ImageView        [122,896][590,897]     false  -                                                 
+77  LinearLayout     [146,897][566,941]     false  -                                                 
+78  ImageView        [146,907][170,931]     false  -                                                 
+79  TextView         [178,897][566,941]     false  -                                                 宠物
+80  ViewGroup        [0,987][720,1387]      false  root                                              
+81  FrameLayout      [305,987][415,1060]    false  f24                                               
+82  TextView         [305,1003][415,1036]   true   -                          下午12:15                下午12:15
+83  FrameLayout      [24,1076][104,1156]    false  wgh                                               
+84  RelativeLayout   [24,1076][104,1156]    true   mh_                                               
+85  FrameLayout      [24,1076][104,1156]    false  -                          1的资料卡                  
+86  ImageView        [24,1076][104,1156]    false  -                                                 
+87  LinearLayout     [104,1060][608,1387]   false  p2q                                               
+88  ViewGroup        [104,1060][608,1387]   false  ml3                        发来宠物名画之旅               
+89  LinearLayout     [122,1080][590,1341]   true   -                                                 
+90  LinearLayout     [146,1104][566,1144]   false  -                                                 
+91  TextView         [146,1104][566,1144]   false  -                                                 宠物名画之旅
+92  LinearLayout     [146,1152][566,1272]   false  -                                                 
+93  TextView         [146,1152][426,1218]   false  -                                                 旅行环线攻略已就位，等你一起出发！
+94  ImageView        [462,1160][566,1264]   false  -                                                 
+95  ImageView        [122,1296][590,1297]   false  -                                                 
+96  LinearLayout     [146,1297][566,1341]   false  -                                                 
+97  ImageView        [146,1307][170,1331]   false  -                                                 
+98  TextView         [178,1297][566,1341]   false  -                                                 宠物
+99  FrameLayout      [0,0][720,1600]        false  -                                                 
+100 FrameLayout      [0,0][720,210]         false  -                                                 
+101 FrameLayout      [0,0][720,210]         false  net                                               
+102 View             [0,0][720,210]         false  -                                                 
+103 RelativeLayout   [0,0][720,210]         true   jo9                                               
+104 RelativeLayout   [0,110][720,210]       false  3md                                               
+105 TextView         [20,136][68,184]       true   ivTitleBtnLeft             返回消息未读5                
+106 View             [65,136][113,184]      true   556                                               
+107 TextView         [129,125][149,171]     true   3kc                                               1
+108 ImageView        [157,132][189,164]     false  pt1                        听筒模式                   
+109 ViewFlipper      [129,175][371,199]     false  mam                                               
+110 LinearLayout     [129,175][371,199]     true   -                                                 
+111 TextView         [129,175][243,199]     false  j64                                               在线 - 5G
+112 TextView         [243,175][261,199]     false  -                                                 ·
+113 TextView         [261,175][371,199]     false  2yc                                               学习中
+114 ImageView        [568,136][616,184]     true   1fv                                               
+115 ImageView        [640,136][688,184]     true   1ft                        聊天设置                   
+116 LinearLayout     [0,210][720,280]       false  -                                                 
+117 RelativeLayout   [0,1403][720,1512]     false  -                                                 
+118 LinearLayout     [0,1403][720,1512]     false  -                                                 
+119 ImageView        [0,1403][720,1404]     false  -                                                 
+120 ViewGroup        [0,1404][720,1512]     true   dmj                                               
+121 EditText         [32,1416][520,1500]    true   input                                             
+122 Button           [544,1416][688,1500]   true   send_btn                                          发送
+123 LinearLayout     [0,1512][720,1600]     true   -                                                 
+124 ImageView        [0,1520][120,1576]     true   -                          语音                     
+125 ImageView        [120,1512][240,1584]   true   -                          相册                     
+126 ImageView        [240,1520][360,1576]   true   -                          拍照                     
+127 FrameLayout      [360,1520][480,1576]   false  -                                                 
+128 ImageView        [360,1520][480,1576]   true   -                          泡泡                     
+129 FrameLayout      [480,1520][600,1576]   false  -                                                 
+130 ImageView        [480,1520][600,1576]   true   -                          表情                     
+131 FrameLayout      [600,1520][720,1576]   false  -                                                 
+132 ImageView        [600,1520][720,1576]   true   -                          更多功能                   
+133 FrameLayout      [0,0][720,1600]        false  r6f                                               
+134 RelativeLayout   [0,0][720,1600]        false  -                                                 
+135 FrameLayout      [0,0][720,1600]        false  -                                                 
+
+=== clickable nodes sorted by y ===
+  y=0     h=210   RelativeLayout     [0,0][720,210]         rid=jo9            desc='' text=''
+  y=125   h=46    TextView           [129,125][149,171]     rid=3kc            desc='' text='1'
+  y=136   h=48    TextView           [20,136][68,184]       rid=ivTitleBtnLeft desc='返回消息未读5' text=''
+  y=136   h=48    View               [65,136][113,184]      rid=556            desc='' text=''
+  y=136   h=48    ImageView          [568,136][616,184]     rid=1fv            desc='' text=''
+  y=136   h=48    ImageView          [640,136][688,184]     rid=1ft            desc='聊天设置' text=''
+  y=175   h=24    LinearLayout       [129,175][371,199]     rid=-              desc='' text=''
+  y=210   h=1390  FrameLayout        [0,210][720,1600]      rid=-              desc='' text=''
+  y=210   h=26    TextView           [273,210][447,236]     rid=-              desc='星期一 下午3:52' text='星期一 下午3:52'
+  y=276   h=80    RelativeLayout     [24,276][104,356]      rid=mh_            desc='' text=''
+  y=280   h=261   LinearLayout       [122,280][590,541]     rid=-              desc='' text=''
+  y=603   h=33    TextView           [285,603][435,636]     rid=-              desc='昨天 凌晨1:59' text='昨天 凌晨1:59'
+  y=676   h=80    RelativeLayout     [24,676][104,756]      rid=mh_            desc='' text=''
+  y=680   h=261   LinearLayout       [122,680][590,941]     rid=-              desc='' text=''
+  y=1003  h=33    TextView           [305,1003][415,1036]   rid=-              desc='下午12:15' text='下午12:15'
+  y=1076  h=80    RelativeLayout     [24,1076][104,1156]    rid=mh_            desc='' text=''
+  y=1080  h=261   LinearLayout       [122,1080][590,1341]   rid=-              desc='' text=''
+  y=1170  h=159   FrameLayout        [303,1170][543,1329]   rid=-              desc='' text=''
+  y=1404  h=108   ViewGroup          [0,1404][720,1512]     rid=dmj            desc='' text=''
+  y=1416  h=84    EditText           [32,1416][520,1500]    rid=input          desc='' text=''
+  y=1416  h=84    Button             [544,1416][688,1500]   rid=send_btn       desc='' text='发送'
+  y=1512  h=88    LinearLayout       [0,1512][720,1600]     rid=-              desc='' text=''
+  y=1512  h=72    ImageView          [120,1512][240,1584]   rid=-              desc='相册' text=''
+  y=1520  h=56    ImageView          [0,1520][120,1576]     rid=-              desc='语音' text=''
+  y=1520  h=56    ImageView          [240,1520][360,1576]   rid=-              desc='拍照' text=''
+  y=1520  h=56    ImageView          [360,1520][480,1576]   rid=-              desc='泡泡' text=''
+  y=1520  h=56    ImageView          [480,1520][600,1576]   rid=-              desc='表情' text=''
+  y=1520  h=56    ImageView          [600,1520][720,1576]   rid=-              desc='更多功能' text=''
+
+=== overlap: sprite band y=1093..1493 vs card bands ===
+  card A y=260..587 : sprite overlap = no
+  card B y=660..987 : sprite overlap = no
+  card C y=1060..1387 : sprite overlap = YES

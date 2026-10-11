@@ -1,0 +1,36 @@
+=== 1. display-4 focused activity / top activity ===
+  display 0 focus=null
+  display 4 focus=Window{dcf6b34 u0 com.tencent.mobileqq/com.tencent.mobileqq.activity.QPublicFragmentActivity}
+
+=== 2. activities on display 4 (dumpsys activity activities) ===
+  Display: mDisplayId=4 rootTasks=1
+  displayId=4
+  Display: mDisplayId=0 rootTasks=7
+  displayId=0
+
+=== 3. which activities mention display 4 ===
+  L283 Display: mDisplayId=4 rootTasks=1
+      ctx L281 deepestLastOrientationSource=ActivityRecord{ba90c7b u0 com.tencent.mobileqq/.activity.QPublicFragmentActivity t2230}
+  L291 displayId=4
+      ctx L289 mFocusedApp=ActivityRecord{ba90c7b u0 com.tencent.mobileqq/.activity.QPublicFragmentActivity t2230}
+  L387 Display: mDisplayId=0 rootTasks=7
+      ctx L385 deepestLastOrientationSource=ActivityRecord{3fb3531 u0 com.huawei.android.launcher/.unihome.UniHomeLauncher t7}
+  L395 displayId=0
+      ctx L393 mFocusedApp=ActivityRecord{3fb3531 u0 com.huawei.android.launcher/.unihome.UniHomeLauncher t7}
+
+=== 4. logcat around the 14:10:34 card tap (activity transitions) ===
+  total logcat lines=4138 hits=5
+  10-07 14:12:42.095 D/HwActivityTaskManagerServiceEx( 1857): isActivityVisiableInFingerBoost:ActivityRecord{3fb3531 u0 com.huawei.android.launcher/.unihome.UniHomeLauncher t7}
+  10-07 14:12:42.095 D/HwActivityTaskManagerServiceEx( 1857): isActivityVisiableInFingerBoost:ActivityRecord{3fb3531 u0 com.huawei.android.launcher/.unihome.UniHomeLauncher t7}
+  10-07 14:12:42.100 D/HwActivityTaskManagerServiceEx( 1857): isActivityVisiableInFingerBoost:ActivityRecord{ba90c7b u0 com.tencent.mobileqq/.activity.QPublicFragmentActivity t2230}
+  10-07 14:13:11.052 I/ActivityTaskManager( 1857): Cannot add android into com.tencent.mobileqq bound list.
+  10-07 14:14:17.616 I/SecurityComp20000302: (19852): verify: certificate is : CN=petalsearch.com,O=Huawei Software Technologies Co.\, Ltd.,L=Nanjing,ST=Jiangsu,C=CN
+
+=== 5. current top activity of the QQ task stack ===
+  #64: fg     TOP  LCMN 23648:com.tencent.mobileqq/u0a230 act:activities|recents
+  #63: vis    BTOP ---N 17884:com.tencent.mobileqq:MSF/u0a230 act:client
+  #58: cch+ 5 CEM  ---- 14250:com.tencent.ilink.ServiceProcess/u0a230
+  #57: svcb   SVC  ---- 18680:com.tencent.mm/u0a232
+  #56: svcb   SVC  ---- 24735:com.tencent.mm:support/u0a232
+  #55: svc    SVC  ---- 20955:com.tencent.mm:push/u0a232
+  #41: cch+45 CEM  ---- 23218:com.tencent.mobileqq:tool/u0a230

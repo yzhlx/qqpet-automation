@@ -1,0 +1,31 @@
+=== TaskRecord t2230 / display-4 task contents ===
+  header: Task{80393ad #2230 type=standard A=10230:com.tencent.mobileqq U=0 visible=true mode=fullscreen translucent=false sz=2}
+    * Hist #1: ActivityRecord{ba90c7b u0 com.tencent.mobileqq/.activity.QPublicFragmentActivity t2230}
+    * Hist #0: ActivityRecord{52977d7 u0 com.tencent.mobileqq/.activity.SplashActivity t2230}
+
+=== every ActivityRecord mentioning t2230 ===
+  mResumedActivity: ActivityRecord{ba90c7b u0 com.tencent.mobileqq/.activity.QPublicFragmentActivity t2230}
+  Activities=[ActivityRecord{52977d7 u0 com.tencent.mobileqq/.activity.SplashActivity t2230}, ActivityRecord{ba90c7b u0 com.tencent.mobileqq/.activity.QPublicFragmentActivity t2230}]
+  * Hist #1: ActivityRecord{ba90c7b u0 com.tencent.mobileqq/.activity.QPublicFragmentActivity t2230}
+  * Hist #0: ActivityRecord{52977d7 u0 com.tencent.mobileqq/.activity.SplashActivity t2230}
+  Resumed: ActivityRecord{ba90c7b u0 com.tencent.mobileqq/.activity.QPublicFragmentActivity t2230}
+  ResumedActivity: ActivityRecord{ba90c7b u0 com.tencent.mobileqq/.activity.QPublicFragmentActivity t2230}
+  mLastResumedActivity=ActivityRecord{ba90c7b u0 com.tencent.mobileqq/.activity.QPublicFragmentActivity t2230}
+  deepestLastOrientationSource=ActivityRecord{ba90c7b u0 com.tencent.mobileqq/.activity.QPublicFragmentActivity t2230}
+  mFocusedApp=ActivityRecord{ba90c7b u0 com.tencent.mobileqq/.activity.QPublicFragmentActivity t2230}
+  * ActivityRecord{ba90c7b u0 com.tencent.mobileqq/.activity.QPublicFragmentActivity t2230}
+  * ActivityRecord{52977d7 u0 com.tencent.mobileqq/.activity.SplashActivity t2230}
+
+=== all ActivityRecords, with task id and state (first 80) ===
+  tid=ba90c7b task=2230 com.tencent.mobileqq/.activity.QPublicFragmentActivity
+  tid=52977d7 task=2230 com.tencent.mobileqq/.activity.SplashActivity
+  tid=3fb3531 task=7 com.huawei.android.launcher/.unihome.UniHomeLauncher
+  tid=cd863f5 task=2066 com.tencent.mobileqq/.activity.SplashActivity
+
+=== windows on display 4 ===
+  Window #0 Window{d62f259 u0 ShellDropTarget}:
+      mDisplayId=4 mSession=Session{6266f76 3102:u0a10081} mClient=android.os.BinderProxy@5aad3a3
+  Window #1 Window{dcf6b34 u0 com.tencent.mobileqq/com.tencent.mobileqq.activity.QPublicFragmentActivity}:
+      mDisplayId=4 rootTaskId=2230 mSession=Session{8fd9a05 23648:u0a10230} mClient=android.os.BinderProxy@749ae07
+  Window #2 Window{b6d9e67 u0 com.tencent.mobileqq/com.tencent.mobileqq.activity.SplashActivity}:
+      mDisplayId=4 rootTaskId=2230 mSession=Session{8fd9a05 23648:u0a10230} mClient=android.os.BinderProxy@98eb226

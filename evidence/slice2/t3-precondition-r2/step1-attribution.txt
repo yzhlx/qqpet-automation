@@ -1,0 +1,15 @@
+﻿@
+step=1
+purpose=open the unique QQ conversation whose preview mentions 宠物名画之旅
+semantic_basis=row band y=423..517 contains text 宠物名画之旅 (annotated in step1-target-annotated.png); frame step1-before-20261007-132007.png
+cmd=adb -s DKS9K23420020242 shell input -d 4 tap 360 470
+source=com.android.shell (NOT APP_AUTOMATION)
+display=-d 4
+x=360
+y=470
+count_cumulative_setup=1
+capture_begin_local=2026-10-07 13:20:07.038
+input_local=2026-10-07 13:20:36.948
+capture_to_input_ms=29948
+label=PRECONDITION_RESTORE
+

@@ -1,0 +1,26 @@
+=== build / device ===
+  ro.product.model=FOA-AL00
+  ro.build.version.release=12
+  ro.build.version.sdk=31
+  ro.build.display.id=FOA-AL00 4.2.0.218(C00E182R3P3)
+  serial=DKS9K23420020242
+
+=== dumpsys display: DisplayDeviceInfo ===
+  DisplayDeviceInfo{"内置屏幕": uniqueId="****", 1084 x 2412, modeId 1, defaultModeId 1, supportedModes [{id=1, width=1084, height=2412, fps=60.000004, alternativeRefreshRates=[120.00001]}, {id=2, width=1084, height=2412, fps=120.00001, alternativeRefreshRates=[60.000004]}], colorMode 0, supportedColorModes [0, 7, 9], hdrCapabilities HdrCapabilities{mSupportedHdrTypes=[2, 3, 4], mMaxLuminance=500.0, mMa
+
+=== dumpsys window displays: display 4 block ===
+  mDisplayId=4 rootTasks=1
+  init=720x1600 320dpi cur=720x1600 app=720x1600 rng=720x720-1600x1600
+  DisplayFrames w=720 h=1600 r=0
+  mDisplayCutout=DisplayCutout{insets=Rect(0, 0 - 0, 0) waterfall=Insets{left=0, top=0, right=0, bottom=0} boundingRect={Bounds=[Rect(0, 0 - 0, 0), Rect(0, 0 - 0, 0), Rect(0, 0 - 0, 0), Rect(0, 0 - 0, 0
+  mPrivacyIndicatorBounds=PrivacyIndicatorBounds {static bounds=null rotation=0}
+
+=== wm size / density per display ===
+  --- display 0 ---
+    wm size --display 0 -> 
+    wm density --display 0 -> 
+  --- display 4 ---
+    wm size --display 4 -> 
+    wm density --display 4 -> 
+
+=== physical input device -> display binding ===

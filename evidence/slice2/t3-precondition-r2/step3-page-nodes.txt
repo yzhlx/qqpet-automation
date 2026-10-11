@@ -1,0 +1,59 @@
+dump4-page.xml nodes=82
+
+== A. clickable nodes in top band y2<=330 ==
+
+== B. any node mentioning return/close/home/pet ==
+  FrameLayout    click=False                          desc=返回                 (0, 110, 117, 210) center=(58, 160)
+
+== C. FORBIDDEN affordances (purchase/claim/pay/authorize) ==
+  count=0
+
+== D. nodes containing (40,150) and (356,411) ==
+  point (40, 150):
+    FrameLayout    click=False text=                     desc=               (0, 0, 720, 1600)
+    RelativeLayout click=False text=                     desc=               (0, 0, 720, 1600)
+    LinearLayout   click=False text=                     desc=               (0, 0, 720, 1600)
+    FrameLayout    click=False text=                     desc=               (0, 0, 720, 1600)
+    FrameLayout    click=False text=                     desc=               (0, 0, 720, 1600)
+    FrameLayout    click=True  text=                     desc=               (0, 0, 720, 1600)
+    FrameLayout    click=False text=                     desc=               (0, 0, 720, 1600)
+    FrameLayout    click=False text=                     desc=               (0, 0, 720, 1600)
+    FrameLayout    click=False text=                     desc=               (0, 0, 720, 1600)
+    FrameLayout    click=False text=                     desc=               (0, 0, 720, 1600)
+    FrameLayout    click=False text=                     desc=               (0, 0, 720, 1600)
+    RecyclerView   click=False text=                     desc=               (0, 0, 720, 1600)
+    FrameLayout    click=False text=                     desc=               (0, 0, 720, 1600)
+    FrameLayout    click=False text=                     desc=               (0, 0, 720, 1600)
+    FrameLayout    click=False text=                     desc=               (0, 0, 720, 586)
+    FrameLayout    click=False text=                     desc=               (0, 0, 720, 586)
+    FrameLayout    click=False text=                     desc=               (0, 0, 720, 586)
+    ImageView      click=False text=                     desc=               (0, 0, 720, 586)
+    FrameLayout    click=False text=                     desc=               (0, 0, 720, 210)
+    FrameLayout    click=False text=                     desc=返回             (0, 110, 117, 210)
+    FrameLayout    click=False text=                     desc=               (20, 127, 85, 192)
+    ImageView      click=False text=                     desc=               (33, 140, 71, 178)
+  point (356, 411):
+    FrameLayout    click=False text=                     desc=               (0, 0, 720, 1600)
+    RelativeLayout click=False text=                     desc=               (0, 0, 720, 1600)
+    LinearLayout   click=False text=                     desc=               (0, 0, 720, 1600)
+    FrameLayout    click=False text=                     desc=               (0, 0, 720, 1600)
+    FrameLayout    click=False text=                     desc=               (0, 0, 720, 1600)
+    FrameLayout    click=True  text=                     desc=               (0, 0, 720, 1600)
+    FrameLayout    click=False text=                     desc=               (0, 0, 720, 1600)
+    FrameLayout    click=False text=                     desc=               (0, 0, 720, 1600)
+    FrameLayout    click=False text=                     desc=               (0, 0, 720, 1600)
+    FrameLayout    click=False text=                     desc=               (0, 0, 720, 1600)
+    FrameLayout    click=False text=                     desc=               (0, 0, 720, 1600)
+    RecyclerView   click=False text=                     desc=               (0, 0, 720, 1600)
+    FrameLayout    click=False text=                     desc=               (0, 0, 720, 1600)
+    FrameLayout    click=False text=                     desc=               (0, 0, 720, 1600)
+    FrameLayout    click=False text=                     desc=               (0, 0, 720, 586)
+    FrameLayout    click=False text=                     desc=               (0, 0, 720, 586)
+    FrameLayout    click=False text=                     desc=               (0, 0, 720, 586)
+    ImageView      click=False text=                     desc=               (0, 0, 720, 586)
+    FrameLayout    click=False text=                     desc=               (159, 328, 363, 549)
+    FrameLayout    click=False text=                     desc=               (159, 328, 363, 549)
+    FrameLayout    click=False text=                     desc=               (159, 328, 363, 549)
+
+== E. all clickable nodes (inventory) ==
+  FrameLayout                                          (0, 0, 720, 1600) center=(360, 800)

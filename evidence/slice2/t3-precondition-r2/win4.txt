@@ -1,0 +1,37 @@
+Display 0:
+    mDisplayId=0
+    mBaseDisplayInfo=DisplayInfo{"内置屏幕", displayId 0", displayGroupId 0, FLAG_SECURE, FLAG_SUPPORTS_PROTECTED_BUFFERS, FLAG_TRUSTED, real 1084 x 2412, lar
+    mOverrideDisplayInfo=DisplayInfo{"内置屏幕", displayId 0", displayGroupId 0, FLAG_SECURE, FLAG_SUPPORTS_PROTECTED_BUFFERS, FLAG_TRUSTED, real 1084 x 2412,
+Display 4:
+    mDisplayId=4
+    mBaseDisplayInfo=DisplayInfo{"Shizuku_VD_1791180519368", displayId 4", displayGroupId 0, FLAG_PRESENTATION, real 720 x 1600, largest app 720 x 1600, s
+    mOverrideDisplayInfo=DisplayInfo{"Shizuku_VD_1791180519368", displayId 4", displayGroupId 0, FLAG_PRESENTATION, real 720 x 1600, largest app 1600 x 16
+
+total window blocks: 17
+  --- 15 Window{d62f259 u0 ShellDropTarget}:
+      mDisplayId=4 mOwnerUid=10081 isOnScreen=false isVisible=false
+      mFrame=[0,0]
+  --- 16 Window{b6d9e67 u0 com.tencent.mobileqq/com.tencent.mobileqq.activity.SplashActivity}:
+      mDisplayId=4 mOwnerUid=10230 isOnScreen=true isVisible=true
+      mFrame=[0,0]
+
+=== windows per display ===
+  display 0: 15 window(s)
+      0 Window{8e3b621 u0 GestureNavAnim}:
+      1 Window{a794ed u0 GestureSildeOut}:
+      2 Window{c53e874 u0 GestureNavBottom}:
+      3 Window{fb629ba u0 GestureNavRight}:
+      4 Window{ba7a2b0 u0 GestureNavLeft}:
+      5 Window{1f3f214 u0 pip-dismiss-overlay}:
+      6 Window{ea6cbcd u0 NavigationBar0}:
+      7 Window{6d49b2d u0 NotificationShade}:
+      8 Window{5bdb074 u0 StatusBar}:
+      9 Window{7e0e269 u0 ShellDropTarget}:
+      10 Window{62ecaec u0 AssistPreviewPanel}:
+      11 Window{16a3f2f u0 com.huawei.intelligent.Workspace}:
+      12 Window{5576a93 u0 InputMethod}:
+      13 Window{4805e5f u0 com.huawei.android.launcher/com.huawei.
+      14 Window{46172d9 u0 com.android.systemui.HwImageWallpaper}:
+  display 4: 2 window(s)
+      15 Window{d62f259 u0 ShellDropTarget}:
+      16 Window{b6d9e67 u0 com.tencent.mobileqq/com.tencent.mobile

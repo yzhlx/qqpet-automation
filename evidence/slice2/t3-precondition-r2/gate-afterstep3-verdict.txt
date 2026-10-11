@@ -1,0 +1,4 @@
+label=afterstep3 local=2026-10-07 14:18:22 took=4.6s
+dir=1791353897549
+  verdict={"verdict":"STOPPED","gate":"capture","states":"[]","error":"java.lang.IllegalStateException: INITIAL_PAGE_UNKNOWN:0.770218318809005"}
+  status={"gate":"capture","status":"STOPPED:INITIAL_PAGE_UNKNOWN:0.770218318809005","timestamp":1791353898863}

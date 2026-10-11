@@ -1,0 +1,92 @@
+=== all nodes whose bounds lie in the title band (y2 <= 260) ===
+  FrameLayout    [273,210][447,260]     click=false lclick=false rid=f24            desc='' text=''
+      path: ViewGroup#root < RecyclerView < FrameLayout < FrameLayout < FrameLayout < FrameLayout < FrameLayout < RelativeLayout
+  TextView       [273,210][447,236]     click=true  lclick=false rid=-              desc='星期一 下午3:52' text='星期一 下午3:52'
+      path: FrameLayout#f24 < ViewGroup#root < RecyclerView < FrameLayout < FrameLayout < FrameLayout < FrameLayout < FrameLayout
+  FrameLayout    [0,0][720,210]         click=false lclick=false rid=-              desc='' text=''
+      path: FrameLayout < FrameLayout < RelativeLayout < FrameLayout < FrameLayout < FrameLayout < FrameLayout < FrameLayout
+  FrameLayout    [0,0][720,210]         click=false lclick=false rid=net            desc='' text=''
+      path: FrameLayout < FrameLayout < FrameLayout < RelativeLayout < FrameLayout < FrameLayout < FrameLayout < FrameLayout
+  View           [0,0][720,210]         click=false lclick=false rid=-              desc='' text=''
+      path: FrameLayout#net < FrameLayout < FrameLayout < FrameLayout < RelativeLayout < FrameLayout < FrameLayout < FrameLayout
+  RelativeLayout [0,0][720,210]         click=true  lclick=false rid=jo9            desc='' text=''
+      path: FrameLayout < FrameLayout < FrameLayout < RelativeLayout < FrameLayout < FrameLayout < FrameLayout < FrameLayout
+  RelativeLayout [0,110][720,210]       click=false lclick=false rid=3md            desc='' text=''
+      path: RelativeLayout#jo9 < FrameLayout < FrameLayout < FrameLayout < RelativeLayout < FrameLayout < FrameLayout < FrameLayout
+  TextView       [20,136][68,184]       click=true  lclick=false rid=ivTitleBtnLeft desc='返回消息未读5' text=''
+      path: RelativeLayout#3md < RelativeLayout#jo9 < FrameLayout < FrameLayout < FrameLayout < RelativeLayout < FrameLayout < FrameLayout
+  View           [65,136][113,184]      click=true  lclick=false rid=556            desc='' text=''
+      path: RelativeLayout#3md < RelativeLayout#jo9 < FrameLayout < FrameLayout < FrameLayout < RelativeLayout < FrameLayout < FrameLayout
+  TextView       [129,125][149,171]     click=true  lclick=false rid=3kc            desc='' text='1'
+      path: RelativeLayout#3md < RelativeLayout#jo9 < FrameLayout < FrameLayout < FrameLayout < RelativeLayout < FrameLayout < FrameLayout
+  ImageView      [157,132][189,164]     click=false lclick=false rid=pt1            desc='听筒模式' text=''
+      path: RelativeLayout#3md < RelativeLayout#jo9 < FrameLayout < FrameLayout < FrameLayout < RelativeLayout < FrameLayout < FrameLayout
+  ViewFlipper    [129,175][371,199]     click=false lclick=false rid=mam            desc='' text=''
+      path: RelativeLayout#3md < RelativeLayout#jo9 < FrameLayout < FrameLayout < FrameLayout < RelativeLayout < FrameLayout < FrameLayout
+  LinearLayout   [129,175][371,199]     click=true  lclick=false rid=-              desc='' text=''
+      path: ViewFlipper#mam < RelativeLayout#3md < RelativeLayout#jo9 < FrameLayout < FrameLayout < FrameLayout < RelativeLayout < FrameLayout
+  TextView       [129,175][243,199]     click=false lclick=false rid=j64            desc='' text='在线 - 5G'
+      path: LinearLayout < ViewFlipper#mam < RelativeLayout#3md < RelativeLayout#jo9 < FrameLayout < FrameLayout < FrameLayout < RelativeLayout
+  TextView       [243,175][261,199]     click=false lclick=false rid=-              desc='' text='·'
+      path: LinearLayout < ViewFlipper#mam < RelativeLayout#3md < RelativeLayout#jo9 < FrameLayout < FrameLayout < FrameLayout < RelativeLayout
+  TextView       [261,175][371,199]     click=false lclick=false rid=2yc            desc='' text='学习中'
+      path: LinearLayout < ViewFlipper#mam < RelativeLayout#3md < RelativeLayout#jo9 < FrameLayout < FrameLayout < FrameLayout < RelativeLayout
+  ImageView      [568,136][616,184]     click=true  lclick=false rid=1fv            desc='' text=''
+      path: RelativeLayout#3md < RelativeLayout#jo9 < FrameLayout < FrameLayout < FrameLayout < RelativeLayout < FrameLayout < FrameLayout
+  ImageView      [640,136][688,184]     click=true  lclick=false rid=1ft            desc='聊天设置' text=''
+      path: RelativeLayout#3md < RelativeLayout#jo9 < FrameLayout < FrameLayout < FrameLayout < RelativeLayout < FrameLayout < FrameLayout
+
+=== every clickable node in the window ===
+  FrameLayout    [303,1170][543,1329]   click=true  lclick=false rid=-              desc='' text=''
+  FrameLayout    [0,210][720,1600]      click=true  lclick=false rid=-              desc='' text=''
+  TextView       [273,210][447,236]     click=true  lclick=false rid=-              desc='星期一 下午3:52' text='星期一 下午3:52'
+  RelativeLayout [24,276][104,356]      click=true  lclick=true  rid=mh_            desc='' text=''
+  LinearLayout   [122,280][590,541]     click=true  lclick=false rid=-              desc='' text=''
+  TextView       [285,603][435,636]     click=true  lclick=false rid=-              desc='昨天 凌晨1:59' text='昨天 凌晨1:59'
+  RelativeLayout [24,676][104,756]      click=true  lclick=true  rid=mh_            desc='' text=''
+  LinearLayout   [122,680][590,941]     click=true  lclick=false rid=-              desc='' text=''
+  TextView       [305,1003][415,1036]   click=true  lclick=false rid=-              desc='下午12:15' text='下午12:15'
+  RelativeLayout [24,1076][104,1156]    click=true  lclick=true  rid=mh_            desc='' text=''
+  LinearLayout   [122,1080][590,1341]   click=true  lclick=false rid=-              desc='' text=''
+  RelativeLayout [0,0][720,210]         click=true  lclick=false rid=jo9            desc='' text=''
+  TextView       [20,136][68,184]       click=true  lclick=false rid=ivTitleBtnLeft desc='返回消息未读5' text=''
+  View           [65,136][113,184]      click=true  lclick=false rid=556            desc='' text=''
+  TextView       [129,125][149,171]     click=true  lclick=false rid=3kc            desc='' text='1'
+  LinearLayout   [129,175][371,199]     click=true  lclick=false rid=-              desc='' text=''
+  ImageView      [568,136][616,184]     click=true  lclick=false rid=1fv            desc='' text=''
+  ImageView      [640,136][688,184]     click=true  lclick=false rid=1ft            desc='聊天设置' text=''
+  ViewGroup      [0,1404][720,1512]     click=true  lclick=false rid=dmj            desc='' text=''
+  EditText       [32,1416][520,1500]    click=true  lclick=true  rid=input          desc='' text=''
+  Button         [544,1416][688,1500]   click=true  lclick=false rid=send_btn       desc='' text='发送'
+  LinearLayout   [0,1512][720,1600]     click=true  lclick=false rid=-              desc='' text=''
+  ImageView      [0,1520][120,1576]     click=true  lclick=false rid=-              desc='语音' text=''
+  ImageView      [120,1512][240,1584]   click=true  lclick=true  rid=-              desc='相册' text=''
+  ImageView      [240,1520][360,1576]   click=true  lclick=false rid=-              desc='拍照' text=''
+  ImageView      [360,1520][480,1576]   click=true  lclick=false rid=-              desc='泡泡' text=''
+  ImageView      [480,1520][600,1576]   click=true  lclick=false rid=-              desc='表情' text=''
+  ImageView      [600,1520][720,1576]   click=true  lclick=false rid=-              desc='更多功能' text=''
+
+=== node [568,136][616,184] and its subtree ===
+  SELF ImageView      [568,136][616,184]     click=true  lclick=false rid=1fv            desc='' text=''
+      path: RelativeLayout#3md < RelativeLayout#jo9 < FrameLayout < FrameLayout < FrameLayout < RelativeLayout < FrameLayout < FrameLayout
+      siblings under RelativeLayout:
+        TextView       [20,136][68,184]       click=true  lclick=false rid=ivTitleBtnLeft desc='返回消息未读5' text=''
+        View           [65,136][113,184]      click=true  lclick=false rid=556            desc='' text=''
+        TextView       [129,125][149,171]     click=true  lclick=false rid=3kc            desc='' text='1'
+        ImageView      [157,132][189,164]     click=false lclick=false rid=pt1            desc='听筒模式' text=''
+        ViewFlipper    [129,175][371,199]     click=false lclick=false rid=mam            desc='' text=''
+        ImageView      [568,136][616,184]     click=true  lclick=false rid=1fv            desc='' text=''
+        ImageView      [640,136][688,184]     click=true  lclick=false rid=1ft            desc='聊天设置' text=''
+
+=== search whole tree for any node mentioning pet words ===
+  FrameLayout    [183,1093][423,1493]   click=false lclick=false rid=-              desc='Q宠-1000001' text=''
+  FrameLayout    [303,1093][543,1493]   click=false lclick=false rid=-              desc='Q宠-1000006' text=''
+  ViewGroup      [104,260][608,587]     click=false lclick=false rid=ml3            desc='发来宠物名画之旅' text=''
+  TextView       [146,304][566,344]     click=false lclick=false rid=-              desc='' text='宠物名画之旅'
+  TextView       [178,497][566,541]     click=false lclick=false rid=-              desc='' text='宠物'
+  ViewGroup      [104,660][608,987]     click=false lclick=false rid=ml3            desc='发来宠物名画之旅' text=''
+  TextView       [146,704][566,744]     click=false lclick=false rid=-              desc='' text='宠物名画之旅'
+  TextView       [178,897][566,941]     click=false lclick=false rid=-              desc='' text='宠物'
+  ViewGroup      [104,1060][608,1387]   click=false lclick=false rid=ml3            desc='发来宠物名画之旅' text=''
+  TextView       [146,1104][566,1144]   click=false lclick=false rid=-              desc='' text='宠物名画之旅'
+  TextView       [178,1297][566,1341]   click=false lclick=false rid=-              desc='' text='宠物'
