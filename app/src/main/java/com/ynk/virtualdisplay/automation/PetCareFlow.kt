@@ -146,7 +146,7 @@ internal fun consumableDeliveryEvidence(consumableAttempted: Boolean, injectionC
 
 /** Extracted measured cookie / soap flow. Unknown is never converted to a number. */
 class PetCareFlow(private val flow: PetFlowContext,private val navigation: PetNavigation,
-    private val budget: CareConsumableBudget = CareConsumableBudget(),
+    private val budget: CareConsumableBudget = CareConsumableBudget(cookies=6,soaps=4),
     private val exchangeBudget: ExchangeBudget = ExchangeBudget(),
     private val onHealth: (HealthObservations)->Unit={}) {
     /** Stock-out purchase branch: created lazily so JVM tests without assets never touch it. */
@@ -236,7 +236,18 @@ class PetCareFlow(private val flow: PetFlowContext,private val navigation: PetNa
                 // Read immediately before the cookie action, which owns every inject call started
                 // after this point: navigation events can not mask a refused consumable action.
                 callsBefore=flow.input.injectionAttempts
-                safety(); input.tap(360f,1287f); delay(2500)
+                // Game update 2026-10-12: feeding is now the bottom-sheet purchase flow. Tap the
+                // scene's 兑换食物 bubble (360,1380), the sheet opens with the cookie selected
+                // (default qty may be >1), then buy exactly 1 (fully verified, including the pay
+                // total) - the purchased cookie is consumed immediately (体力+10). The exchange
+                // budget allowance covers this feed.
+                safety(); input.tap(360f,1380f); delay(2500)
+                if(!exchange.dialogOpen(Consumable.COOKIE)) error("FEED_SHEET_NOT_OPENED")
+                exchange.buy(Consumable.COOKIE,1,"feed",dialogAlreadyOpen=true)
+                // The purchased cookie does NOT feed automatically: it waits on the plate and the
+                // 兑换食物 pill disappears while food is out. Tap the cookie to feed, measured
+                // plate center (360,1300) from the field evidence afterpay.png.
+                safety(); input.tap(360f,1300f); delay(2500)
                 navigation.dismissCareUpgradeIfPresent()
                 verify(listOf(foodScene),"feed-after")
                 h=readHealth("feed-health",foodScene)
@@ -256,32 +267,28 @@ class PetCareFlow(private val flow: PetFlowContext,private val navigation: PetNa
             }
             catch(t: Throwable) {
                 settle(reservation,"feed",consuming,callsBefore)
-                // Stock-out repair: a measured zero-gain feed means the cookie inventory ran out.
-                // One autonomous purchase (1 cookie, verified qty and total), then one retry; a
-                // second zero-gain failure propagates unmasked.
+                // Stock-out repair under the sheet feed flow: the feed IS a verified 1-cookie
+                // purchase, so an inventory stock-out now surfaces as FEED_SHEET_NOT_OPENED (the
+                // bubble no longer opens the sheet) or a failed buy inside the sheet. Recovery is
+                // bounded by FEED_RETRY_LIMIT and the exchange budget; every purchase is fully
+                // qty/total-verified.
                 val message=t.message.orEmpty()
-                // A stock-out feed opens the EXCHANGE dialog instead of showing an eaten-cookie
-                // scene, so the FIRST symptom is PAGE_MISMATCH on feed-after, not a measured
-                // zero-gain. If the dialog is verifiably open, use it as the restock entry (no
-                // further input); anything else propagates fail-closed. Each restock buys ONE
-                // verified cookie; a 90-reach may need several, bounded by FEED_RETRY_LIMIT and
-                // the exchange budget (still fully qty/total-verified per purchase).
-                // Symmetry with the soap path: a measured zero-gain feed with the dialog already
-                // open is handled above; a zero-gain feed WITHOUT a dialog also means an empty
-                // inventory (the eat animation simply never played) - restock from the scene,
-                // bounded, every purchase fully verified.
-                if(message.startsWith("FEED_NO_EXPECTED_GAIN_OR_EMPTY") && restocks<4) {
+                if(message.startsWith("FEED_SHEET_NOT_OPENED") && restocks<4) {
                     restocks++
                     emit("feed-stockout-restock",reason=message)
+                    // The bubble tap may have left a stray sheet; dismiss with back, then re-enter.
+                    flow.input.tap(660f,660f); delay(1200)
                     ensureFoodScene()
                     exchange.buy(Consumable.COOKIE,1,"feed-stockout")
-                    continue
-                }
-                if(message.startsWith("PAGE_MISMATCH:") && message.contains(":feed-after:")
-                    && exchange.dialogOpen(Consumable.COOKIE) && restocks<4) {
-                    restocks++
-                    emit("feed-stockout-restock",reason="dialog-on-feed-after#$restocks")
-                    exchange.buy(Consumable.COOKIE,1,"feed-stockout",dialogAlreadyOpen=true)
+                    // After the sheet purchase the cookie is consumed by the feed itself; re-verify.
+                    navigation.dismissCareUpgradeIfPresent()
+                    verify(listOf(foodScene),"feed-after-restock")
+                    h=readHealth("feed-health-restock",foodScene)
+                    check(h.energy>0) { "FEED_NO_EXPECTED_GAIN_OR_EMPTY" }
+                    navigation.tap(foodScene,PointF(80f,160f),room,"leave-food")
+                    feeds++
+                    reservation.confirmConsumed()
+                    budgetEvent("feed-consume",reservation)
                     continue
                 }
                 throw t

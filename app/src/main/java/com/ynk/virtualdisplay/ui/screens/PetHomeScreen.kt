@@ -207,7 +207,7 @@ fun PetHomeScreen(
                 if (controls.batchRoundsSelectable) {
                     Row(Modifier.fillMaxWidth().padding(bottom = 8.dp),
                         horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        listOf(1, 2, 3).forEach { n ->
+                        listOf(1, 3, 10).forEach { n ->
                             val selected = n == roundsToRequest
                             Box(
                                 Modifier.weight(1f).height(36.dp)

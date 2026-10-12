@@ -29,7 +29,7 @@ class DialogDigitReaderTest {
     @Test
     fun `reader rejects empty field with fail-closed reason`() {
         val reader = DialogDigitReader(mapOf(1 to listOf("0".repeat(768))))
-        val r = reader.read(74, 56) { _, _ -> false }
+        val r = reader.read(70, 56) { _, _ -> false }
         assertFalse(r.known)
         assertEquals("DIALOG_DIGITS_ABSENT", r.reason)
     }
@@ -37,7 +37,7 @@ class DialogDigitReaderTest {
     @Test
     fun `reader rejects unexpected roi width`() {
         val reader = DialogDigitReader(mapOf(1 to listOf("0".repeat(768))))
-        val r = reader.read(50, 31) { _, _ -> true }
+        val r = reader.read(55, 31) { _, _ -> true }
         assertFalse(r.known)
         assertTrue(r.reason!!.startsWith("DIALOG_ROI_SIZE"))
     }
@@ -47,8 +47,8 @@ class DialogDigitReaderTest {
         // synthetic digit: solid block normalizes to an all-ink mask; the '1' template matches it
         val reader = DialogDigitReader(mapOf(1 to listOf("1".repeat(768))))
         // render into the qty ROI: digit block x 10..16 (rows 18..42 of 56), cursor at x 60 (2 px, 2 px gap)
-        val w = 74; val h = 56
-        fun ink(x: Int, y: Int) = (x in 10..16 && y in 18..42) || (x in 60..61 && y in 5..50)
+        val w = 70; val h = 56
+        fun ink(x: Int, y: Int) = (x in 10..16 && y in 18..42) || (x in 66..67 && y in 5..50)
         val r = reader.read(w, h, ::ink)
         assertTrue("expected known, got ${r.reason}", r.known)
         assertEquals("1", r.text)

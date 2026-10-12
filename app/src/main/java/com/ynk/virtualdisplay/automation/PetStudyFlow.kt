@@ -26,7 +26,12 @@ class PetStudyFlow(private val flow: PetFlowContext,private val navigation: PetN
                 input.tap(profile.startButton.x,profile.startButton.y);delay(profile.pageSettleMs)
                 // Actual run: the first fresh frame after Start was an academy transition.
                 // Read-only settling does not repeat input or relax the matching threshold.
-                val learningDeadline=SystemClock.elapsedRealtime()+8000
+                // Field evidence (2026-10-12): after 去上课 the pet walks out and the bottom
+                // 正在学习 panel slides up noticeably later; a 30s window still expired with the
+                // panel arriving right after (score held at 0.782, then measured 1.0 minutes in).
+                // The panel persists for the whole 10-minute course, so a bounded 120s confirm
+                // window stays far inside the course and never masks a real failure.
+                val learningDeadline=SystemClock.elapsedRealtime()+120000
                 var learningConfirmed=false
                 while(SystemClock.elapsedRealtime()<learningDeadline) {
                     val current=frame()

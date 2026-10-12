@@ -14,17 +14,31 @@ class TemplateMatcher(private val context: Context) {
     fun match(frame: Bitmap, probe: PetProfile.Probe, threshold: Double): Result {
         val r = probe.rect
         require(r.left >= 0 && r.top >= 0 && r.right <= frame.width && r.bottom <= frame.height)
+        val template = cache.getOrPut(probe.assetPath) {
+            context.assets.open(probe.assetPath).use { BitmapFactory.decodeStream(it) }
+                ?: error("Cannot decode template ${probe.assetPath}")
+        }
         val live = Bitmap.createBitmap(frame, r.left, r.top, r.width(), r.height())
         return try {
-            val template = cache.getOrPut(probe.assetPath) {
-                context.assets.open(probe.assetPath).use { BitmapFactory.decodeStream(it) }
-                    ?: error("Cannot decode template ${probe.assetPath}")
-            }
             val scaled = if (template.width == live.width && template.height == live.height) template
             else Bitmap.createScaledBitmap(template, live.width, live.height, true)
             try {
                 val score = similarity(live, scaled)
-                Result(score >= threshold, score)
+                if (score >= threshold) return Result(true, score)
+                // Scene elements such as the 出门 button drift vertically between sessions
+                // (measured: the same button sat at y1354 in one session and y1332 in the next),
+                // which is layout drift, not a page change. Retry with small vertical offsets
+                // before reporting a miss; horizontal drift is not expected on these pages.
+                var best = score
+                for (dy in intArrayOf(-64,-56,-48,-40,-32,-24,-16,-8,8,16,24,32,40,48,56,64)) {
+                    val ny = r.top + dy
+                    if (ny < 0 || ny + r.height() > frame.height) continue
+                    val shifted = Bitmap.createBitmap(frame, r.left, ny, r.width(), r.height())
+                    val s = try { similarity(shifted, scaled) } finally { shifted.recycle() }
+                    if (s > best) best = s
+                    if (best >= threshold) return Result(true, best)
+                }
+                Result(best >= threshold, best)
             } finally {
                 if (scaled !== template) scaled.recycle()
             }

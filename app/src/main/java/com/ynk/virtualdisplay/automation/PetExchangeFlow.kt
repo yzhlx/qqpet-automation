@@ -38,13 +38,16 @@ class PetExchangeFlow(private val flow: PetFlowContext, private val navigation: 
             flow.context.assets.open("pet_exchange/pay_digits.txt").bufferedReader().readText()))
     }
 
-    private val foodTitle = PetProfile.Probe("exchange_food_title", Rect(240, 878, 480, 922),
+    // Bottom-sheet exchange UI (game update 2026-10-12): title ~(255-430,845-895), selected
+    // product tile (30-205,975-1200), minus (517,1277), quantity digits ~(575-655,1250-1310),
+    // pay button (35-685,1380-1470) with the amount at ~(365-545,1395-1455).
+    private val foodTitle = PetProfile.Probe("exchange_food_title", Rect(255, 845, 430, 895),
         "pet_exchange/dialog_food_title.png")
-    private val soapTitle = PetProfile.Probe("exchange_soap_title", Rect(240, 878, 480, 922),
+    private val soapTitle = PetProfile.Probe("exchange_soap_title", Rect(255, 845, 430, 895),
         "pet_exchange/dialog_soap_title.png")
-    private val cookieSelected = PetProfile.Probe("exchange_cookie_selected", Rect(16, 916, 108, 1204),
+    private val cookieSelected = PetProfile.Probe("exchange_cookie_selected", Rect(30, 975, 205, 1200),
         "pet_exchange/food_cookie_selected.png")
-    private val soapSelected = PetProfile.Probe("exchange_soap_selected", Rect(16, 916, 108, 1204),
+    private val soapSelected = PetProfile.Probe("exchange_soap_selected", Rect(30, 975, 205, 1200),
         "pet_exchange/soap_soap_selected.png")
 
     private fun titleProbe(item: Consumable) = if (item == Consumable.COOKIE) foodTitle else soapTitle
@@ -94,8 +97,8 @@ class PetExchangeFlow(private val flow: PetFlowContext, private val navigation: 
         return reader.read(w, h, ::ink)
     }
 
-    fun readQuantity(frame: Bitmap) = readField(frame, 548, 1262, 622, 1318, false, qtyReader)
-    fun readPayTotal(frame: Bitmap) = readField(frame, 400, 1370, 545, 1448, true, payReader)
+    fun readQuantity(frame: Bitmap) = readField(frame, 555, 1250, 625, 1310, false, qtyReader)
+    fun readPayTotal(frame: Bitmap) = readField(frame, 395, 1383, 445, 1413, true, payReader)
 
     /**
      * Steps the quantity down to [target] with the minus button (516,1287). Unreadable
@@ -120,7 +123,7 @@ class PetExchangeFlow(private val flow: PetFlowContext, private val navigation: 
                 // Unknown intermediate (unrecorded digit shape): skip it and keep stepping.
                 check(steps < 12) { "EXCHANGE_QUANTITY_STEPS:$steps" }
                 steps++
-                safety(); input.tap(516f, 1287f); delay(700)
+                safety(); input.tap(517f, 1277f); delay(700)
                 if (item == Consumable.COOKIE) verify(listOf(foodTitle), "exchange-dialog-still-open")
                 else verify(listOf(soapTitle), "exchange-dialog-still-open")
             }
@@ -148,9 +151,10 @@ class PetExchangeFlow(private val flow: PetFlowContext, private val navigation: 
         var callsBefore = 0
         try {
             if (!dialogAlreadyOpen) {
-                // Entry: the plate tap opens the dialog only when the stock is empty; a fed cookie
-                // instead would leave the dialog absent, which stops the flow (never a blind buy).
-                safety(); input.tap(360f, 1287f)
+                // Entry: the scene's bottom "兑换..." bubble opens the sheet only when the stock
+                // is empty; a fed consumable instead would leave the sheet absent, which stops
+                // the flow (never a blind buy).
+                safety(); input.tap(360f, 1380f)
             }
             val dialog = awaitDialog(item)
             try {
@@ -178,7 +182,7 @@ class PetExchangeFlow(private val flow: PetFlowContext, private val navigation: 
                 .put("total", totalRead).put("unit", unit).toString())
             // Pay. The tap baseline decides whether an unknown outcome could have spent coins.
             callsBefore = input.injectionAttempts
-            safety(); input.tap(360f, 1390f)
+            safety(); input.tap(360f, 1425f)
             payDelivered = input.injectionAttempts > callsBefore
             confirmClosed(item)
             allowance.confirmPaid()

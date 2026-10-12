@@ -33,7 +33,17 @@ class PetSessionController(context:Context,capture:HeadlessDisplayCapture,input:
             publish()
         },reconcile={cp,page -> cp.phase=="WAIT_RESULT" && cp.trustedPage=="LEARNING" && page=="result" && ledger.canReconcileResult(cp.round)})
     private val navigation=PetNavigation(flow)
-    private val care=PetCareFlow(flow,navigation,exchangeBudget=ExchangeBudget(maxPurchases=10,maxCoins=200)) {health ->
+    // Consumable/exchange budgets must scale with the batch: a long session eats/drags every
+    // round, and a failed consumable gesture retains its allowance as possibly-spent before the
+    // restock buys a verified replacement (measured: ~2 budget slots per wasted feed). One cookie
+    // ≈ one feed round, one soap ≈ one clean round, plus the single-round spares measured on
+    // device (6 cookies / 4 soaps at 1-3 rounds). Coins: cookie=5, soap=2, plus a drift margin.
+    private val cookieBudget=maxOf(6,2*totalRounds)
+    private val soapBudget=maxOf(4,totalRounds+1)
+    private val care=PetCareFlow(flow,navigation,
+        budget=CareConsumableBudget(cookies=cookieBudget,soaps=soapBudget),
+        exchangeBudget=ExchangeBudget(maxPurchases=cookieBudget+soapBudget,
+            maxCoins=6*cookieBudget+3*soapBudget)) {health ->
         snapshot=snapshot.copy(energy=health.energy,cleanliness=health.cleanliness,mood=health.mood);publish()
     }
     private val study=PetStudyFlow(flow,navigation,ledger)

@@ -94,8 +94,8 @@ class DialogDigitReader(private val templates: Map<Int, List<String>>) {
     }
 
     companion object {
-        const val QTY_ROI_W = 74   // 548..622
-        const val PAY_ROI_W = 145  // 400..545
+        const val QTY_ROI_W = 70   // 555..625 (2026-10-12 sheet layout)
+        const val PAY_ROI_W = 50   // 395..445 (2026-10-12 sheet layout, 2-digit totals)
         const val MIN_CONFIDENCE = 0.90
         const val MARGIN = 0.06
         fun similarity(a: String, b: String): Double =
