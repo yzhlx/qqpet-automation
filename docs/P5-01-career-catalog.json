@@ -1,0 +1,238 @@
+{
+  "schemaVersion": 1,
+  "stage": "P5.1",
+  "collectedAt": "2026-10-12T19:20:00+08:00",
+  "device": "DKS9K23420020242",
+  "display": 4,
+  "dataSource": "on-device screen capture (adb shell screencap -d 4) + local PP-OCRv4 OCR, read-only page inspection",
+  "ocrModel": "PP-OCRv4 (det/rec/cls onnx, local)",
+  "confidence": "medium-high for visible text; see per-item confidence",
+  "petProfile": {
+    "name": "小乞写",
+    "career": "小乞写",
+    "careerPath": "流浪散人",
+    "careerStage": "见习",
+    "attributes": {"力量": 189, "智力": 1, "魅力": 1},
+    "pkType": "力量型",
+    "note": "attributes read from town page header; values drift during work (体力/清洁 consumed)"
+  },
+  "townPage": {
+    "identity": "宠物职业小镇",
+    "layout": "horizontally scrollable map, 6 visible venue cards + 2 locked ??? cards",
+    "headerIcons": [
+      {"point": [551, 155], "target": "职业树 (career tree)"},
+      {"point": [635, 160], "target": "出门记录 (outdoor records)"}
+    ],
+    "attributeBar": [
+      {"label": "力量", "value": 189, "box": [55, 235, 260, 267]},
+      {"label": "智力", "value": 1, "box": [325, 235, 464, 267]},
+      {"label": "魅力", "value": 1, "box": [559, 232, 701, 268]}
+    ],
+    "evidence": "town-top.png sha256 f49184068a3d65b5 (first 16 hex), cur.png, w3.png"
+  },
+  "venues": [
+    {
+      "id": "zhuying",
+      "name": "竹影武馆",
+      "status": "openable",
+      "labelBox": [269, 638, 471, 670],
+      "tapPoint": [370, 654],
+      "careerStage": "习武小童",
+      "workScoreDisplay": "？？？ (masked)",
+      "starCondition": "升星条件：获得该阶段工分0/200",
+      "workOptions": [
+        {
+          "name": "帮武馆跑腿",
+          "durationMinutes": 10,
+          "durationRaw": "用时：10分钟",
+          "box": [80, 935, 343, 955]
+        },
+        {
+          "name": "陪练基础课",
+          "durationMinutes": 45,
+          "durationRaw": "用时：45分钟",
+          "box": [356, 935, 615, 955]
+        }
+      ],
+      "costs": {
+        "体力": {"amount": 5, "raw": "消耗体5当前80）", "currentAtCapture": 80},
+        "清洁": {"amount": 2, "raw": "清洁当前8", "currentAtCapture": 86}
+      },
+      "rewards": {
+        "工分": {"amount": 10, "raw": "工分+10点"},
+        "金币": {"amount": 68, "raw": "奖励 68"}
+      },
+      "rewardAppliesTo": "per work session (confirmed: started 帮武馆跑腿, banner showed 奖励 68)",
+      "companion": "同伴 / 雇佣有额外加成",
+      "description": "简介提着比自己还重的沙袋一路飞奔，虽然是杂役小萝卜头，但跑着跑着体力就变超级厉害了。",
+      "goWorkButton": [285, 1362, 461, 1405],
+      "evidence": "venue-zhuying.png sha256 9157684ea63455d5, reopen-竹影武馆.png, go-竹影武馆.png"
+    },
+    {
+      "id": "fengling",
+      "name": "风铃旅社",
+      "status": "openable",
+      "labelBox": [482, 1138, 685, 1170],
+      "tapPoint": [583, 1154],
+      "careerStage": "小乞",
+      "workScoreDisplay": "？？？ (masked)",
+      "starCondition": "升星条件：获得该阶段工分0/200",
+      "workOptions": [
+        {
+          "name": "替摊主看摊",
+          "durationMinutes": 10,
+          "durationRaw": "用时：10分钟",
+          "box": [83, 935, 342, 955]
+        },
+        {
+          "name": "街巷跑腿",
+          "durationMinutes": 45,
+          "durationRaw": "用时：45分钟",
+          "box": [383, 935, 589, 955]
+        }
+      ],
+      "costs": {
+        "体力": {"amount": 5, "raw": "消耗体力5（当前75）", "currentAtCapture": 75},
+        "清洁": {"amount": 2, "raw": "清洁（当前86)", "currentAtCapture": 86}
+      },
+      "rewards": {
+        "工分": {"amount": 10, "raw": "工分+10点"},
+        "金币": {"amount": 40, "raw": "奖励 40"}
+      },
+      "rewardAppliesTo": "per work session",
+      "companion": "同伴 / 雇佣有额外加成",
+      "description": "简介帮菜市场大妈大爷看一小时摊，小眼睛转啊转，注意别让人顺手顺走苹果。",
+      "goWorkButton": [285, 1362, 461, 1405],
+      "evidence": "reopen-风铃旅社.png, d-风铃旅社.png"
+    },
+    {
+      "id": "caihong",
+      "name": "彩虹画室",
+      "status": "locked-or-not-yet-unlocked",
+      "labelBox": [359, 431, 641, 464],
+      "note": "no response to any tap (22+ offsets tested); belongs to 画家 path which requires 智力/魅力 the pet does not have (智力1 魅力1)",
+      "unlockHypothesis": "requires 画家 career path (智力/魅力 growth)",
+      "evidence": "toast_test.py: 彩虹画室 (500,447) -> no change"
+    },
+    {
+      "id": "miwu",
+      "name": "迷雾侦探所",
+      "status": "locked-or-not-yet-unlocked",
+      "labelBox": [677, 449, 720, 485],
+      "note": "no response to any tap; belongs to 侦探 path which requires 智力 the pet does not have (智力1)",
+      "unlockHypothesis": "requires 侦探 career path (智力 growth)",
+      "evidence": "toast_test.py: 迷雾 (698,467) -> no change"
+    },
+    {
+      "id": "xingchen",
+      "name": "星尘魔法塔",
+      "status": "locked-or-not-yet-unlocked",
+      "labelBox": [190, 915, 526, 951],
+      "note": "no response to any tap",
+      "unlockHypothesis": "requires a career path/attribute not yet unlocked",
+      "evidence": "toast_test.py: 星尘魔法塔 (358,933) -> no change"
+    },
+    {
+      "id": "gulu",
+      "name": "咕噜厨房",
+      "status": "locked-or-not-yet-unlocked",
+      "labelBox": [465, 938, 720, 970],
+      "note": "label only partially visible at this map position; no response to any tap",
+      "unlockHypothesis": "requires a career path/attribute not yet unlocked",
+      "evidence": "toast_test.py: not present in current position; earlier probes also no change"
+    },
+    {
+      "id": "unknown-1",
+      "name": "？？？",
+      "status": "locked",
+      "labelBox": [507, 785, 603, 815],
+      "note": "locked venue, name hidden"
+    },
+    {
+      "id": "unknown-2",
+      "name": "？？？",
+      "status": "locked",
+      "labelBox": [291, 784, 424, 820],
+      "note": "locked venue, name hidden"
+    }
+  ],
+  "careerTree": {
+    "identity": "职业树",
+    "subtitle": "不同的属性搭配，会点亮宠物不同的职业路线",
+    "paths": [
+      {
+        "name": "流浪散人",
+        "current": true,
+        "stages": [
+          {"stage": "见习", "career": "小乞写", "unlocked": true, "current": true},
+          {"stage": "初级", "career": "？？？", "unlocked": false},
+          {"stage": "中级", "career": null, "unlocked": false, "note": "no node shown on this path"},
+          {"stage": "高级", "career": "？？？", "unlocked": false},
+          {"stage": "大师", "career": "？？？", "unlocked": false}
+        ]
+      },
+      {
+        "name": "画家",
+        "current": false,
+        "stages": [
+          {"stage": "见习", "career": "涂鸦小徒", "unlocked": false},
+          {"stage": "初级", "career": "素描画手", "unlocked": false},
+          {"stage": "中级", "career": "调色师", "unlocked": false},
+          {"stage": "高级", "career": "妙笔丹青", "unlocked": false},
+          {"stage": "大师", "career": null, "unlocked": false}
+        ]
+      },
+      {
+        "name": "侦探",
+        "current": false,
+        "stages": [
+          {"stage": "见习", "career": "见习侦探", "unlocked": false},
+          {"stage": "初级", "career": "线索猎手", "unlocked": false},
+          {"stage": "中级", "career": "破案高手", "unlocked": false},
+          {"stage": "高级", "career": "推理大师", "unlocked": false},
+          {"stage": "大师", "career": null, "unlocked": false}
+        ]
+      }
+    ],
+    "evidence": "career-tree.png sha256 b1bef77cd275b0d7"
+  },
+  "confirmedGameRules": {
+    "fatigue": {
+      "source": "rules-3.png (规则说明)",
+      "rule": "学习/打工共同计算：前 8 小时收益 100%；8~12h 收益 25%；12~24h 收益 10%；每日 0 点恢复，上一天时长不累计",
+      "implication": "the 480-minute effective-activity budget is a game-enforced shared study+work budget, not an app-local estimate"
+    },
+    "workPrerequisite": "打工需先完成学前辅导班",
+    "careerStages": ["见习", "初级", "中级", "高级", "大师"],
+    "starLevels": "星级 2/3/4/5，工分开星，晋级花金币",
+    "hire": {
+      "rule": "雇佣发宠打工：双方共耗体力、均得基础工资；被雇佣方只得金币不得工分；每日 5:00 刷新雇佣金币加成比例（职业阶级越高加成越多）",
+      "recallSplitTable": [
+        {"progress": "0%", "owner": 0, "worker": 0},
+        {"progress": "0~10%", "owner": 25, "worker": 25},
+        {"progress": "11~40%", "owner": 60, "worker": 50},
+        {"progress": "41~70%", "owner": 75, "worker": "unknown"},
+        {"progress": "71~100%", "owner": 100, "worker": 10},
+        {"progress": "未召回", "owner": 100, "worker": 100}
+      ]
+    },
+    "pk": "战力 = 力量 + 魅力 + 智力；类型分力量型/魅力型/智力型"
+  },
+  "openQuestions": [
+    "Whether 金币 reward (68 / 40) is per-session or per-option — the 45-min option's reward is still unconfirmed",
+    "Whether 金币 reward scales with career stage / hire bonus",
+    "Exact unlock conditions for the 4 non-responsive venues",
+    "Recall split value for 41~70% owner share",
+    "被雇佣 duration cap threshold (suspected 4h or 6h)"
+  ],
+  "realWorkSession": {
+    "startedAt": "2026-10-12T19:18:00+08:00",
+    "venue": "竹影武馆",
+    "work": "帮武馆跑腿",
+    "durationMinutes": 10,
+    "cost": {"体力": 5, "清洁": 2},
+    "rewardShown": {"金币": 68, "工分": 10},
+    "authorization": "accidental tap during P5.1 probing; user authorized letting it finish and collecting the reward",
+    "purpose": "doubles as Gate 3 evidence (single real work + reward verification)"
+  }
+}
