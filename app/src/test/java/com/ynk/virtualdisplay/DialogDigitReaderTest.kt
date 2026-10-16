@@ -35,9 +35,9 @@ class DialogDigitReaderTest {
     }
 
     @Test
-    fun `reader rejects unexpected roi width`() {
+    fun `reader rejects roi narrower than the minimum`() {
         val reader = DialogDigitReader(mapOf(1 to listOf("0".repeat(768))))
-        val r = reader.read(55, 31) { _, _ -> true }
+        val r = reader.read(10, 31) { _, _ -> true }
         assertFalse(r.known)
         assertTrue(r.reason!!.startsWith("DIALOG_ROI_SIZE"))
     }
@@ -46,9 +46,23 @@ class DialogDigitReaderTest {
     fun `reader drops cursor column and reads single digit`() {
         // synthetic digit: solid block normalizes to an all-ink mask; the '1' template matches it
         val reader = DialogDigitReader(mapOf(1 to listOf("1".repeat(768))))
-        // render into the qty ROI: digit block x 10..16 (rows 18..42 of 56), cursor at x 60 (2 px, 2 px gap)
+        // render into the qty ROI: digit block x 10..17 (rows 18..42 of 56), cursor at x 60 (2 px, 2 px gap)
         val w = 70; val h = 56
-        fun ink(x: Int, y: Int) = (x in 10..16 && y in 18..42) || (x in 66..67 && y in 5..50)
+        fun ink(x: Int, y: Int) = (x in 10..17 && y in 18..42) || (x in 66..67 && y in 5..50)
+        val r = reader.read(w, h, ::ink)
+        assertTrue("expected known, got ${r.reason}", r.known)
+        assertEquals("1", r.text)
+    }
+
+    @Test
+    fun `reader accepts a small digit that the old absolute-height guard rejected`() {
+        // Regression for the 2026-10-16 fix: a QQ rescale rendered pay digits ~8px tall, which the
+        // old `h !in 16..26` guard refused with DIALOG_DIGIT_HEIGHT:8. The relative guard must
+        // accept a short-but-proportionate digit instead of mistaking a rescale for drift.
+        val reader = DialogDigitReader(mapOf(1 to listOf("1".repeat(768))))
+        // 8px-tall digit (x 10..17, y 4..11) inside a 20px-tall ROI -> h=8 >= 20*0.25=5.0
+        val w = 70; val h = 20
+        fun ink(x: Int, y: Int) = x in 10..17 && y in 4..11
         val r = reader.read(w, h, ::ink)
         assertTrue("expected known, got ${r.reason}", r.known)
         assertEquals("1", r.text)
@@ -121,17 +135,17 @@ class DialogDigitReaderTest {
         val img = javax.imageio.ImageIO.read(path)
         assertEquals(720, img.width); assertEquals(1600, img.height)
         fun qtyInk(x: Int, y: Int): Boolean {
-            val c = img.getRGB(548 + x, 1262 + y)
+            val c = img.getRGB(535 + x, 1285 + y)
             val r = (c shr 16) and 0xFF; val g = (c shr 8) and 0xFF; val b = c and 0xFF
             return maxOf(r, g, b) < 100
         }
         fun payInk(x: Int, y: Int): Boolean {
-            val c = img.getRGB(400 + x, 1370 + y)
+            val c = img.getRGB(390 + x, 1400 + y)
             val r = (c shr 16) and 0xFF; val g = (c shr 8) and 0xFF; val b = c and 0xFF
             return r > 200 && g > 200 && b > 200
         }
-        val q = qtyReader.read(74, 56, ::qtyInk)
-        val p = payReader.read(145, 78, ::payInk)
+        val q = qtyReader.read(90, 30, ::qtyInk)
+        val p = payReader.read(55, 35, ::payInk)
         assertTrue("$path qty: ${q.reason}", q.known)
         assertEquals("$path qty", expectedQty, q.text)
         assertTrue("$path total: ${p.reason}", p.known)

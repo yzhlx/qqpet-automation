@@ -41,9 +41,15 @@ class PetExchangeFlow(private val flow: PetFlowContext, private val navigation: 
     // Bottom-sheet exchange UI (game update 2026-10-12): title ~(255-430,845-895), selected
     // product tile (30-205,975-1200), minus (517,1277), quantity digits ~(575-655,1250-1310),
     // pay button (35-685,1380-1470) with the amount at ~(365-545,1395-1455).
-    private val foodTitle = PetProfile.Probe("exchange_food_title", Rect(255, 845, 430, 895),
+    // 2026-10-15 recalibrated from a live FOA_AL00 capture (QQ 9.3.70/16410): the old title
+    // template was cropped through strokes and rendered ~5px smaller, matching only 0.607.
+    private val foodTitle = PetProfile.Probe("exchange_food_title", Rect(278, 848, 432, 902),
         "pet_exchange/dialog_food_title.png")
-    private val soapTitle = PetProfile.Probe("exchange_soap_title", Rect(255, 845, 430, 895),
+    // 2026-10-16 soap title recalibrated the same way as foodTitle: the live "兑换洗护道具"
+    // title is six characters wide (~232px), far wider than the old 4-char ROI, which matched
+    // only 0.625 on a real soap dialog. Template re-cut from the same live capture with clean
+    // padding on all sides.
+    private val soapTitle = PetProfile.Probe("exchange_soap_title", Rect(268, 846, 512, 906),
         "pet_exchange/dialog_soap_title.png")
     private val cookieSelected = PetProfile.Probe("exchange_cookie_selected", Rect(30, 975, 205, 1200),
         "pet_exchange/food_cookie_selected.png")
@@ -97,8 +103,14 @@ class PetExchangeFlow(private val flow: PetFlowContext, private val navigation: 
         return reader.read(w, h, ::ink)
     }
 
-    fun readQuantity(frame: Bitmap) = readField(frame, 555, 1250, 625, 1310, false, qtyReader)
-    fun readPayTotal(frame: Bitmap) = readField(frame, 395, 1383, 445, 1413, true, payReader)
+    // 2026-10-16 recalibrated on FOA_AL00 (see 养宠自动化\memory.md "数字 OCR 真机基线"):
+    // qty digit 12x20 @ (582,1289..1308) with '-' bar at (506..533,1297..1299); pay digit 14x25 @
+    // (399..433,1405..1429). ROIs are widened to hold up to 3 qty digits / 2 pay digits, and the
+    // reader no longer asserts exact widths, so a QQ rescale shifts the ink inside the ROI rather
+    // than tripping a stale constant. The qty ROI starts AFTER the '-' bar (its right edge is 533)
+    // so the minus symbol never pollutes the digit grouping.
+    fun readQuantity(frame: Bitmap) = readField(frame, 535, 1285, 625, 1315, false, qtyReader)
+    fun readPayTotal(frame: Bitmap) = readField(frame, 390, 1400, 445, 1435, true, payReader)
 
     /**
      * Steps the quantity down to [target] with the minus button (516,1287). Unreadable

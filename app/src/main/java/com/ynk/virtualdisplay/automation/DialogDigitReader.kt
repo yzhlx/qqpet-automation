@@ -41,7 +41,9 @@ class DialogDigitReader(private val templates: Map<Int, List<String>>) {
      * was measured (s23 qty frame) and must never re-normalize the digit box.
      */
     fun read(width: Int, height: Int, ink: (Int, Int) -> Boolean): Reading {
-        if (width != QTY_ROI_W && width != PAY_ROI_W) return Reading(null, 0.0, "DIALOG_ROI_SIZE:$width")
+        // ROI width is caller-measured; it only needs room for >=1 digit plus the cursor column.
+        // No fixed width is asserted here, so a QQ layout rescale never trips a stale constant.
+        if (width < MIN_ROI_W) return Reading(null, 0.0, "DIALOG_ROI_SIZE:$width")
         val columns = (0 until width).filter { x -> (0 until height).any { y -> ink(x, y) } }
         if (columns.isEmpty()) return Reading(null, 0.0, "DIALOG_DIGITS_ABSENT")
         val groups = mutableListOf<MutableList<Int>>()
@@ -62,9 +64,13 @@ class DialogDigitReader(private val templates: Map<Int, List<String>>) {
             if (ys.isEmpty()) return Reading(null, 0.0, "DIALOG_GROUP_EMPTY")
             val l = xs.first; val r = xs.last; val t = ys.first(); val b = ys.last()
             val w = r - l + 1; val h = b - t + 1
-            // Measured digit geometry: 9-14 px wide, 19-22 px tall. Anything else is layout drift.
-            if (w !in 6..18) return Reading(null, 0.0, "DIALOG_DIGIT_WIDTH:$w")
-            if (h !in 16..26) return Reading(null, 0.0, "DIALOG_DIGIT_HEIGHT:$h")
+            // Relative geometry only (no absolute px): a QQ rescale must not be mistaken for drift.
+            // A digit must be at least DIGIT_MIN_HEIGHT_RATIO of the field ROI height, and its
+            // width:height ratio must stay in a sane band (digits are taller than wide).
+            if (h < height * DIGIT_MIN_HEIGHT_RATIO) return Reading(null, 0.0, "DIALOG_DIGIT_HEIGHT:$h")
+            if (w < 3) return Reading(null, 0.0, "DIALOG_DIGIT_WIDTH:$w")
+            val aspect = w.toDouble() / h
+            if (aspect !in DIGIT_ASPECT_MIN..DIGIT_ASPECT_MAX) return Reading(null, 0.0, "DIALOG_ASPECT:$aspect")
             val mask = buildString {
                 for (row in 0 until 32) for (col in 0 until 24) {
                     val x = l + col * w / 24
@@ -94,8 +100,15 @@ class DialogDigitReader(private val templates: Map<Int, List<String>>) {
     }
 
     companion object {
-        const val QTY_ROI_W = 70   // 555..625 (2026-10-12 sheet layout)
-        const val PAY_ROI_W = 50   // 395..445 (2026-10-12 sheet layout, 2-digit totals)
+        // Caller-measured ROI widths, no longer asserted verbatim (QQ rescale-safe).
+        const val MIN_ROI_W = 20
+        // A digit must span at least this fraction of the field ROI height (measured on
+        // FOA_AL00 2026-10-16: pay digit 25px in a 38px ROI -> 0.66; qty digit 20px in 60px -> 0.33).
+        const val DIGIT_MIN_HEIGHT_RATIO = 0.25
+        // Digits are taller than wide; measured width:height 12:20=0.60 .. 30:30=1.0 (coin icon is
+        // excluded upstream). A looser band tolerates font rescale.
+        const val DIGIT_ASPECT_MIN = 0.30
+        const val DIGIT_ASPECT_MAX = 1.20
         const val MIN_CONFIDENCE = 0.90
         const val MARGIN = 0.06
         fun similarity(a: String, b: String): Double =
