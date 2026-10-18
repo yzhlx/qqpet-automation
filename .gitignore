@@ -33,3 +33,10 @@ evidence/screencap-err.txt
 # Working copies of device probing scripts with screenshots; per the privacy rule
 # above, device screenshots stay out of the repo.
 /build-ascii/
+
+# Raw device evidence and local Python cache excluded from code snapshots.
+/evidence/slice2/t3-precondition/
+/evidence/slice2/t3-precondition-r2/
+/work/
+/tools/digit-recon/frames/
+/tools/digit-recon/__pycache__/
