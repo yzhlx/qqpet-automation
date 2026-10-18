@@ -38,16 +38,21 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
+import com.ynk.virtualdisplay.automation.CourseCatalogStore
 import com.ynk.virtualdisplay.automation.DailyBudgetStore
 import com.ynk.virtualdisplay.automation.PetAutomationService
 import com.ynk.virtualdisplay.automation.PetManagedRuntime
 import com.ynk.virtualdisplay.automation.PetProfile
 import com.ynk.virtualdisplay.automation.PetRuntime
+import com.ynk.virtualdisplay.automation.SessionMode
+import com.ynk.virtualdisplay.automation.SessionPlan
+import com.ynk.virtualdisplay.automation.SessionPlanStore
 import com.ynk.virtualdisplay.data.model.ShizukuState
 import com.ynk.virtualdisplay.ui.data.LogEntry
 import com.ynk.virtualdisplay.ui.data.PetEvidenceRepository
 import com.ynk.virtualdisplay.ui.data.SessionEvidence
 import com.ynk.virtualdisplay.ui.data.SessionRunRecord
+import com.ynk.virtualdisplay.ui.data.SessionStartRequest
 import com.ynk.virtualdisplay.ui.kit.PetButtonTone
 import com.ynk.virtualdisplay.ui.kit.PetCard
 import com.ynk.virtualdisplay.ui.kit.PetChevron
@@ -119,7 +124,10 @@ fun PetHomeScreen(
     var shots by remember { mutableStateOf<List<File>>(emptyList()) }
     var logRows by remember { mutableStateOf<List<PetLogEntry>>(emptyList()) }
     var budgetUsed by remember { mutableStateOf(0) }
-    var roundsToRequest by remember { mutableStateOf(1) }
+    // The saved plan decides the batch: course, round count, thresholds and budget. It replaces the
+    // old in-memory 1/3/10 selector, which reset every time the screen was left.
+    var plan by remember { mutableStateOf(SessionPlan()) }
+    var catalogFresh by remember { mutableStateOf(false) }
 
     LaunchedEffect(runtime.running, managed.sessionId) {
         suspend fun reload() = withContext(Dispatchers.IO) {
@@ -128,6 +136,8 @@ fun PetHomeScreen(
             shots = repo.screenshotsFor(liveDir ?: latest?.directory, null)
             logRows = PetLogPresentation.timeline(repo.logEntries(limit = 600))
             budgetUsed = DailyBudgetStore(context).usedMinutes()
+            plan = SessionPlanStore(context).load()
+            catalogFresh = CourseCatalogStore(context).load()?.isFresh(System.currentTimeMillis()) == true
         }
         reload()
         while (runtime.running) {
@@ -153,7 +163,8 @@ fun PetHomeScreen(
         displayReady = readyDisplay != null,
     )
     val progress = RoundProgressPresentation.of(managed.totalRounds, managed.completedRounds)
-    val budgetLeft = DailyBudgetStore.HARD_STOP_MINUTES - budgetUsed
+    val budgetCap = minOf(plan.dailyBudgetMinutes, DailyBudgetStore.HARD_STOP_MINUTES)
+    val budgetLeft = budgetCap - budgetUsed
 
     var dialog by remember { mutableStateOf<HomeDialog?>(null) }
 
@@ -185,8 +196,8 @@ fun PetHomeScreen(
                 HomeLogCard(logRows, onOpenLogs)
             } else {
                 LastRunCard(latest, fmt)
-                PlanCard(roundsToRequest, onRoundsChange = { roundsToRequest = it }, onOpenPlanSheet)
-                ThresholdCard(health)
+                PlanCard(plan, catalogFresh, onOpenPlanSheet)
+                ThresholdCard(plan)
                 PetNote("金币、属性、库存当前无法从游戏可靠读取，记录里不以估算值代填。")
             }
 
@@ -204,49 +215,26 @@ fun PetHomeScreen(
                 PetNote(controls.blockerNote, Modifier.padding(bottom = 7.dp))
             }
             if (!runtime.running) {
-                if (controls.batchRoundsSelectable) {
-                    Row(Modifier.fillMaxWidth().padding(bottom = 8.dp),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        listOf(1, 2, 3).forEach { n ->
-                            val selected = n == roundsToRequest
-                            Box(
-                                Modifier.weight(1f).height(36.dp)
-                                    .background(
-                                        if (selected) PetTokens.BlueSoft else PetTokens.GraySoft,
-                                        RoundedCornerShape(PetTokens.NextRadius),
-                                    )
-                                    .clickable { roundsToRequest = n },
-                                contentAlignment = Alignment.Center,
-                            ) {
-                                Text(
-                                    "$n 节", fontSize = 13.sp,
-                                    fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
-                                    color = if (selected) PetTokens.BlueInk else PetTokens.Ink2,
-                                )
-                            }
-                        }
-                    }
+                // Three separate entries, one per capability. v0.1 bundled 健康检查+护理+学习 into a
+                // single 开始托管, so reading the pet's current 体力/清洁 also spent coins and burned
+                // the shared daily budget. Each stage now runs on its own.
+                if (!catalogFresh) {
+                    PetNote("还没有课程档案，托管暂不可用。先到「托管方案」里读取本号已解锁的课程。", Modifier.padding(bottom = 7.dp))
                 }
-                PetFootButton(
-                    text = "开始托管",
-                    tone = if (controls.startEnabled) PetButtonTone.PRIMARY else PetButtonTone.DISABLED,
-                    onClick = {
-                        val target = readyDisplay
-                        if (controls.startEnabled && target != null) {
-                            ContextCompat.startForegroundService(
-                                context,
-                                PetAutomationService.startIntent(context, target.id, roundsToRequest),
-                            )
-                        }
-                    },
-                    modifier = Modifier.fillMaxWidth(),
+                SessionModeRow(
+                    enabled = controls.startEnabled,
+                    studyEnabled = controls.startEnabled && catalogFresh,
+                    displayId = readyDisplay?.id,
+                    rounds = plan.rounds,
+                    context = context,
                 )
                 Spacer(Modifier.height(7.dp))
-                // Two stacked lines instead of one crowded row: at 360dp width the two hints ran
-                // together visually and read as a single broken sentence.
-                PetNote("本次 $roundsToRequest 节 · 每节约 10 分钟")
+                PetNote("托管：${plan.courseName} × ${plan.rounds} 节；健康检查/护理仅执行一次，不上课")
                 Spacer(Modifier.height(2.dp))
-                PetNote("今日已记 $budgetUsed / ${DailyBudgetStore.HARD_STOP_MINUTES} 分钟 · 剩余 $budgetLeft")            } else {
+                PetNote("健康检查只读数，不花金币不占时长；护理会买饼干/香皂片；托管=护理+上课")
+                Spacer(Modifier.height(2.dp))
+                PetNote("今日已记 $budgetUsed / $budgetCap 分钟 · 剩余 $budgetLeft")
+            } else {
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     PetFootButton(
                         text = "暂停",
@@ -539,13 +527,13 @@ private fun StripCell(value: Int, label: String, modifier: Modifier = Modifier) 
 }
 
 @Composable
-private fun PlanCard(rounds: Int, onRoundsChange: (Int) -> Unit, onOpenPlanSheet: () -> Unit) {
+private fun PlanCard(plan: SessionPlan, catalogFresh: Boolean, onOpenPlanSheet: () -> Unit) {
     PetCard(pad0 = true) {
         Row(Modifier.fillMaxWidth().padding(top = 2.dp, bottom = 4.dp),
             verticalAlignment = Alignment.CenterVertically) {
             PetSection("本次方案")
             Spacer(Modifier.weight(1f))
-            PetNote("$rounds 节")
+            PetNote("${plan.courseName} × ${plan.rounds} 节")
         }
         Box(Modifier.clickable { onOpenPlanSheet() }) {
             PetListRow(
@@ -560,10 +548,16 @@ private fun PlanCard(rounds: Int, onRoundsChange: (Int) -> Unit, onOpenPlanSheet
         PetListRow(
             tileBg = PetTokens.AmberSoft,
             icon = { PetIcon(PetGlyph.Coin, 18.dp) },
-            title = "收益行动",
-            sub = "打工 · PK · 福袋 · 冒险",
-            dimmed = true,
-            trailing = { PetChip("暂未开放", PetTokens.GraySoft, PetTokens.Ink2) },
+            title = "打工赚学费",
+            sub = if (plan.workBeforeStudy) "金币不足时先打一轮工" else "未开启",
+            dimmed = !plan.workBeforeStudy,
+            trailing = {
+                PetChip(
+                    if (plan.workBeforeStudy) "已开启" else "未开启",
+                    if (plan.workBeforeStudy) PetTokens.GreenSoft else PetTokens.GraySoft,
+                    if (plan.workBeforeStudy) PetTokens.GreenInk else PetTokens.Ink2,
+                )
+            },
         )
         PetListRow(
             tileBg = PetTokens.VioletSoft,
@@ -577,7 +571,7 @@ private fun PlanCard(rounds: Int, onRoundsChange: (Int) -> Unit, onOpenPlanSheet
 }
 
 @Composable
-private fun ThresholdCard(health: List<HealthStat>) {
+private fun ThresholdCard(plan: SessionPlan) {
     PetCard(pad0 = true) {
         Row(Modifier.fillMaxWidth().padding(top = 2.dp, bottom = 2.dp),
             verticalAlignment = Alignment.CenterVertically) {
@@ -587,8 +581,12 @@ private fun ThresholdCard(health: List<HealthStat>) {
         }
         Spacer(Modifier.height(6.dp))
         Row(Modifier.fillMaxWidth().padding(bottom = 13.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            listOf("体力", "清洁", "心情").forEachIndexed { index, name ->
-                val stat = health.getOrNull(index)
+            listOf("体力", "清洁", "心情").forEach { name ->
+                val gate = when (name) {
+                    "体力" -> "≥ ${plan.energyThreshold}"
+                    "清洁" -> "≥ ${plan.cleanlinessThreshold}"
+                    else -> "不参与"
+                }
                 Column(Modifier.weight(1f)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         PetDot(dotColorFor(name))
@@ -597,20 +595,13 @@ private fun ThresholdCard(health: List<HealthStat>) {
                     }
                     Spacer(Modifier.height(3.dp))
                     Text(
-                        if (name == "心情") "不参与" else "≥ 90",
+                        gate,
                         fontSize = 17.sp, fontWeight = FontWeight.Bold, color = PetTokens.Ink,
                         fontFamily = FontFamily.Monospace,
                     )
                     Spacer(Modifier.height(2.dp))
                     Text(
-                        when {
-                            name == "心情" -> "仅观察记录"
-                            stat == null -> "—"
-                            stat.status == HealthStatStatus.KNOWN && stat.current -> "当前 ${stat.valueText} · 可判定"
-                            stat.status == HealthStatStatus.KNOWN -> "非本会话读数"
-                            stat.status == HealthStatStatus.STALE -> "读数已过期"
-                            else -> "无当前读数"
-                        },
+                        if (name == "心情") "仅观察记录" else "低于时先护理",
                         fontSize = 9.5.sp, color = PetTokens.Ink3, maxLines = 1,
                     )
                 }
@@ -708,4 +699,85 @@ private fun pillForeground(tone: StatusPillTone): Color = when (tone) {
 private fun hhmmFormatter(): (Long) -> String {
     val fmt = SimpleDateFormat("HH:mm", Locale.US)
     return { ms -> fmt.format(Date(ms)) }
+}
+
+/**
+ * 1 / 3 / 10 节. Restores the choice that the worktree had dropped, in the original visual style.
+ *
+ * Disabled (and dimmed) whenever the environment cannot start, so the selector never looks like it
+ * will do something while 开始 is blocked for a real reason.
+ */
+@Composable
+private fun RoundSelectorRow(selected: Int, enabled: Boolean, onSelect: (Int) -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().padding(bottom = 8.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        SessionStartRequest.ROUND_OPTIONS.forEach { n ->
+            val isSelected = n == selected
+            Box(
+                Modifier.weight(1f).height(36.dp)
+                    .background(
+                        if (isSelected) PetTokens.BlueSoft else PetTokens.GraySoft,
+                        RoundedCornerShape(PetTokens.NextRadius),
+                    )
+                    .clickable(enabled = enabled) { onSelect(n) },
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    "$n 节", fontSize = 13.sp,
+                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                    color = if (isSelected) PetTokens.BlueInk else PetTokens.Ink2,
+                )
+            }
+        }
+    }
+}
+
+/**
+ * The three stage entries, one row each, so every capability can be started on its own.
+ *
+ * Ordering is by cost, cheapest first: 健康检查 spends nothing, 护理 spends coins on
+ * cookies/soap, 托管 adds a lesson on top and consumes the shared daily budget. Each button
+ * names what it does in its own label, so the cost of a tap is never a surprise.
+ */
+@Composable
+private fun SessionModeRow(
+    enabled: Boolean,
+    studyEnabled: Boolean,
+    displayId: Int?,
+    rounds: Int,
+    context: android.content.Context,
+) {
+    fun start(mode: SessionMode) {
+        if (!enabled || displayId == null) return
+        // 托管 carries the selected batch; 健康检查/护理 are always one pass (see SessionStartRequest).
+        val requested = SessionStartRequest.plannedRounds(mode, SessionStartRequest.sanitize(rounds))
+        ContextCompat.startForegroundService(
+            context,
+            PetAutomationService.startIntent(context, displayId, requested, mode),
+        )
+    }
+    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        PetFootButton(
+            text = "健康检查",
+            tone = if (enabled) PetButtonTone.PRIMARY else PetButtonTone.DISABLED,
+            onClick = { start(SessionMode.HEALTH_CHECK) },
+            modifier = Modifier.fillMaxWidth(),
+        )
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            PetFootButton(
+                text = "护理",
+                tone = if (enabled) PetButtonTone.PRIMARY else PetButtonTone.DISABLED,
+                onClick = { start(SessionMode.CARE) },
+                modifier = Modifier.weight(1f),
+            )
+            PetFootButton(
+                text = "托管",
+                tone = if (studyEnabled) PetButtonTone.PRIMARY else PetButtonTone.DISABLED,
+                onClick = { if (studyEnabled) start(SessionMode.FULL) },
+                modifier = Modifier.weight(1f),
+            )
+        }
+    }
 }

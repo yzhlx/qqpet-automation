@@ -151,4 +151,5 @@ dependencies {
     implementation(libs.shizuku.api)
     implementation(libs.shizuku.provider)
     implementation(libs.hiddenapibypass)
+    implementation(libs.mlkit.text.recognition.chinese)
 }

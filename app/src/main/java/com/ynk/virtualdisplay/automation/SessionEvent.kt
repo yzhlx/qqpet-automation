@@ -7,6 +7,11 @@ import java.util.UUID
 enum class EventSource { APP_AUTOMATION, GAME_OBSERVATION, USER, DEBUG_ADB }
 enum class EventKind { HEALTH_OBSERVED, HEALTH_UNKNOWN, FRAME_VALID, FRAME_INVALID, INPUT_SENT,
     COURSE_STARTED, LEARNING_CONFIRMED, ERROR, SESSION_CONFIG, SESSION_STATE, CHECKPOINT,
+    // Career-town work (P5.3). Each one is a DISTINCT event on purpose: a requested start, a
+    // confirmed work session, an observed completion and a verified reward must never be collapsed
+    // into one record, because only the last one is evidence of an actual payout.
+    WORK_PREVIEW_VERIFIED, WORK_START_REQUESTED, WORK_STARTED, WORK_COMPLETED, WORK_REWARD_CONFIRMED,
+    WORK_FAILED, WORK_INTERRUPTED,
     // Batch-wide consumable allowance ledger. Its own kind on purpose: SESSION_STATE is catalogued by
     // the runtime-state reader and CHECKPOINT is the page/health recovery ledger, so neither may be
     // reused to carry budget semantics without corrupting those records.

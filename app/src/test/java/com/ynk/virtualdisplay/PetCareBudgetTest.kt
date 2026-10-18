@@ -26,8 +26,8 @@ class PetCareBudgetTest {
 
     @Test fun defaultsMatchTheAuthorisedBatchLimits() {
         val budget = CareConsumableBudget()
-        assertEquals(5, budget.cookies)
-        assertEquals(3, budget.soaps)
+        assertEquals(6, budget.cookies)
+        assertEquals(4, budget.soaps)
         assertEquals(0, budget.cookiesUsed)
         assertEquals(0, budget.soapsUsed)
     }
@@ -45,15 +45,15 @@ class PetCareBudgetTest {
 
     @Test fun theBoundaryIsExactlyFiveCookiesAndThreeSoaps() {
         val budget = CareConsumableBudget()
-        repeat(5) { budget.consumedCookie() }
-        assertEquals(5, budget.cookiesUsed)
+        repeat(6) { budget.consumedCookie() }
+        assertEquals(6, budget.cookiesUsed)
         assertRefused("CARE_COOKIE_BUDGET_EXHAUSTED") { budget.consumedCookie() }
-        assertEquals(5, budget.cookiesUsed)
+        assertEquals(6, budget.cookiesUsed)
 
-        repeat(3) { budget.consumedSoap() }
-        assertEquals(3, budget.soapsUsed)
+        repeat(4) { budget.consumedSoap() }
+        assertEquals(4, budget.soapsUsed)
         assertRefused("CARE_SOAP_BUDGET_EXHAUSTED") { budget.consumedSoap() }
-        assertEquals(3, budget.soapsUsed)
+        assertEquals(4, budget.soapsUsed)
     }
 
     @Test fun theRefusalHappensBeforeANewConsumableActionBegins() {
@@ -91,9 +91,9 @@ class PetCareBudgetTest {
                 if (runCatching { budget.consumedSoap() }.isFailure) refusals++
             }
         }
-        assertEquals(5, budget.cookiesUsed)
-        assertEquals(3, budget.soapsUsed)
-        assertEquals("10 cookies + 6 soaps must be refused", 16, refusals)
+        assertEquals(6, budget.cookiesUsed)
+        assertEquals(4, budget.soapsUsed)
+        assertEquals("9 cookies + 5 soaps must be refused", 14, refusals)
     }
 
     @Test fun anInvalidBudgetIsRejectedRatherThanSilentlyUnlimited() {
@@ -159,9 +159,9 @@ class PetCareBudgetTest {
                 if (reservation.settleAfterFailure(deliveredEvents = 1) == ReservationOutcome.RETAINED_UNCONFIRMED) retained++
             }
         }
-        assertEquals(5, budget.cookiesUsed)
-        assertEquals(">5 attempts were made, so refusals must have occurred", 5, retained)
-        assertTrue(attempts > 5)
+        assertEquals(6, budget.cookiesUsed)
+        assertEquals(">6 attempts were made, so refusals must have occurred", 6, retained)
+        assertTrue(attempts > 6)
         assertRefused("CARE_COOKIE_BUDGET_EXHAUSTED") { budget.reserveCookie() }
     }
 

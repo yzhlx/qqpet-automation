@@ -43,10 +43,16 @@ object PetHealthCheck {
         require(frame.width == 720 && frame.height == 1600)
         val ys = listOf(244, 320, 396)
         val colors = listOf(Color.rgb(0, 153, 255), Color.rgb(100, 201, 0), Color.rgb(255, 128, 0))
+        // Track colour measured on FOA_AL00 2026-10-16 (memory.md "数字 OCR 真机基线"): an EMPTY
+        // bar (value 0) shows only the grey track at the anchor — that is a legitimate reading,
+        // not an occluded panel. The old strict fill-colour check turned "cleanliness = 0", the
+        // state that most needs care, into a hard stop (BAR_UNCONFIRMED).
+        val track = Color.rgb(214, 208, 197)
         fun near(pixel: Int, color: Int) = abs(Color.red(pixel) - Color.red(color)) <= 8 &&
             abs(Color.green(pixel) - Color.green(color)) <= 8 && abs(Color.blue(pixel) - Color.blue(color)) <= 8
+        fun barPresent(pixel: Int, color: Int) = near(pixel, color) || near(pixel, track)
         val values = ys.zip(colors).map { (y, color) ->
-            check(near(frame.getPixel(330, y), color)) { "Health panel absent or occluded" }
+            check(barPresent(frame.getPixel(330, y), color)) { "Health panel absent or occluded" }
             val end = (330..504).takeWhile { near(frame.getPixel(it, y), color) }.lastOrNull() ?: 329
             ((end + 1 - 318) * 100.0 / 188).roundToInt().coerceIn(0, 100)
         }

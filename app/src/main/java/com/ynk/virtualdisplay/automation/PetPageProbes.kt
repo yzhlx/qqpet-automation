@@ -21,7 +21,14 @@ object PetPageProbes {
         PetProfile.Probe(name, Rect(l, t, r, b), "pet_mvp/$name.png")
 
     val home = experimental("home", 600, 130, 670, 190)
-    val room = experimental("room", 320, 1340, 405, 1465)
+    /**
+     * Room page IDENTITY: the left icon column (back / gear / bell / notebook / hat). Chosen over
+     * the 出门 button region because that button drifts vertically between sessions (measured
+     * y1354 in one session, y1332 in the next), which broke full-frame identification with
+     * INITIAL_PAGE_UNKNOWN. The icon column measured 0.9991 across two independent sessions and
+     * at most 0.771 on the outdoor map, so the 0.97 threshold keeps a wide margin.
+     */
+    val room = experimental("room", 40, 120, 130, 560)
     val healthPanel = experimental("health", 169, 228, 250, 415)
 
     /**
@@ -48,7 +55,17 @@ object PetPageProbes {
      * The asset shipped in the APK is the authority; the acceptance evidence is the real Android
      * `TemplateMatcher` score, not any host-side replay.
      */
-    val foodScene = mvp("food_scene", 0, 740, 200, 980)
+    /**
+     * FOOD page IDENTITY (game update 2026-10-12): the doghouse + bowl station at the right.
+     * Two prior regions failed in the field: the cushion (20,820,240,970) is crossed by the
+     * cat, and the bottom 兑换食物 pill (275,1330,450,1420) exists ONLY while the cookie stock
+     * is empty - after a purchase the pill is replaced by the purchased cookie on the plate
+     * (measured scene score 0.711 through a whole confirm window and beyond). The doghouse
+     * region is static in every food-scene state: 1.0 pre-purchase, 0.996 with the purchased
+     * cookie waiting, 0.84 on the bath scene, 0.85 on the room and 0.80 under the open sheet,
+     * so the 0.97 threshold keeps a wide margin and the sheet must never match.
+     */
+    val foodScene = mvp("food_scene", 480, 690, 690, 960)
 
     /** Measured soap gesture/tap target on the bath page. Target only, never page identity. */
     val soap = mvp("soap", 280, 1280, 440, 1400)

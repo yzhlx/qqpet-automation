@@ -21,6 +21,16 @@ class DailyBudgetStore(context: Context) {
         prefs.edit().putInt(KEY_MINUTES, usedMinutes() + minutes).apply()
     }
 
+    /**
+     * True when another activity of [minutes] would stay inside the allowance. The game's own
+     * [HARD_STOP_MINUTES] always applies; [limitMinutes] can only tighten it, which is how a
+     * [SessionPlan] asks the app to stop earlier than the game would.
+     */
+    fun canAfford(minutes: Int, limitMinutes: Int = HARD_STOP_MINUTES): Boolean {
+        require(minutes > 0)
+        return usedMinutes() + minutes <= minOf(limitMinutes, HARD_STOP_MINUTES)
+    }
+
     fun resetToday() {
         prefs.edit().putString(KEY_DAY, LocalDate.now().toString()).putInt(KEY_MINUTES, 0).apply()
     }

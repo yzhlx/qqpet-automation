@@ -70,8 +70,9 @@ fun PetSettingsScreen(
     val managedIds by viewModel.repository.managedDisplayIds.collectAsState()
 
     val profile = remember { PetProfile.calibrated() }
-    val thresholds = remember { SettingsFacts.thresholds() }
-    val batch = remember { SettingsFacts.batch() }
+    val plan = remember { com.ynk.virtualdisplay.automation.SessionPlanStore(context).load() }
+    val thresholds = remember { SettingsFacts.thresholds(plan) }
+    val batch = remember { SettingsFacts.batch(plan) }
     val repo = remember { PetEvidenceRepository(context) }
 
     var screenshots by remember { mutableStateOf(0) }
@@ -179,8 +180,8 @@ fun PetSettingsScreen(
             )
             Row(Modifier.fillMaxWidth().padding(bottom = 10.dp, top = 2.dp)) {
                 PetNote(
-                    "阈值与上限直接取自自动化层正在执行的策略，不是界面上的独立设置；" +
-                        "修改需要改代码并重新校准，因此这里只读。心情不参与判定，仅观察记录。"
+                    "阈值、节数与每日上限取自「托管方案」里保存的设置，在那里修改。" +
+                        "心情不参与判定，仅观察记录。"
                 )
             }
         }

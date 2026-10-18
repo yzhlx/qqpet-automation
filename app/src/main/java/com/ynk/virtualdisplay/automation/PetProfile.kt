@@ -19,7 +19,7 @@ data class PetProfile(
     val courseListProbe: Probe = Probe("course_list", Rect(0, 0, 1, 1), "pet_mvp/course_list.png"),
     val courseDetailProbe: Probe = Probe("course_detail", Rect(0, 0, 1, 1), "pet_mvp/course_detail.png"),
     val learningProbes: List<Probe> = emptyList(),
-    val matchThreshold: Double = 0.97,
+    val matchThreshold: Double = 0.95,
     val pageSettleMs: Long = 900L,
     val courseDurationMs: Long = 10L * 60L * 1000L,
     val courseFinishGraceMs: Long = 8_000L,
@@ -59,8 +59,12 @@ data class PetProfile(
             courseListProbe = Probe("course_list", Rect(118, 681, 290, 727), "pet_mvp/course_list.png"),
             courseDetailProbe = Probe("course_detail", Rect(80, 762, 328, 1029), "pet_mvp/course_detail.png"),
             learningProbes = listOf(
-                Probe("learning_initial", Rect(95, 1132, 260, 1174), "pet_mvp/learning_initial.png"),
-                Probe("learning_expanded", Rect(95, 946, 260, 988), "pet_mvp/learning_expanded.png"),
+                // Game update 2026-10-12: the course now plays on the outdoor map with a bottom
+                // "正在学习 / 剩余" panel instead of a classroom page; the old classroom ROIs
+                // held at 0.838 for the whole confirm window. Both new probes live on the static
+                // panel header (positive 1.0 self-score, <=0.89 on room / course-detail negatives).
+                Probe("learning_initial", Rect(60, 925, 420, 1000), "pet_mvp/learning_initial.png"),
+                Probe("learning_expanded", Rect(330, 925, 530, 1000), "pet_mvp/learning_expanded.png"),
             ),
         )
     }

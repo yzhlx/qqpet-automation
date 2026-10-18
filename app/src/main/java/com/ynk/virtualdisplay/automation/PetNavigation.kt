@@ -15,6 +15,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.TimeoutCancellationException
 import org.json.JSONObject
+import java.io.ByteArrayOutputStream
 import java.io.File
 import kotlin.coroutines.coroutineContext
 import kotlin.math.abs
@@ -1208,7 +1209,19 @@ class PetNavigation(private val flow: PetFlowContext) {
         val panelOpen=try {score(current,listOf(profile.courseListProbe))>=profile.matchThreshold} finally {current.recycle()}
         if(panelOpen) tap(profile.courseListProbe,PointF(80f,160f),academy,"$action-close-course")
         tap(academy,PointF(80f,160f),outdoor,"$action-leave-academy")
-        tap(outdoor,PointF(80f,160f),room,"$action-return-home")
+        // The outdoor map can pop a random NPC story bubble ("武侠之路...") that covers the
+        // home button and the room probe (measured: round-4 return-home-after 0.803). Dismiss
+        // it with a tap on the bubble, then retry the return tap once.
+        try {
+            tap(outdoor,PointF(80f,160f),room,"$action-return-home")
+        } catch (t: Throwable) {
+            if (t.message?.contains("PAGE_MISMATCH") != true) throw t
+            val retry=frame()
+            val stillOutdoor=try {score(retry,listOf(outdoor))>=profile.matchThreshold} finally {retry.recycle()}
+            if (!stillOutdoor) throw t
+            safety(); input.tap(608f,1450f); delay(profile.pageSettleMs)
+            tap(outdoor,PointF(80f,160f),room,"$action-return-home-retry")
+        }
     }
     /** Enter the academy map, then explicitly open the unlocked primary academy course panel. */
     suspend fun openAcademyCourseList() = with(flow) {
@@ -1335,6 +1348,11 @@ class PetNavigation(private val flow: PetFlowContext) {
         dismissCareUpgradeIfPresent()
         dismissUpgradeIfPresent("initial")
         val current=frame()
+        val sRoom=score(current,listOf(room))
+        val sHealth=score(current,listOf(healthPanel))
+        val sOutdoor=score(current,listOf(outdoor))
+        val sResult=score(current,listOf(profile.resultProbe))
+        val unknownDump=try {ByteArrayOutputStream().also {current.compress(Bitmap.CompressFormat.PNG,80,it)}} catch(t:Throwable) {null}
         val page=try {
             when {
                 score(current,listOf(foodScene))>=profile.matchThreshold -> "food_scene"
@@ -1360,7 +1378,12 @@ class PetNavigation(private val flow: PetFlowContext) {
                 tap(outdoor,PointF(80f,160f),room,"initial-home")}
             "outdoor" -> tap(outdoor,PointF(80f,160f),room,"initial-home")
             "LEARNING" -> error("ACTIVE_COURSE_WITHOUT_OWNED_CHECKPOINT")
-            else -> error("INITIAL_PAGE_UNKNOWN")
+            else -> {
+                if (unknownDump!=null) {evidence.mkdirs();File(evidence,"round-0-initial-unknown-page.png").outputStream().use {it.write(unknownDump.toByteArray())}}
+                emit("initial-page-scores",null,capture.telemetry().put("room",sRoom)
+                    .put("healthPanel",sHealth).put("outdoor",sOutdoor).put("result",sResult).toString())
+                error("INITIAL_PAGE_UNKNOWN")
+            }
         }
     }
 }
