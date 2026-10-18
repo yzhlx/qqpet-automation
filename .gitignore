@@ -23,3 +23,13 @@ evidence/**/logcat-*.txt
 evidence/**/*-err.txt
 evidence/screencap-err.txt
 
+
+# Local build scratch, Gradle home and ASCII-path junctions created by the build
+# recipe. Never commit: .build-tmp is >100MB and Userslu158dsh-qqpet is a symlink
+# pointing back at the project's own parent directory.
+/.build-tmp/
+/.gradle-user/
+/Userslu158dsh-qqpet
+# Working copies of device probing scripts with screenshots; per the privacy rule
+# above, device screenshots stay out of the repo.
+/build-ascii/

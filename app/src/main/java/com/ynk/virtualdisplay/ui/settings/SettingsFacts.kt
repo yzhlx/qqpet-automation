@@ -2,7 +2,7 @@ package com.ynk.virtualdisplay.ui.settings
 
 import com.ynk.virtualdisplay.automation.DailyBudgetStore
 import com.ynk.virtualdisplay.automation.PetProfile
-import com.ynk.virtualdisplay.automation.PetStudyHealthPolicy
+import com.ynk.virtualdisplay.automation.SessionPlan
 
 /**
  * Pure mapping of the settings screen's real values.
@@ -32,24 +32,16 @@ data class BatchFacts(
 object SettingsFacts {
 
     /**
-     * The real gate the controller applies before every course. The boundary is discovered by asking
-     * [PetStudyHealthPolicy] itself, so this screen can never advertise a threshold the automation
-     * layer does not enforce.
+     * The gate the saved plan applies before every course. Read from the plan rather than searched
+     * for, because the threshold is now a setting and the two axes can differ.
      */
-    fun thresholds(): ThresholdFacts {
-        var low = 0
-        var high = 100
-        while (low < high) {
-            val mid = (low + high) / 2
-            if (PetStudyHealthPolicy.Reading(mid, mid).ready) high = mid else low = mid + 1
-        }
-        return ThresholdFacts(low, low)
-    }
+    fun thresholds(plan: SessionPlan): ThresholdFacts =
+        ThresholdFacts(plan.energyThreshold, plan.cleanlinessThreshold)
 
-    fun batch(): BatchFacts = BatchFacts(
-        minRounds = 1,
-        maxRounds = 3,
-        dailyHardStopMinutes = DailyBudgetStore.HARD_STOP_MINUTES,
+    fun batch(plan: SessionPlan): BatchFacts = BatchFacts(
+        minRounds = plan.rounds,
+        maxRounds = plan.rounds,
+        dailyHardStopMinutes = plan.dailyBudgetMinutes,
     )
 
     fun displayFacts(profile: PetProfile): String =

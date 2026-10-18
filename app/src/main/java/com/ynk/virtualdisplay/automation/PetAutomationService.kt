@@ -47,13 +47,24 @@ class PetAutomationService : Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         when (intent?.action) {
             ACTION_STOP -> stopSession("用户停止")
+            ACTION_SCAN_COURSES -> {
+                val displayId = intent.getIntExtra(EXTRA_DISPLAY_ID, -1)
+                startForeground(NOTIFICATION_ID, notification("读取课程中…"))
+                if (job?.isActive == true) return START_NOT_STICKY
+                val newJob = scope.launch { scanCourses(displayId) }
+                job = newJob
+                newJob.invokeOnCompletion { scope.launch(Dispatchers.Main) { finalizeStop() } }
+            }
             ACTION_START -> {
                 val displayId = intent.getIntExtra(EXTRA_DISPLAY_ID, -1)
                 startForeground(NOTIFICATION_ID, notification("正在初始化…"))
                 if (job?.isActive == true) return START_NOT_STICKY
                 stopReason = "会话结束"
                 val rounds = intent.getIntExtra(EXTRA_ROUNDS, 1)
-                val newJob = scope.launch { runSession(displayId, rounds) }
+                // An unknown mode name fails closed here rather than silently running a costlier
+                // stage than the user selected.
+                val mode = SessionMode.fromWire(intent.getStringExtra(EXTRA_MODE))
+                val newJob = scope.launch { runSession(displayId, rounds, mode) }
                 job = newJob
                 newJob.invokeOnCompletion {
                     scope.launch(Dispatchers.Main) { finalizeStop() }
@@ -63,11 +74,46 @@ class PetAutomationService : Service() {
         return START_NOT_STICKY
     }
 
-    private suspend fun runSession(displayId: Int, rounds: Int) {
+    /**
+     * Reads the academy course list and stores it. Read only: the scan scrolls the list but never
+     * taps a course or a button that spends anything, then returns home and stops.
+     */
+    private suspend fun scanCourses(displayId: Int) {
+        if (displayId <= 0) return stopSession("拒绝默认/无效 displayId")
+        try {
+            withTimeout(7_000L) {
+                app.displayRepository.connectionStatus.first { it == ConnectionStatus.CONNECTED }
+                app.displayRepository.managedDisplayIds.first { displayId in it }
+            }
+            verifyDisplay(displayId)
+            val capture = HeadlessDisplayCapture(app.displayRepository, displayId, profile.displayWidth, profile.displayHeight)
+            val input = PetInputController(app.displayRepository, displayId, profile.displayWidth, profile.displayHeight, capture.facts)
+            val evidence = File(getExternalFilesDir(null), "pet_mvp_session/${System.currentTimeMillis()}")
+            capture.start()
+            try {
+                val flow = PetFlowContext(this, capture, input, evidence, { verifyDisplay(displayId) }, ::logEvent)
+                val navigation = PetNavigation(flow)
+                flow.state = "INITIAL_NAVIGATION"
+                navigation.initialise()
+                navigation.tap(flow.room, android.graphics.PointF(360f, 1390f), flow.outdoor, "outdoor")
+                val catalog = CourseScanFlow(flow, navigation, MlKitCourseNameReader()).scan()
+                CourseCatalogStore(this).save(catalog)
+                stopReason = "课程读取完成 ${catalog.courses.size} 门"
+            } finally { capture.stop() }
+        } catch (ce: CancellationException) {
+            throw ce
+        } catch (t: Throwable) {
+            Log.e(TAG, "course scan failed", t)
+            stopSession("读取课程失败：${t.javaClass.simpleName}: ${t.message}")
+        }
+    }
+
+    private suspend fun runSession(displayId: Int, rounds: Int, mode: SessionMode) {
         val errors = profile.validate(healthGuardInstalled=true)
         if (errors.isNotEmpty()) return stopSession("配置未完成：${errors.joinToString()}")
         if (displayId <= 0) return stopSession("拒绝默认/无效 displayId")
-        if (rounds !in 1..10) return stopSession("Only finite 1..10 round batches are supported")
+        // A HEALTH_CHECK session has no rounds to run, so the 1..10 batch rule does not apply to it.
+        if (mode.runsStudy && rounds !in 1..10) return stopSession("Only finite 1..10 round batches are supported")
 
         try {
             withTimeout(7_000L) {
@@ -79,19 +125,22 @@ class PetAutomationService : Service() {
             acquireWakeLock()
 
             val budget = DailyBudgetStore(this)
+            val plan = SessionPlanStore(this).load()
             val capture = HeadlessDisplayCapture(app.displayRepository, displayId, profile.displayWidth, profile.displayHeight)
             val input = PetInputController(app.displayRepository, displayId, profile.displayWidth, profile.displayHeight, capture.facts)
             val matcher = TemplateMatcher(this)
             val evidence = File(getExternalFilesDir(null), "pet_mvp_session/${System.currentTimeMillis()}")
-            val controller=PetSessionController(this,capture,input,evidence,{verifyDisplay(displayId)},::logEvent,rounds,
-                beforeCourse={check(budget.usedMinutes()+10<=DailyBudgetStore.HARD_STOP_MINUTES) {"DAILY_BUDGET_LIMIT"}},
-                onRoundCompleted={round ->budget.addCourse(10);PetRuntime.update {it.copy(cycles=round)}})
+            val controller=PetSessionController(this,capture,input,evidence,{verifyDisplay(displayId)},::logEvent,rounds,mode,plan,
+                beforeCourse={check(budget.canAfford(plan.courseDurationMinutes(),plan.dailyBudgetMinutes)) {"DAILY_BUDGET_LIMIT"}},
+                onRoundCompleted={round ->budget.addCourse(plan.courseDurationMinutes());PetRuntime.update {it.copy(cycles=round)}},
+                onWorkCompleted={minutes ->budget.addCourse(minutes)})
             capture.start()
             try {
-                PetRuntime.update {it.copy(running=true,runState=SessionRunState.RUNNING,displayId=displayId,cycles=0,status="Managed session")}
+                PetRuntime.update {it.copy(running=true,runState=SessionRunState.RUNNING,displayId=displayId,cycles=0,status=modeLabel(mode))}
                 val verdict=controller.run()
                 stopReason=if(verdict=="MANAGED_BATCH_PASS") "BATCH_PASS ${controller.completed}/$rounds" else controller.stopReason ?: "STOPPED"
                 File(evidence,"verdict.json").writeText(JSONObject().put("verdict",verdict)
+                    .put("mode",mode.wire)
                     .put("completed",controller.completed).put("requested",rounds)
                     .put("stopReason",controller.stopReason ?: JSONObject.NULL)
                     .put("captureStatistics",capture.statistics()).toString())
@@ -210,11 +259,28 @@ class PetAutomationService : Service() {
         private const val NOTIFICATION_ID = 10901
         private const val EXTRA_DISPLAY_ID = "display_id"
         private const val EXTRA_ROUNDS = "rounds"
+        private const val EXTRA_MODE = "session_mode"
         private const val ACTION_START = "com.ynk.virtualdisplay.pet.START"
         private const val ACTION_STOP = "com.ynk.virtualdisplay.pet.STOP"
+        private const val ACTION_SCAN_COURSES = "com.ynk.virtualdisplay.pet.SCAN_COURSES"
         private const val MAX_WAKELOCK_MS = 8L * 60L * 60L * 1000L
-        fun startIntent(context: Context, displayId: Int, rounds: Int = 1) = Intent(context, PetAutomationService::class.java)
-            .setAction(ACTION_START).putExtra(EXTRA_DISPLAY_ID, displayId).putExtra(EXTRA_ROUNDS, rounds)
+
+        /** What the foreground notification shows while a session runs, per mode. */
+        private fun modeLabel(mode: SessionMode) = when (mode) {
+            SessionMode.HEALTH_CHECK -> "健康检查"
+            SessionMode.CARE -> "护理中"
+            SessionMode.FULL -> "托管中"
+        }
+
+        fun startIntent(context: Context, displayId: Int, rounds: Int = 1, mode: SessionMode = SessionMode.FULL) =
+            Intent(context, PetAutomationService::class.java)
+                .setAction(ACTION_START).putExtra(EXTRA_DISPLAY_ID, displayId)
+                .putExtra(EXTRA_ROUNDS, rounds).putExtra(EXTRA_MODE, mode.wire)
         fun stopIntent(context: Context) = Intent(context, PetAutomationService::class.java).setAction(ACTION_STOP)
+
+        /** A read-only pass over the academy course list. It spends nothing and stops itself. */
+        fun scanCoursesIntent(context: Context, displayId: Int) =
+            Intent(context, PetAutomationService::class.java)
+                .setAction(ACTION_SCAN_COURSES).putExtra(EXTRA_DISPLAY_ID, displayId)
     }
 }

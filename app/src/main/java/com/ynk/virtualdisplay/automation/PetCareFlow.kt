@@ -152,6 +152,8 @@ class PetCareFlow(private val flow: PetFlowContext,private val navigation: PetNa
     /** Stock-out purchase branch: created lazily so JVM tests without assets never touch it. */
     val exchange: PetExchangeFlow by lazy { PetExchangeFlow(flow,navigation,exchangeBudget) }
     var careStatistics=JSONObject();private set
+    /** The most recent panel reading, so a later stage can reuse it without reopening the panel. */
+    var latestReading: PetCareReading? = null; private set
     /**
      * Allowance-transition sink. Defaults to the session journal, which fsyncs every append; JVM
      * tests substitute it to observe transitions without a capture session.
@@ -202,7 +204,11 @@ class PetCareFlow(private val flow: PetFlowContext,private val navigation: PetNa
             recovery.health(snapshot)
             PetCareReading(snapshot)
         } finally { f.recycle() }
-        check(h.energy in 10..100 && h.cleanliness in 10..100) { "HEALTH_VALUE_ABNORMAL" }
+        // Care exists precisely to lift low readings back up: the entry guard must accept the
+        // full valid sensor range (0..100, matching PetStudyHealthPolicy), not a wellness band.
+        // A dirty/hungry pet is the normal input to care, never a refusal reason.
+        check(h.energy in 0..100 && h.cleanliness in 0..100) { "HEALTH_VALUE_ABNORMAL" }
+        latestReading=h
         emit(label,result=healthJson(h).put("read_duration_ms",SystemClock.elapsedRealtime()-started).toString())
         navigation.tap(healthPanel,PointF(355f,454f),parent,"close-health")
         h

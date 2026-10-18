@@ -11,16 +11,22 @@ import org.json.JSONObject
 import java.io.File
 
 /** Existing measured learning chain, separate from the experimental runner. */
-class PetStudyFlow(private val flow: PetFlowContext,private val navigation: PetNavigation,private val ledger:PetRoundLedger) {
-    suspend fun start(ready:PetCareReading):JSONObject = with(flow) {
+class PetStudyFlow(private val flow: PetFlowContext,private val navigation: PetNavigation,private val ledger:PetRoundLedger,private val courses:CourseSelector?=null) {
+    suspend fun start(ready:PetCareReading,plan:SessionPlan=SessionPlan()):JSONObject = with(flow) {
                 state="SELECT_COURSE"
                 val navigationStart=SystemClock.elapsedRealtime()
                 navigation.tap(room,PointF(360f,1390f),outdoor,"outdoor")
-                navigation.openAcademyCourseList()
-                navigation.tap(profile.courseListProbe,profile.courseButton,profile.courseDetailProbe,"select-fixed-course")
+                // A selector finds the plan's course by name and proves the detail page. Without
+                // one, the only course ever measured on this device is tapped at its fixed point.
+                if(courses!=null) courses.select(plan)
+                else {
+                    check(plan.courseId==SessionPlan.DEFAULT_COURSE_ID) {"COURSE_SELECTOR_REQUIRED:${plan.courseId}"}
+                    navigation.openAcademyCourseList()
+                    navigation.tap(profile.courseListProbe,profile.courseButton,profile.courseDetailProbe,"select-fixed-course")
+                }
                 state="START_COURSE"
                 verify(listOf(profile.courseDetailProbe),"course-before-start",latest=true)
-                PetStudyHealthPolicy.requireReady(ready.observations,System.currentTimeMillis())
+                PetStudyHealthPolicy.requireReady(ready.observations,System.currentTimeMillis(),plan.energyThreshold,plan.cleanlinessThreshold)
                 ledger.startAttempt(round)
                 safety();val start=SystemClock.elapsedRealtime();val startWall=System.currentTimeMillis()
                 input.tap(profile.startButton.x,profile.startButton.y);delay(profile.pageSettleMs)
@@ -46,9 +52,9 @@ class PetStudyFlow(private val flow: PetFlowContext,private val navigation: PetN
                     delay(300)
                 }
                 check(learningConfirmed) { "LEARNING_NOT_CONFIRMED_AFTER_START" }
-                capture.facts.events.append(EventSource.GAME_OBSERVATION,EventKind.COURSE_STARTED,mapOf("round" to round,"course" to "PHYSICAL_10_MIN"),listOf(evidence.absolutePath))
+                capture.facts.events.append(EventSource.GAME_OBSERVATION,EventKind.COURSE_STARTED,mapOf("round" to round,"course" to plan.courseId),listOf(evidence.absolutePath))
                 capture.facts.events.append(EventSource.GAME_OBSERVATION,EventKind.LEARNING_CONFIRMED,mapOf("round" to round),listOf(evidence.absolutePath))
-                val course=JSONObject().put("name","蹦蹦跳跳体能课").put("courseStartElapsedRealtime",start)
+                val course=JSONObject().put("name",plan.courseName).put("courseId",plan.courseId).put("courseStartElapsedRealtime",start)
                     .put("start_ts",startWall).put("enter_course_ms",start-navigationStart)
                 ledger.started(round)
                 course

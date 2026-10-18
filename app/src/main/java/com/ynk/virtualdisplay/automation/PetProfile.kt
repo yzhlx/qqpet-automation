@@ -19,7 +19,7 @@ data class PetProfile(
     val courseListProbe: Probe = Probe("course_list", Rect(0, 0, 1, 1), "pet_mvp/course_list.png"),
     val courseDetailProbe: Probe = Probe("course_detail", Rect(0, 0, 1, 1), "pet_mvp/course_detail.png"),
     val learningProbes: List<Probe> = emptyList(),
-    val matchThreshold: Double = 0.97,
+    val matchThreshold: Double = 0.95,
     val pageSettleMs: Long = 900L,
     val courseDurationMs: Long = 10L * 60L * 1000L,
     val courseFinishGraceMs: Long = 8_000L,
