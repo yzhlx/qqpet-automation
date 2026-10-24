@@ -43,6 +43,8 @@ object Layout {
     val defaultCourse = Point(203f, 950f)
     /** Course strip fling to the next page: interpolated MOVEs, since two-point drags are ignored (PetSessionController). */
     val courseFling: List<Point> = (0..6).map { Point(560f - it * 60f, 950f) }
+    /** Career-town map: scroll right to reveal more venues (PetWorkNavigation SCROLL_*). */
+    val townScroll: List<Point> = (0..6).map { Point(150f + it * 78f, 900f) }
     /** Lesson: the high-five cue (PetStudyFlow.highFiveWindow). */
     val highFive = Point(325f, 375f)
     /** Course detail: "去上课" (PetProfile.startButton). */

@@ -24,7 +24,12 @@ interface Gauges {
     /** Quantity and total price on the open exchange sheet. */
     suspend fun exchangeQuantity(): Int?
     suspend fun exchangeTotal(): Int?
-    /** Centre of the first OCR line on screen whose text equals [text] after trimming; null if absent. */
+    /** All OCR text on screen, lines joined by spaces. */
+    suspend fun screenText(): String
+    /**
+     * Centre of the first OCR line on screen that names [text] (see [TextMatch]); a label that OCR
+     * split over consecutive lines counts too. Null if absent.
+     */
     suspend fun findText(text: String): Point?
     /** The high-five cue that appears early in a lesson. */
     suspend fun highFiveVisible(): Boolean

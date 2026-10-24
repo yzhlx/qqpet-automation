@@ -4,6 +4,7 @@ import android.graphics.Bitmap
 import com.ynk.virtualdisplay.automation.PetPageProbes
 import com.ynk.virtualdisplay.automation.PetProfile
 import com.ynk.virtualdisplay.automation.TemplateMatcher
+import com.ynk.virtualdisplay.automation.WorkPageParser
 
 /**
  * Template scores for every probe [PageClassifier] reads, from one frame. Reuses the measured
@@ -41,7 +42,7 @@ class ProbeSet(private val matcher: TemplateMatcher) {
  * [Eyes] on the real virtual display.
  *
  * @param frame captures one fresh frame; the caller owns the capture session.
- * @param isTown OCR check for career-town pages, which have no template; null until work is wired.
+ * @param isTown OCR check for career-town pages, which have no template (see [townCheck]).
  */
 class DeviceEyes(
     private val frame: suspend () -> Bitmap,
@@ -60,4 +61,12 @@ class DeviceEyes(
             current.recycle()
         }
     }
+}
+
+/** OCR check for the career town's list, detail, working and payroll pages. */
+fun townCheck(ocr: com.ynk.virtualdisplay.automation.CourseNameReader): suspend (Bitmap) -> Boolean = { frame ->
+    val lines = ocr.read(frame)
+    val text = lines.joinToString(" ") { it.text }
+    WorkPageParser.parseTownPage(lines) != WorkPageParser.TownPageKind.NONE ||
+        text.contains("打工中") || WorkPageParser.PAYROLL_MARKERS.any { text.contains(it) }
 }

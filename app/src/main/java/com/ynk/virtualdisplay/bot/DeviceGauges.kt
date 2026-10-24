@@ -10,6 +10,8 @@ import com.ynk.virtualdisplay.automation.PetHealthCheck
 import com.ynk.virtualdisplay.automation.PetPageProbes
 import com.ynk.virtualdisplay.automation.PetProfile
 import com.ynk.virtualdisplay.automation.TemplateMatcher
+import com.ynk.virtualdisplay.automation.TextLine
+import com.ynk.virtualdisplay.automation.WorkPageParser
 
 /** [Gauges] on the real virtual display, reusing the earlier measured readers and regions. */
 class DeviceGauges(
@@ -57,9 +59,19 @@ class DeviceGauges(
 
     override suspend fun exchangeTotal(): Int? = onFrame { f -> readField(f, 390, 1400, 445, 1435, true, payReader) }
 
+    override suspend fun screenText(): String = onFrame { f -> ocr.read(f).joinToString(" ") { it.text } }
+
     override suspend fun findText(text: String): Point? = onFrame { f ->
-        ocr.read(f).firstOrNull { TextMatch.matches(it.text, text) }
-            ?.let { Point(it.bounds.exactCenterX(), it.bounds.exactCenterY()) }
+        val lines = ocr.read(f)
+        lines.firstOrNull { TextMatch.matches(it.text, text) }
+            ?.let { return@onFrame Point(it.bounds.exactCenterX(), it.bounds.exactCenterY()) }
+        // OCR splits some labels over lines (职业 + 小镇, measured 2026-10-20).
+        val sorted = lines.sortedBy { it.bounds.top }
+            .map { TextLine(WorkPageParser.normaliseGlyphs(it.text), it.bounds) }
+        WorkPageParser.locateJoinedRun(sorted, text)?.let { (top, bottom, left, right) ->
+            if (WorkPageParser.validBounds(top, bottom, left, right, f.width, f.height))
+                Point((left + right) / 2f, (top + bottom) / 2f) else null
+        }
     }
 
     override suspend fun highFiveVisible(): Boolean = onFrame { f ->

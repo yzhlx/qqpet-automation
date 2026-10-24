@@ -67,6 +67,9 @@ class FakePet(
     /** Texts visible per page, with where they sit; tests add what they need. */
     val texts = mutableMapOf<Page, MutableMap<String, Point>>()
     var highFiveShown = false
-    override suspend fun findText(text: String) = texts[game.page]?.entries?.firstOrNull { TextMatch.matches(it.key, text) }?.value
+    /** What OCR sees on the current screen; tests may replace it to model pages without templates. */
+    var screen: () -> Map<String, Point> = { texts[game.page].orEmpty() }
+    override suspend fun findText(text: String) = screen().entries.firstOrNull { TextMatch.matches(it.key, text) }?.value
+    override suspend fun screenText() = screen().keys.joinToString(" ")
     override suspend fun highFiveVisible() = highFiveShown && game.page == Page.LEARNING
 }
