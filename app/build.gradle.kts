@@ -82,7 +82,19 @@ android {
         ?: signingProperties.getProperty("release.keyAlias")
         ?: "key0"
 
+    // Optional fixed key for debug builds, so a CI-built APK installs over the copy already on
+    // the phone (same signature keeps app data). Without it the runner's own debug key is used.
+    val sharedDebugStore: File? = System.getenv("QQPET_SIGN_STORE_FILE").takeIf { !it.isNullOrEmpty() }?.let { File(it) }
+
     signingConfigs {
+        if (sharedDebugStore != null && sharedDebugStore.exists()) {
+            create("sharedDebug") {
+                storeFile = sharedDebugStore
+                storePassword = System.getenv("QQPET_SIGN_STORE_PASSWORD")
+                keyAlias = System.getenv("QQPET_SIGN_KEY_ALIAS")
+                keyPassword = System.getenv("QQPET_SIGN_KEY_PASSWORD")
+            }
+        }
         if (releaseStoreFile != null && releaseStoreFile.exists()) {
             create("release") {
                 storeFile = releaseStoreFile
@@ -94,6 +106,9 @@ android {
     }
 
     buildTypes {
+        debug {
+            signingConfigs.findByName("sharedDebug")?.let { signingConfig = it }
+        }
         release {
             isMinifyEnabled = false
             if (signingConfigs.findByName("release") != null) {
