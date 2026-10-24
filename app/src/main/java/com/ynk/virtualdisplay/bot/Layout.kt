@@ -25,8 +25,26 @@ object Layout {
     /** Room shortcuts to the food and bath scenes (PetCareFlow enter-food / enter-bath). */
     val enterFood = Point(638f, 720f)
     val enterBath = Point(638f, 868f)
+    /** Food scene: use one cookie (PetCareFlow feed). */
+    val feedCookie = Point(360f, 1300f)
+    /** Bath scene: drag the soap up, then scrub over the pet (PetCareFlow clean, 40 loops). */
+    val scrubGesture: List<Point> = buildList {
+        add(Point(360f, 1345f)); add(Point(360f, 1100f)); add(Point(360f, 900f))
+        repeat(40) { add(Point(280f, 800f)); add(Point(430f, 950f)); add(Point(280f, 950f)); add(Point(430f, 800f)) }
+    }
+    /** Scene's 兑换 bubble, drawn only when the stock is empty (PetExchangeFlow.buy). */
+    val openExchange = Point(360f, 1380f)
+    /** Exchange sheet: quantity minus and the pay button (PetExchangeFlow). */
+    val exchangeMinus = Point(517f, 1277f)
+    val exchangePay = Point(360f, 1425f)
     /** Outdoor map: the academy (PetNavigation.openAcademyCourseList). */
     val enterAcademy = Point(200f, 635f)
+    /** Course list: the default course card (PetProfile.courseButton). */
+    val defaultCourse = Point(203f, 950f)
+    /** Course strip fling to the next page: interpolated MOVEs, since two-point drags are ignored (PetSessionController). */
+    val courseFling: List<Point> = (0..6).map { Point(560f - it * 60f, 950f) }
+    /** Lesson: the high-five cue (PetStudyFlow.highFiveWindow). */
+    val highFive = Point(325f, 375f)
     /** Course detail: "去上课" (PetProfile.startButton). */
     val startCourse = Point(360f, 1384f)
 

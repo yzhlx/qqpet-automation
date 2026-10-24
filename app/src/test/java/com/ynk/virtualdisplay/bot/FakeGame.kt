@@ -14,16 +14,21 @@ class FakeGame(
     val interjections = ArrayDeque<Page>()
     /** Called on every pause, so a test can let time move the game on. */
     var onPause: (FakeGame) -> Unit = {}
+    /** Called after every tap and drag, so a test can give input side effects. */
+    var onTap: (FakeGame, Point) -> Unit = { _, _ -> }
+    var onDrag: (FakeGame) -> Unit = {}
     private var clock = 0L
 
     override suspend fun look(): Observation = Observation(interjections.removeFirstOrNull() ?: page, clock++)
 
     override suspend fun tap(point: Point) {
         taps += page to point
-        moves[page to point]?.let { page = it }
+        val from = page
+        moves[from to point]?.let { page = it }
+        onTap(this, point)
     }
 
-    override suspend fun drag(points: List<Point>, stepMs: Long) {}
+    override suspend fun drag(points: List<Point>, stepMs: Long) = onDrag(this)
 
     override suspend fun pause(ms: Long) {
         pausedMs += ms
