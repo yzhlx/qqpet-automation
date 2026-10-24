@@ -148,9 +148,105 @@ internal fun consumableDeliveryEvidence(consumableAttempted: Boolean, injectionC
 class PetCareFlow(private val flow: PetFlowContext,private val navigation: PetNavigation,
     private val budget: CareConsumableBudget = CareConsumableBudget(cookies=6,soaps=4),
     private val exchangeBudget: ExchangeBudget = ExchangeBudget(),
+    /** Legacy source-compatible argument; cached-wallet guards no longer authorize payment. */
+    private val payGuard: ((Consumable,Int,Int,Int)->Unit)? = null,
+    /** Called per payment with its own fresh sheet wallet; caller protects ALL unpaid suffix tuition. */
+    private val freshPayGuard: (suspend (Consumable,Int,Int,Int,ObservedValue<Int>)->Unit)? = null,
+    private val beforeConsumingInput: ((Consumable)->Unit)? = null,
     private val onHealth: (HealthObservations)->Unit={}) {
-    /** Stock-out purchase branch: created lazily so JVM tests without assets never touch it. */
-    val exchange: PetExchangeFlow by lazy { PetExchangeFlow(flow,navigation,exchangeBudget) }
+    private val resourceTextReader by lazy { MlKitCourseNameReader() }
+    private val inventoryReader by lazy { DeviceInventoryReader(resourceTextReader) }
+    private var inventoryReadSerial=0
+    val exchange: PetExchangeFlow by lazy {
+        PetExchangeFlow(flow,navigation,exchangeBudget,payGuard,
+            freshPayGuard=freshPayGuard,walletReader=DeviceWalletReader(resourceTextReader),
+            beforeConsumingInput=beforeConsumingInput) }
+
+    /** Read numeric stock only after proving this exact scene frame; never infer it from artwork. */
+    private suspend fun observedStock(item: Consumable, label: String): ObservedValue<Int> = with(flow) {
+        val f=frame(latest=true)
+        val observedAt=System.currentTimeMillis()
+        val page=if(item==Consumable.COOKIE) InventoryScenePage.FOOD else InventoryScenePage.BATH
+        val expected=if(item==Consumable.COOKIE) foodScene else bath
+        try {
+            check(f.width==720 && f.height==1600) { "CARE_INVENTORY_DISPLAY_UNSUPPORTED" }
+            val matched=score(f,listOf(expected))
+            check(matched>=profile.matchThreshold) { "CARE_INVENTORY_SCENE_UNCONFIRMED:$label:$matched" }
+            val roi=SceneInventoryParser.roiBounds(page)
+            val local=Bitmap.createBitmap(f,roi.left,roi.top,roi.width(),roi.height())
+            val path=File(evidence,"round-$round-$label-inventory-${inventoryReadSerial++}.png")
+            try { path.outputStream().use { check(local.compress(Bitmap.CompressFormat.PNG,100,it)) } }
+            finally { if(local!==f) local.recycle() }
+            val careItem=if(item==Consumable.COOKIE) CareItem.COOKIE else CareItem.SOAP
+            val reading=inventoryReader.read(careItem,page,f,observedAt,path.absolutePath,pageIdentityVerified=true)
+                .countOf(careItem)
+            val counterOwned=if(reading is ObservedValue.Known) reading else {
+                val box=SceneInventoryParser.roiBounds(page)
+                val crop=Bitmap.createBitmap(f,box.left,box.top,box.width(),box.height())
+                try {
+                    val pixels=IntArray(crop.width*crop.height)
+                    crop.getPixels(pixels,0,crop.width,0,0,crop.width,crop.height)
+                    if(SceneCounterDetector.hasCounter(pixels,crop.width,crop.height))
+                        ObservedValue.Known(1,observedAt,1.0,path.absolutePath,
+                            ObservationSource.SCENE_COUNTER_LOWER_BOUND)
+                    else reading
+                } finally { if(crop!==f) crop.recycle() }
+            }
+            val resolved=run {
+                val bubbleProbe=if(item==Consumable.COOKIE) foodExchangeBubble else bathExchangeBubble
+                val bubbleScore=score(f,listOf(bubbleProbe))
+                val bubbleMatched=bubbleScore>=profile.matchThreshold
+                val bubblePath=File(evidence,"round-$round-$label-empty-stock-${inventoryReadSerial}.png")
+                val bubble=Bitmap.createBitmap(f,bubbleProbe.rect.left,bubbleProbe.rect.top,
+                    bubbleProbe.rect.width(),bubbleProbe.rect.height())
+                try {
+                    bubblePath.outputStream().use { check(bubble.compress(Bitmap.CompressFormat.PNG,100,it)) }
+                } finally { if(bubble!==f) bubble.recycle() }
+                val afterEmpty=SceneEmptyStockPolicy.resolve(
+                    page=page,
+                    digitCount=counterOwned,
+                    emptyStockBubbleMatched=bubbleMatched,
+                    bubbleScore=bubbleScore,
+                    matchThreshold=profile.matchThreshold,
+                    observedAt=observedAt,
+                    evidence=bubblePath.absolutePath,
+                )
+                if(afterEmpty is ObservedValue.Known || item!=Consumable.COOKIE) afterEmpty else {
+                    val cookieScore=score(f,listOf(cookie))
+                    val cookiePath=File(evidence,"round-$round-$label-owned-stock-${inventoryReadSerial}.png")
+                    val cookieCrop=Bitmap.createBitmap(f,cookie.rect.left,cookie.rect.top,
+                        cookie.rect.width(),cookie.rect.height())
+                    try {
+                        cookiePath.outputStream().use { check(cookieCrop.compress(Bitmap.CompressFormat.PNG,100,it)) }
+                    } finally { if(cookieCrop!==f) cookieCrop.recycle() }
+                    SceneOwnedStockPolicy.resolve(
+                        page=page,
+                        digitCount=afterEmpty,
+                        emptyStockBubbleMatched=bubbleMatched,
+                        cookieTargetMatched=cookieScore>=profile.matchThreshold,
+                        cookieScore=cookieScore,
+                        matchThreshold=profile.matchThreshold,
+                        observedAt=observedAt,
+                        evidence=cookiePath.absolutePath,
+                    )
+                }
+            }
+            emit("$label-inventory",result=EventJson.encode(resolved.fields()))
+            resolved
+        } finally { f.recycle() }
+    }
+
+    private suspend fun ensureOwnedStock(item: Consumable, label: String): ObservedValue<Int> {
+        val current=observedStock(item,label)
+        if(CareResourceGate.stockAction(current,System.currentTimeMillis())==CareResourceGate.StockAction.CONSUME_OWNED)
+            return current
+        exchange.buy(item,1,"$label-numeric-zero",ownedCount=current)
+        val restocked=observedStock(item,"$label-restocked")
+        check(CareResourceGate.stockAction(restocked,System.currentTimeMillis())==CareResourceGate.StockAction.CONSUME_OWNED) {
+            "CARE_RESTOCK_NOT_CONFIRMED:$item"
+        }
+        return restocked
+    }
     var careStatistics=JSONObject();private set
     /** The most recent panel reading, so a later stage can reuse it without reopening the panel. */
     var latestReading: PetCareReading? = null; private set
@@ -213,16 +309,38 @@ class PetCareFlow(private val flow: PetFlowContext,private val navigation: PetNa
         navigation.tap(healthPanel,PointF(355f,454f),parent,"close-health")
         h
     }
-    suspend fun recover(initial: PetCareReading): PetCareReading = with(flow) {
+    suspend fun recover(initial: PetCareReading, energyThreshold: Int = 90, cleanlinessThreshold: Int = 90): PetCareReading = with(flow) {
+        require(energyThreshold in SessionPlan.MIN_THRESHOLD..SessionPlan.MAX_THRESHOLD)
+        require(cleanlinessThreshold in SessionPlan.MIN_THRESHOLD..SessionPlan.MAX_THRESHOLD)
         state="RECOVER_IF_NEEDED"
         var h = initial
         val recovery=JSONObject().put("feed_count",0).put("feed_duration_ms",0L)
             .put("clean_count",0).put("clean_duration_ms",0L)
         careStatistics=recovery
         var feeds=0
-        var restocks=0
-        while(h.energy<90) {
-            check(feeds<5) { "FEED_RETRY_LIMIT" }
+        // The feed limit follows the MEASURED gap, not a fixed count. The old cap of five feeds
+        // was measured on a pet that already sat at 84-91, so a pet that starts at 16 could never
+        // reach a 70 threshold with it: the loop stopped with FEED_RETRY_LIMIT while the
+        // threshold still asked for more (measured 2026-10-20, 16 体力 / 0 清洁, 70/70 plan).
+        val feedLimit=CareAllowance.feedLimit(h.energy,energyThreshold)
+        while(true) {
+            // A care iteration can exceed the freshness window (a purchase plus a long gesture), so
+            // the decision to keep feeding is taken on a FRESH reading, never on the previous
+            // iteration's number. Measured 2026-10-22: an iteration took ~2 minutes.
+            if(h.isStale()) h=readHealth("feed-health-fresh")
+            val energy=h.recordedEnergy ?: error("FEED_ENERGY_UNREAD")
+            if(energy>=energyThreshold) break
+            check(feeds<feedLimit) { "FEED_RETRY_LIMIT" }
+            // The pet can already sit at the game's own cap (体力 100) while the conservative bar
+            // estimate still reads a point below it: feeding then buys a cookie that cannot lift
+            // the number any further. Measured 2026-10-21 (session 1792549392632): the pet was
+            // full, the loop fed a second cookie, the measured gain was 0, the session died with
+            // FEED_NO_EXPECTED_GAIN_OR_EMPTY and cleanliness stayed at 61. A pet the game itself
+            // reports as FULL is done: stop feeding and let the clean step run.
+            if(h.digitEnergy==GAME_FULL) {
+                emit("feed-skipped-full",result="energy=${h.digitEnergy} threshold=$energyThreshold")
+                break
+            }
             // The batch-wide limit, checked BEFORE the action begins, and then reserved on the spot:
             // from here the allowance is spent-or-possibly-spent and a failed feed cannot free it.
             val reservation=budget.reserveCookie()
@@ -233,32 +351,33 @@ class PetCareFlow(private val flow: PetFlowContext,private val navigation: PetNa
             var consuming=false
             var callsBefore=0
             try {
+                val beforeReading=h
                 val before=h.energy; val started=SystemClock.elapsedRealtime(); val wall=System.currentTimeMillis()
                 // After a stock-out restock the flow is already standing on the food scene
                 // (the purchase closes back onto it); only enter from the room otherwise.
-                if(feeds>0 || restocks>0) enterSceneIfAbsent(foodScene,"enter-food",PointF(638f,720f)) else navigation.tap(room,PointF(638f,720f),foodScene,"enter-food")
+                if(feeds>0) enterSceneIfAbsent(foodScene,"enter-food",PointF(638f,720f)) else navigation.tap(room,PointF(638f,720f),foodScene,"enter-food")
                 verify(listOf(foodScene),"feed-before",latest=true)
+                val stockBefore=ensureOwnedStock(Consumable.COOKIE,"feed")
                 consuming=true
-                // Read immediately before the cookie action, which owns every inject call started
-                // after this point: navigation events can not mask a refused consumable action.
                 callsBefore=flow.input.injectionAttempts
-                // Game update 2026-10-12: feeding is now the bottom-sheet purchase flow. Tap the
-                // scene's 兑换食物 bubble (360,1380), the sheet opens with the cookie selected
-                // (default qty may be >1), then buy exactly 1 (fully verified, including the pay
-                // total) - the purchased cookie is consumed immediately (体力+10). The exchange
-                // budget allowance covers this feed.
-                safety(); input.tap(360f,1380f); delay(2500)
-                if(!exchange.dialogOpen(Consumable.COOKIE)) error("FEED_SHEET_NOT_OPENED")
-                exchange.buy(Consumable.COOKIE,1,"feed",dialogAlreadyOpen=true)
-                // The purchased cookie does NOT feed automatically: it waits on the plate and the
-                // 兑换食物 pill disappears while food is out. Tap the cookie to feed, measured
-                // plate center (360,1300) from the field evidence afterpay.png.
-                safety(); input.tap(360f,1300f); delay(2500)
+                safety()
+                check(CareResourceGate.stockAction(stockBefore,System.currentTimeMillis())==CareResourceGate.StockAction.CONSUME_OWNED)
+                // Exactly one consumable tap. An unexpected sheet or missing gain is unconfirmed,
+                // never permission to buy or send this consumption again.
+                beforeConsumingInput?.invoke(Consumable.COOKIE)
+                check(CareResourceGate.stockAction(stockBefore,System.currentTimeMillis())==CareResourceGate.StockAction.CONSUME_OWNED)
+                guard()
+                input.tap(360f,1300f); delay(2500)
                 navigation.dismissCareUpgradeIfPresent()
                 verify(listOf(foodScene),"feed-after")
                 h=readHealth("feed-health",foodScene)
-                check(h.energy>before && h.energy-before in 5..12) { "FEED_NO_EXPECTED_GAIN_OR_EMPTY" }
-                navigation.tap(foodScene,PointF(80f,160f),room,"leave-food")
+                // The gain is measured on the game's own digits when they are readable: the pixel
+                // bar estimate carries a point of geometric noise and stops at the cap, so a
+                // bar-only delta can read 0 for a cookie that did work (93 -> 100 measures +7).
+                val gain=feedGain(beforeReading,h)
+                check(gain>0 && (gain in 5..12 || h.digitEnergy==GAME_FULL)) { "FEED_NO_EXPECTED_GAIN_OR_EMPTY" }
+                val stockAfter=observedStock(Consumable.COOKIE,"feed-after")
+                navigation.returnHomeFromPage(foodScene,"leave-food")
                 feeds++
                 // The effect was measured on a frame taken after the tap, so the allowance is spent.
                 reservation.confirmConsumed()
@@ -269,54 +388,89 @@ class PetCareFlow(private val flow: PetFlowContext,private val navigation: PetNa
                 recovery.put("feed_duration_ms",recovery.getLong("feed_duration_ms")+SystemClock.elapsedRealtime()-started)
                 emit("feed",result=JSONObject().put("feed_start_ts",wall).put("feed_end_ts",System.currentTimeMillis())
                     .put("feed_duration_ms",SystemClock.elapsedRealtime()-started).put("stamina_before",before)
-                    .put("stamina_after",h.energy).put("inventory_before","UNKNOWN").put("inventory_after","UNKNOWN").toString())
+                    .put("stamina_after",h.energy).put("inventory_before",JSONObject(stockBefore.fields()))
+                    .put("inventory_after",JSONObject(stockAfter.fields())).toString())
             }
             catch(t: Throwable) {
                 settle(reservation,"feed",consuming,callsBefore)
-                // Stock-out repair under the sheet feed flow: the feed IS a verified 1-cookie
-                // purchase, so an inventory stock-out now surfaces as FEED_SHEET_NOT_OPENED (the
-                // bubble no longer opens the sheet) or a failed buy inside the sheet. Recovery is
-                // bounded by FEED_RETRY_LIMIT and the exchange budget; every purchase is fully
-                // qty/total-verified.
-                val message=t.message.orEmpty()
-                if(message.startsWith("FEED_SHEET_NOT_OPENED") && restocks<4) {
-                    restocks++
-                    emit("feed-stockout-restock",reason=message)
-                    // The bubble tap may have left a stray sheet; dismiss with back, then re-enter.
-                    flow.input.tap(660f,660f); delay(1200)
-                    ensureFoodScene()
-                    exchange.buy(Consumable.COOKIE,1,"feed-stockout")
-                    // After the sheet purchase the cookie is consumed by the feed itself; re-verify.
-                    navigation.dismissCareUpgradeIfPresent()
-                    verify(listOf(foodScene),"feed-after-restock")
-                    h=readHealth("feed-health-restock",foodScene)
-                    check(h.energy>0) { "FEED_NO_EXPECTED_GAIN_OR_EMPTY" }
-                    navigation.tap(foodScene,PointF(80f,160f),room,"leave-food")
-                    feeds++
-                    reservation.confirmConsumed()
-                    budgetEvent("feed-consume",reservation)
-                    continue
-                }
                 throw t
             }
         }
-        var cleans=0
-        var soapRestocks=0
-        while(h.cleanliness<90) {
-            check(cleans<3) { "CLEAN_RETRY_LIMIT" }
+        h=cleanLoop(h,cleanlinessThreshold,recovery)
+        h
+    }
+
+    /**
+     * The measured energy gain of one feed.
+     *
+     * The game's own digit is the authority when it is readable: the pixel bar estimate carries a
+     * point of geometric noise and stops at the cap, so a bar-only delta can read 0 for a cookie
+     * that did work (measured 2026-10-21, session 1792549392632: 体力 93 -> 100 measures +7 on the
+     * digit while the bar estimate only moved 93 -> 99).
+     */
+    private fun feedGain(before: PetCareReading, after: PetCareReading): Int {
+        val b=before.recordedEnergy; val a=after.recordedEnergy
+        return if(b!=null && a!=null) a-b else after.energy-before.energy
+    }
+
+    /** The measured cleanliness gain of one scrub, on the same digit-first rule as [feedGain]. */
+    private fun cleanGain(before: PetCareReading, after: PetCareReading): Int {
+        val b=before.recordedCleanliness; val a=after.recordedCleanliness
+        return if(b!=null && a!=null) a-b else after.cleanliness-before.cleanliness
+    }
+
+    /**
+     * The game's own cap for 体力 and 清洁. The pixel bar estimate can read a point below it, so
+     * only the digit proves that the pet is full.
+     */
+    private companion object {
+        const val GAME_FULL = 100
+    }
+
+    /**
+     * Cleans the pet until it reaches [target] cleanliness.
+     *
+     * The limit follows the MEASURED gap (see [CareAllowance]): the old fixed cap of three cleans
+     * was measured on a pet that already sat at 84-92, so a pet that starts at 0 could never
+     * reach a 70 threshold with it - the clean loop stopped with CLEAN_RETRY_LIMIT while the
+     * threshold still asked for more.
+     *
+     * [target] belongs to the caller. recover() passes the plan's threshold; the work step passes
+     * the work option's OWN cleanliness cost, which is the game's requirement for that shift and
+     * not an app-side threshold. This function only spends the game's own soap to reach it.
+     */
+    private suspend fun cleanLoop(start: PetCareReading, target: Int, recovery: JSONObject): PetCareReading = with(flow) {
+        var h = start
+        var cleans = 0
+        val limit = CareAllowance.cleanLimit(h.cleanliness, target)
+        while(true) {
+            // Same rule as the feed loop: the decision to scrub again needs a fresh reading.
+            if(h.isStale()) h=readHealth("clean-health-fresh")
+            val cleanliness=h.recordedCleanliness ?: error("CLEAN_CLEANLINESS_UNREAD")
+            if(cleanliness>=target) break
+            check(cleans < limit) { "CLEAN_RETRY_LIMIT" }
+            // A pet the game itself calls FULL cannot be scrubbed any further: the pixel bar
+            // estimate may still read a point below the cap, and scrubbing then buys a soap that
+            // changes nothing. Stop here instead of spending coins on a soap with no effect.
+            if(h.digitCleanliness==GAME_FULL) {
+                emit("clean-skipped-full",result="cleanliness=${h.digitCleanliness} target=$target")
+                break
+            }
             // Batch-wide soap limit, checked before the gesture begins and reserved on the spot.
             val reservation=budget.reserveSoap()
             budgetEvent("clean-reserve",reservation)
             var consuming=false
             var callsBefore=0
             try {
+                val beforeReading=h
                 val before=h.cleanliness; val started=SystemClock.elapsedRealtime()
-                if(cleans>0 || soapRestocks>0) enterSceneIfAbsent(bath,"enter-bath",PointF(638f,868f)) else navigation.tap(room,PointF(638f,868f),bath,"enter-bath")
+                if(cleans>0) enterSceneIfAbsent(bath,"enter-bath",PointF(638f,868f)) else navigation.tap(room,PointF(638f,868f),bath,"enter-bath")
                 // Page identity is the stable bath scene, never the soap button: the button repaints
                 // to its pale "already clean" state once cleanliness is maxed, which used to fail
                 // clean-after verification (PAGE_MISMATCH ... 0.9538353304284677) with cleanliness
                 // already at 99. The soap probe stays the measured gesture/tap target only.
                 verify(listOf(bath),"clean-before",latest=true)
+                val stockBefore=ensureOwnedStock(Consumable.SOAP,"clean")
                 val points=buildList {
                     add(PointF(360f,1345f));add(PointF(360f,1100f));add(PointF(360f,900f))
                     repeat(40) { add(PointF(280f,800f));add(PointF(430f,950f));add(PointF(280f,950f));add(PointF(430f,800f)) }
@@ -326,12 +480,21 @@ class PetCareFlow(private val flow: PetFlowContext,private val navigation: PetNa
                 // Read immediately before the soap gesture, which owns every inject call started after
                 // this point, so a safety() refusal can still return the allowance.
                 callsBefore=flow.input.injectionAttempts
-                safety(); input.drag(points,150); delay(2000)
+                safety()
+                check(CareResourceGate.stockAction(stockBefore,System.currentTimeMillis())==CareResourceGate.StockAction.CONSUME_OWNED)
+                beforeConsumingInput?.invoke(Consumable.SOAP)
+                check(CareResourceGate.stockAction(stockBefore,System.currentTimeMillis())==CareResourceGate.StockAction.CONSUME_OWNED)
+                guard()
+                input.drag(points,150); delay(2000)
                 navigation.dismissCareUpgradeIfPresent()
                 verify(listOf(bath),"clean-after")
                 h=readHealth("clean-health",bath)
-                check(h.cleanliness>before) { "CLEAN_NO_GAIN_OR_EMPTY" }
-                navigation.tap(bath,PointF(80f,160f),room,"leave-bath")
+                // A scrub that measured no gain on the game's own digit is a stock-out symptom
+                // (no soap left), not a pet that is already clean - the full-pet case is handled
+                // above, before any soap is spent.
+                check(cleanGain(beforeReading,h)>0) { "CLEAN_NO_GAIN_OR_EMPTY" }
+                val stockAfter=observedStock(Consumable.SOAP,"clean-after")
+                navigation.returnHomeFromPage(bath,"leave-bath")
                 cleans++
                 // Measured gain observed after the gesture: the soap allowance is firmly spent.
                 reservation.confirmConsumed()
@@ -341,40 +504,33 @@ class PetCareFlow(private val flow: PetFlowContext,private val navigation: PetNa
                 recovery.put("clean_budget",budget.soaps)
                 recovery.put("clean_duration_ms",recovery.getLong("clean_duration_ms")+SystemClock.elapsedRealtime()-started)
                 emit("clean",result=JSONObject().put("cleanliness_before",before).put("cleanliness_after",h.cleanliness)
-                    .put("clean_duration_ms",SystemClock.elapsedRealtime()-started).put("inventory_before","UNKNOWN")
-                    .put("inventory_after","UNKNOWN").toString())
+                    .put("clean_duration_ms",SystemClock.elapsedRealtime()-started).put("inventory_before",JSONObject(stockBefore.fields()))
+                    .put("inventory_after",JSONObject(stockAfter.fields())).toString())
             }
             catch(t: Throwable) {
                 settle(reservation,"clean",consuming,callsBefore)
-                // Stock-out repair for soap: measured zero-gain clean -> buy 1 soap, retry once.
-                val message=t.message.orEmpty()
-                // One measured soap = +10; reaching 90 from the 60s may need 3 soaps, so both
-                // stock-out symptoms (measured zero-gain, or the dialog opened by the failed
-                // gesture) may recur. Each restock buys ONE verified soap; the count is bounded
-                // by CLEAN_RETRY_LIMIT and the exchange budget; every purchase is fully
-                // qty/total-verified, so nothing here blind-buys.
-                if(message.startsWith("CLEAN_NO_GAIN_OR_EMPTY") && soapRestocks<4) {
-                    soapRestocks++
-                    emit("clean-stockout-restock",reason=message)
-                    ensureBathScene()
-                    exchange.buy(Consumable.SOAP,1,"clean-stockout")
-                    continue
-                }
-                // A stock-out clean opens the EXCHANGE dialog instead of a scrubbed scene: the
-                // first symptom is PAGE_MISMATCH on clean-after. Reuse that open dialog (no
-                // further input) for the restock; bounded like the cookie path, every purchase
-                // fully verified; anything else propagates fail-closed.
-                if(message.startsWith("PAGE_MISMATCH:") && message.contains(":clean-after:")
-                    && exchange.dialogOpen(Consumable.SOAP) && soapRestocks<4) {
-                    soapRestocks++
-                    emit("clean-stockout-restock",reason="dialog-on-clean-after#$soapRestocks")
-                    exchange.buy(Consumable.SOAP,1,"clean-stockout",dialogAlreadyOpen=true)
-                    continue
-                }
+                // A delivered scrub with an unconfirmed outcome is never retried or treated as zero stock.
                 throw t
             }
         }
         h
+    }
+
+    /**
+     * Cleans the pet up to [target] cleanliness and returns the reading that proves it.
+     *
+     * This is the WORK step's preparation, not a care policy: the shift's own cleanliness cost is
+     * the game's requirement, and the app's answer to it is to act on it rather than to refuse
+     * the shift. See [WorkPreparation] for the measured reason the shift cannot start dirty.
+     *
+     * The pet is left where the caller found it: the clean loop returns to the room itself.
+     */
+    suspend fun cleanTo(target: Int, initial: PetCareReading): PetCareReading = with(flow) {
+        require(target in 0..100) { "CLEAN_TARGET_OUT_OF_RANGE:$target" }
+        if(initial.cleanliness>=target) return@with initial
+        state="CLEAN_TO_TARGET"
+        val stats=JSONObject().put("clean_count",0).put("clean_duration_ms",0L)
+        cleanLoop(initial,target,stats)
     }
 
     /**

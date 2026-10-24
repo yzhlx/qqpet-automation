@@ -11,7 +11,12 @@ class PetRecoveryBoundary(private val context: Context,private val capture: Head
     private val frameTimeoutMs: Long=350L,
     private val reconcile: (SessionCheckpoint,String)->Boolean={_,_->false},
     private val validateHealth: (HealthObservations,Long)->Unit={health,at ->health.current(at);Unit},
-    private val onState: (SessionRunState,String,Int)->Unit={_,_,_->}) {
+    private val onState: (SessionRunState,String,Int)->Unit={_,_,_->},
+    /** Optional positive proof of the running-class panel on this same valid recovery frame.
+     * Supply a panel-scoped recognizer (header AND running timer), not arbitrary full-screen text.
+     * Only consulted for a trusted LEARNING checkpoint after pixel/overlay/result classification.
+     * Exceptions, including cancellation, propagate to the existing recovery handling. */
+    private val learningEvidence: (suspend (Bitmap)->Boolean)? = null) {
     private val facts=capture.facts
     private val matcher=TemplateMatcher(context)
     private val healthProbe=PetProfile.Probe("health",android.graphics.Rect(169,228,250,415),"pet_health/health.png")
@@ -64,14 +69,15 @@ class PetRecoveryBoundary(private val context: Context,private val capture: Head
             val healthVisible=matcher.match(frame,healthProbe,0.97).matched
             val probes=pages[cp.trustedPage] ?: recovery.stop("CHECKPOINT_PAGE_UNSUPPORTED")
             val matches=probes.any {matcher.match(frame,it,0.97).matched}
-            // Home/room remain visible behind the health overlay. That is a different page.
-            val overlayMismatch=healthVisible && cp.trustedPage!="health" && cp.trustedPage!="HEALTH"
             val ambiguousCourse=cp.trustedPage in setOf("course_list","course_detail","COURSE_LIST","COURSE_DETAIL") &&
                 matcher.match(frame,PetProfile.calibrated().courseListProbe,0.97).matched &&
                 matcher.match(frame,PetProfile.calibrated().courseDetailProbe,0.97).matched
             val resultVisible=matcher.match(frame,PetProfile.calibrated().resultProbe,0.97).matched
-            val page=if(overlayMismatch) "HEALTH" else if(ambiguousCourse) null else if(matches) cp.trustedPage
-                else if(resultVisible) "result" else null
+            val page=RecoveryPageClassification.classify(
+                trustedPage=cp.trustedPage, trustedPageMatches=matches, healthVisible=healthVisible,
+                ambiguousCourse=ambiguousCourse, resultVisible=resultVisible,
+                learningEvidence=learningEvidence?.let { evidence -> { evidence(frame) } },
+            )
             val health=if(cp.healthRequired && healthVisible) PetHealthCheck.observe(context,frame,
                 facts.clock.wallTimeMs(),"recovery:${facts.events.sessionId}") else null
             if(health!=null) facts.health(health)

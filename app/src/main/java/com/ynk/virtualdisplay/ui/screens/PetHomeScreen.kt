@@ -137,7 +137,9 @@ fun PetHomeScreen(
             logRows = PetLogPresentation.timeline(repo.logEntries(limit = 600))
             budgetUsed = DailyBudgetStore(context).usedMinutes()
             plan = SessionPlanStore(context).load()
-            catalogFresh = CourseCatalogStore(context).load()?.isFresh(System.currentTimeMillis()) == true
+            val catalog = CourseCatalogStore(context).load()
+            catalogFresh = catalog?.isUsable(System.currentTimeMillis()) == true &&
+                catalog.find(plan.courseId)?.let { it.unlocked && it.durationMinutes in 1..DailyBudgetStore.HARD_STOP_MINUTES } == true
         }
         reload()
         while (runtime.running) {
@@ -219,19 +221,24 @@ fun PetHomeScreen(
                 // single 开始托管, so reading the pet's current 体力/清洁 also spent coins and burned
                 // the shared daily budget. Each stage now runs on its own.
                 if (!catalogFresh) {
-                    PetNote("还没有课程档案，托管暂不可用。先到「托管方案」里读取本号已解锁的课程。", Modifier.padding(bottom = 7.dp))
+                    PetNote("请先读取完整课表并选择已解锁课程，托管暂不可用。到「托管方案」刷新课表。", Modifier.padding(bottom = 7.dp))
                 }
                 SessionModeRow(
                     enabled = controls.startEnabled,
                     studyEnabled = controls.startEnabled && catalogFresh,
+                    workEnabled = controls.startEnabled,
                     displayId = readyDisplay?.id,
                     rounds = plan.rounds,
                     context = context,
                 )
                 Spacer(Modifier.height(7.dp))
-                PetNote("托管：${plan.courseName} × ${plan.rounds} 节；健康检查/护理仅执行一次，不上课")
+                PetNote("托管：${plan.courseName} × ${plan.rounds} 节；打工/护理/学习各自独立，只做所选动作")
                 Spacer(Modifier.height(2.dp))
-                PetNote("健康检查只读数，不花金币不占时长；护理会买饼干/香皂片；托管=护理+上课")
+                PetNote("打工：按岗位体力/清洁消耗和固定时长换金币；不查课表、不护理")
+                Spacer(Modifier.height(2.dp))
+                PetNote("学习：只花学费，不要求体力/清洁；金币不足会停止，不会自动去打工")
+                Spacer(Modifier.height(2.dp))
+                PetNote("护理：先用背包里的饼干/香皂，缺了才买；购买前核对真实金币并保留学费")
                 Spacer(Modifier.height(2.dp))
                 PetNote("今日已记 $budgetUsed / $budgetCap 分钟 · 剩余 $budgetLeft")
             } else {
@@ -745,13 +752,14 @@ private fun RoundSelectorRow(selected: Int, enabled: Boolean, onSelect: (Int) ->
 private fun SessionModeRow(
     enabled: Boolean,
     studyEnabled: Boolean,
+    workEnabled: Boolean,
     displayId: Int?,
     rounds: Int,
     context: android.content.Context,
 ) {
     fun start(mode: SessionMode) {
         if (!enabled || displayId == null) return
-        // 托管 carries the selected batch; 健康检查/护理 are always one pass (see SessionStartRequest).
+        // 托管/学习 carry the selected batch; 健康检查/护理/打工 are always a single pass.
         val requested = SessionStartRequest.plannedRounds(mode, SessionStartRequest.sanitize(rounds))
         ContextCompat.startForegroundService(
             context,
@@ -759,12 +767,20 @@ private fun SessionModeRow(
         )
     }
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        PetFootButton(
-            text = "健康检查",
-            tone = if (enabled) PetButtonTone.PRIMARY else PetButtonTone.DISABLED,
-            onClick = { start(SessionMode.HEALTH_CHECK) },
-            modifier = Modifier.fillMaxWidth(),
-        )
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            PetFootButton(
+                text = "健康检查",
+                tone = if (enabled) PetButtonTone.PRIMARY else PetButtonTone.DISABLED,
+                onClick = { start(SessionMode.HEALTH_CHECK) },
+                modifier = Modifier.weight(1f),
+            )
+            PetFootButton(
+                text = "打工",
+                tone = if (workEnabled) PetButtonTone.PRIMARY else PetButtonTone.DISABLED,
+                onClick = { if (workEnabled) start(SessionMode.WORK) },
+                modifier = Modifier.weight(1f),
+            )
+        }
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             PetFootButton(
                 text = "护理",
@@ -773,11 +789,17 @@ private fun SessionModeRow(
                 modifier = Modifier.weight(1f),
             )
             PetFootButton(
-                text = "托管",
+                text = "学习",
                 tone = if (studyEnabled) PetButtonTone.PRIMARY else PetButtonTone.DISABLED,
-                onClick = { if (studyEnabled) start(SessionMode.FULL) },
+                onClick = { if (studyEnabled) start(SessionMode.STUDY) },
                 modifier = Modifier.weight(1f),
             )
         }
+        PetFootButton(
+            text = "托管（护理+上课）",
+            tone = if (studyEnabled) PetButtonTone.PRIMARY else PetButtonTone.DISABLED,
+            onClick = { if (studyEnabled) start(SessionMode.FULL) },
+            modifier = Modifier.fillMaxWidth(),
+        )
     }
 }

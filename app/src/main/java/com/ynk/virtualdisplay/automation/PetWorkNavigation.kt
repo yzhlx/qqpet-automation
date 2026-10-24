@@ -46,6 +46,8 @@ class PetWorkNavigation(
         // QQ pet -> 互动 page -> back -> pet room -> outdoor map -> town. The room/outdoor hops reuse
         // the verified chain from the study flow; the final hop is the town entry on the outdoor map.
         emit("enter-town-start", "PASS", null)
+        // The reader's locate already retries fresh frames (ML Kit's read of the outdoor map is not
+        // stable frame to frame, measured 2026-10-20). Read-only until a positive match.
         val entry = reader.locateTownEntry()
         check(entry != null) { "CAREER_TOWN_ENTRY_NOT_FOUND" }
         tap(entry, TOWN_SETTLE_MS)
@@ -83,12 +85,15 @@ class PetWorkNavigation(
     }
 
     /**
-     * Selects the work option card, waits for the page to settle, and RE-READS the reward row.
+     * Selects the work option card, waits for the page to settle, then scrolls the reward block into
+     * view and RE-READS it.
      *
-     * The re-read is the whole point: selecting the card switches every number on the page, so the
-     * reward row read before the selection is the WRONG option's data.
+     * Measured 2026-10-20: the 消耗/工分/奖励 block lives below the fold, so the reward read happens
+     * on the SCROLLED frame. The selection itself is proven by the card's own 用时 value on the top
+     * frame: the cards sit side by side, and the card whose duration equals the one the page shows
+     * for the selected option is the selected one (see [WorkPageParser.parseSelectedOptionLabel]).
      */
-    suspend fun selectWorkOption(venue: String, optionLabel: String): SelectedOption = with(flow) {
+    suspend fun selectWorkOption(venue: String, optionLabel: String, expectedMinutes: Int): SelectedOption = with(flow) {
         state = "SELECT_WORK_OPTION"
         val card = reader.locateWorkOptionCard(venue, optionLabel)
         check(card != null) { "WORK_OPTION_CARD_NOT_FOUND:$venue/$optionLabel" }
@@ -96,41 +101,69 @@ class PetWorkNavigation(
 
         val settled = reader.readDetailPage()
         check(settled.identityMatched) { "WORK_DETAIL_PAGE_UNCONFIRMED_AFTER_SELECTION" }
-        val selected = reader.readSelectedOptionLabel()
+        val selected = reader.readSelectedOptionLabel(expectedMinutes)
         check(selected == optionLabel) { "WORK_OPTION_NOT_SELECTED:$selected!=$optionLabel" }
 
+        val rewardRow = scrollRewardIntoViewAndRead(venue, optionLabel, expectedMinutes)
+        emit("work-option-selected", "PASS", "label=$selected minutes=$expectedMinutes")
         SelectedOption(
             identityMatched = true,
-            rewardRow = reader.readRewardRow(venue, optionLabel),
+            rewardRow = rewardRow,
             optionSelected = true,
         )
+    }
+
+    /**
+     * Swipes the detail page up once and reads the reward block that lives below the fold.
+     *
+     * The single swipe must move the 消耗/工分/奖励 lines into view without losing the 去打工 button
+     * (it stays fixed at the page bottom, measured 2026-10-20). After the swipe the frame is checked
+     * for the reward block; the read is refused when it cannot be positively confirmed.
+     *
+     * [durationMinutes] is the duration read off the TOP frame, carried over because the option
+     * cards scroll out of view and their 用时 lines are not on the scrolled frame.
+     */
+    private suspend fun scrollRewardIntoViewAndRead(venue: String, optionLabel: String, durationMinutes: Int): WorkOption = with(flow) {
+        swipe(DETAIL_SCROLL_FROM_X, DETAIL_SCROLL_FROM_Y, DETAIL_SCROLL_TO_X, DETAIL_SCROLL_TO_Y, DETAIL_SCROLL_MS)
+        delay(OPTION_SETTLE_MS)
+        val row = reader.readRewardRow(venue, optionLabel, durationMinutes)
+        check(row.unreadFields.isEmpty()) { "WORK_REWARD_ROW_UNREAD:${row.unreadFields.joinToString(",")}" }
+        row
     }
 
     /**
      * Re-confirms the page identity and the selected option immediately before a real start tap.
      * Returns identityMatched=false when anything cannot be positively matched, so the caller stops
      * instead of sending input on a stale frame.
+     *
+     * Runs on the frame the caller leaves the page in (the scrolled reward view): the fixed bottom
+     * 去打工/升星 lines carry the page identity, and the reward numbers are re-read against the
+     * catalog. The duration is carried over from the top frame for the same reason as above.
      */
-    suspend fun confirmWorkOptionSelected(venue: String, optionLabel: String): SelectedOption = with(flow) {
+    suspend fun confirmWorkOptionSelected(venue: String, optionLabel: String, durationMinutes: Int): SelectedOption = with(flow) {
         val page = reader.readDetailPage()
         if (!page.identityMatched) return@with SelectedOption(false, emptyRewardRow(venue, optionLabel), false)
-        val selected = reader.readSelectedOptionLabel()
-        if (selected != optionLabel) {
-            return@with SelectedOption(false, emptyRewardRow(venue, optionLabel), false)
-        }
-        SelectedOption(true, reader.readRewardRow(venue, optionLabel), true)
+        val rewardRow = reader.readRewardRow(venue, optionLabel, durationMinutes)
+        SelectedOption(true, rewardRow, rewardRow.unreadFields.isEmpty())
     }
 
     /**
-     * THE START TAP. Called only by PetWorkFlow.start() after an explicit grant.
+     * Locates the 去打工 button. Null when it is not there.
+     *
+     * The flow resolves this BEFORE it reserves any budget, so a start whose button cannot be found
+     * spends nothing.
+     */
+    suspend fun locateStartWorkButton(): PointF? = reader.locateStartWorkButton()
+
+    /**
+     * THE START TAP. Called only by PetWorkFlow.start() after an explicit grant, with the [button]
+     * the flow located on the frame that passed its checks.
      *
      * There is deliberately no retry here and no wrapper that could hide a failure: one call, one
      * tap. The caller decides what an unconfirmed outcome means.
      */
-    suspend fun tapStartWork() = with(flow) {
+    suspend fun tapStartWork(button: PointF) = with(flow) {
         state = "START_WORK"
-        val button = reader.locateStartWorkButton()
-        check(button != null) { "WORK_START_BUTTON_NOT_FOUND" }
         tap(button, WORKING_SETTLE_MS)
         emit("work-start-tap", "DELIVERED", null)
     }
@@ -201,6 +234,13 @@ class PetWorkNavigation(
         const val SCROLL_TO_X = 620
         const val SCROLL_Y = 900
         const val SCROLL_MS = 400L
+
+        /** Detail-page reward scroll: swipe up inside the scrollable body (below the fixed header). */
+        const val DETAIL_SCROLL_FROM_X = 360
+        const val DETAIL_SCROLL_TO_X = 360
+        const val DETAIL_SCROLL_FROM_Y = 1100
+        const val DETAIL_SCROLL_TO_Y = 600
+        const val DETAIL_SCROLL_MS = 400L
     }
 }
 
@@ -225,16 +265,27 @@ interface WorkPageReader {
     /** Reads the venue detail page identity. */
     suspend fun readDetailPage(): PetWorkNavigation.TownPage
 
-    /** The label of the work option card that is currently selected. */
-    suspend fun readSelectedOptionLabel(): String?
+    /**
+     * The label of the work option card that is currently selected.
+     *
+     * [expectedMinutes] lets the reader prove the selection by the card's OWN 用时 value (the cards
+     * sit side by side, so vertical proximity cannot tell them apart). When null, the reader may
+     * only answer when exactly one candidate card carries a readable duration.
+     */
+    suspend fun readSelectedOptionLabel(expectedMinutes: Int? = null): String?
 
     /** Locates a work option card to tap. */
     suspend fun locateWorkOptionCard(venue: String, optionLabel: String): PointF?
 
-    /** Re-reads the reward row for the currently selected option. */
-    suspend fun readRewardRow(venue: String, optionLabel: String): WorkOption
+    /**
+     * Re-reads the reward row for the currently selected option.
+     *
+     * [durationMinutes] is the option's duration read off the TOP frame: the reward block sits
+     * below the fold, and on the scrolled frame the option cards (with their 用时 lines) are gone.
+     */
+    suspend fun readRewardRow(venue: String, optionLabel: String, durationMinutes: Int? = null): WorkOption
 
-    /** Locates the 去打工 button. */
+    /** Locates the 去打工 button. Null when not found. */
     suspend fun locateStartWorkButton(): PointF?
 
     /** Positive proof the pet is now working. */
@@ -254,9 +305,24 @@ interface WorkPageReader {
     suspend fun awaitCompletionPage(expectedEndAtMs: Long, extraWindowMs: Long = 180_000L): CompletionResult
 }
 
-/** What the completion wait actually proved. */
+/**
+ * What the completion wait actually proved.
+ *
+ * [optionLabel] is the work option the payroll page NAMED, or null when the surface matched but did
+ * not name any option. A caller must not treat an unnamed match as proof of the work it started:
+ * the game can show a payroll-style dialog for a different session.
+ *
+ * [coinAward] is the positive coin amount the payroll page itself named ("金币 +N" / "基础工资 N"),
+ * or null when unread. It is evidence of the award line, never a balance reading.
+ */
 data class CompletionResult(
     val matched: Boolean,
     val actualMinutes: Int,
     val reason: String,
-)
+    val optionLabel: String? = null,
+    val coinAward: Int? = null,
+) {
+    /** True when the matched surface explicitly names [option]. An unnamed surface never matches. */
+    fun namesOption(option: String): Boolean =
+        matched && optionLabel != null && optionLabel == option
+}

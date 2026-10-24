@@ -1,6 +1,16 @@
 package com.ynk.virtualdisplay.automation
 
-enum class ObservationSource { DIGIT_RECOGNITION, CONSERVATIVE_BAR_ESTIMATE, SYSTEM }
+enum class ObservationSource {
+    DIGIT_RECOGNITION,
+    CONSERVATIVE_BAR_ESTIMATE,
+    /** Measured empty-stock scene bubble when the digit ROI has no number. Zero only. */
+    EMPTY_STOCK_SCENE_PROOF,
+    /** Cookie on plate with empty-stock bubble absent; proves at least one owned cookie. */
+    OWNED_STOCK_SCENE_PROOF,
+    /** Blue scene counter ink; proves at least one owned item, not an exact count. */
+    SCENE_COUNTER_LOWER_BOUND,
+    SYSTEM,
+}
 
 /** Unknown is an attempted observation; Unsupported means no reader exists. No numeric defaults. */
 sealed interface ObservedValue<out T> {

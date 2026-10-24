@@ -1,5 +1,6 @@
 package com.ynk.virtualdisplay.automation
 
+import android.graphics.PointF
 import kotlin.math.abs
 
 /**
@@ -16,8 +17,12 @@ import kotlin.math.abs
  *     stops with [WorkOutcome.UnconfirmedStart]; it does not tap again.
  *
  *  3. TIMER ZERO IS A PREDICTION, NOT A FACT. [WorkOutcome.Completed] requires a positively matched
- *     completion surface AND a resource delta. The countdown is used only to decide when to start
- *     looking, never as the evidence of a payout.
+ *     completion surface THAT NAMES THE WORK THAT WAS STARTED, the work's own minutes read off that
+ *     surface and agreeing with the duration the page showed, AND a positive coin arrival. The
+ *     preferred proof is a before/after balance delta. When that delta cannot be differenced, a
+ *     positive payroll award line ("金币 +N" / "基础工资 N") on the same named surface is accepted
+ *     as the arrival. The countdown is used only to decide when to start looking, never as payout
+ *     evidence, and a missing, zero or negative coin reading is never allowed to look like an arrival.
  *
  *  4. REWARDS KEEP THEIR RUNG. EXPECTED_REWARD / PAGE_READING / OBSERVED_DELTA / CONFIRMED_REWARD
  *     are four different [RewardRecordKind]s and are never collapsed. A page reading that survives
@@ -46,6 +51,15 @@ class PetWorkFlow(
     /** Exposed so tests and the acceptance report can prove what was booked, and how many times. */
     val sessionLedger: WorkSessionLedger = WorkSessionLedger(),
     private val clock: () -> Long = { System.currentTimeMillis() },
+    /**
+     * Reserves the session's minute budget immediately BEFORE the real start tap, and only once the
+     * page has actually confirmed the work's duration. The preview never calls it: a preview may
+     * never spend budget, because it may never start work.
+     *
+     * The argument is the ACTUAL duration the page showed, never the catalog's value, so a budget
+     * reserved here is the budget the game will really consume.
+     */
+    private val beforeStart: (Int) -> Unit = {},
 ) {
     val state = WorkStateMachine()
 
@@ -113,10 +127,13 @@ class PetWorkFlow(
         workNavigation.navigateToVenue(target.venue)
         this@PetWorkFlow.state.move(WorkPhase.WORK_SELECTED, "venue-open", clock())
 
-        val page = workNavigation.selectWorkOption(target.venue, target.optionLabel)
+        // The selection is proven by the card's own 用时 value against the catalog's duration.
+        val page = workNavigation.selectWorkOption(target.venue, target.optionLabel,
+            catalogEntry?.durationMinutes ?: return@with WorkOutcome.Blocked("WORK_DURATION_NOT_IN_CATALOG"))
         val reRead = page.rewardRow
-        // Remember the page reading so the completion delta can be reconciled against it later.
-        recordPageReading(reRead)
+        // Incomplete readings never become a page reward record or authorise a start.
+        if (reRead.unreadFields.isNotEmpty()) blockers += "工作字段未读全：${reRead.unreadFields.joinToString()}"
+        else recordPageReading(reRead)
 
         this@PetWorkFlow.state.move(WorkPhase.PREVIEW_VERIFIED, "reward-row-re-read", clock())
 
@@ -144,14 +161,43 @@ class PetWorkFlow(
         )
     }
 
-    // ------------------------------------------------------------------ start
+    /**
+     * Resolves the 去打工 button for a start that has already passed every safety check.
+     *
+     * Called before the reservation: a start whose button cannot be located must spend nothing, so
+     * the refusal happens here, before any budget is booked.
+     */
+    private suspend fun resolveStartButton(): PointF? = workNavigation.locateStartWorkButton()
+
+    /**
+     * Reserves the budget and dispatches the real start tap to [button].
+     *
+     * The reservation runs HERE, after every safety check has passed and immediately before the
+     * tap. Reserving earlier would spend budget on starts that then get refused (a missing button,
+     * an unread energy reading, a stale page); reserving later would let a tap land with nothing
+     * booked. The one case that keeps its minutes is an UNCERTAIN dispatch: the tap went out, so the
+     * work may be running, and that minute charge is the honest accounting for it. It is not released.
+     */
+    private suspend fun reserveAndDispatch(button: PointF) {
+        beforeStart(actualDurationMinutes)
+        this@PetWorkFlow.state.move(WorkPhase.START_REQUESTED, "start-tap-requested", clock())
+        startConfirmation.markTapDelivered()
+        workNavigation.tapStartWork(button)
+    }
 
     /**
      * Starts ONE real work session under an explicit grant.
      *
-     * Preconditions, all checked before the tap: a live grant naming this exact venue and option,
-     * remaining starts in that grant, and a freshly re-confirmed page identity. If any of them
-     * fails, no input is sent.
+     * ORDER OF OPERATIONS. The target is resolved and every safety check runs BEFORE the budget is
+     * reserved, and the reservation runs immediately before the tap:
+     *
+     *  1. a live grant naming this exact venue and option;
+     *  2. the page identity and the selected option re-confirmed on the current frame;
+     *  3. the work's own duration read off that frame, and its energy requirement met;
+     *  4. the 去打工 button located on that same frame - no button, no budget;
+     *  5. the reservation, immediately before the dispatch.
+     *
+     * A start that fails at any step sends no input and spends no minutes.
      *
      * The tap is sent at most ONCE per call, and [WorkStartConfirmation] makes a second call's tap
      * impossible after delivery.
@@ -179,6 +225,26 @@ class PetWorkFlow(
             return@with WorkOutcome.Blocked("WORK_AUTHORISATION_REVOKED")
         }
 
+        // Only an evidenced VERIFIED zero-entry-fee job may start without a coin baseline.
+        // The grant's spending cap alone does not prove what the game charges. Without a baseline,
+        // completion still needs this attempt's matching positive payroll award.
+        val before = resources.snapshot("before-start")
+        val baselineOptional = WorkEvidencePolicy.allowsUnknownBaseline(
+            catalog.find(target.venue, target.optionId), grant.maxCoinsSpent)
+        if (before.coins !is ObservedValue.Known && !baselineOptional) {
+            val reason = "WORK_COIN_BALANCE_UNREAD_BEFORE_START:" +
+                "${(before.coins as? ObservedValue.Unknown)?.reason ?: before.coins.fields()["status"]}"
+            this@PetWorkFlow.state.move(WorkPhase.BLOCKED, reason, clock())
+            emit("work-start-blocked", "BLOCKED", reason)
+            return@with WorkOutcome.Blocked(reason)
+        }
+        if (before.coins !is ObservedValue.Known) {
+            // No baseline, but this shift risks no coins: its own award line must carry the payout.
+            emit("work-balance-baseline-missing", "DEGRADED",
+                "award-only payout proof required for ${target.optionId}")
+        }
+        beforeStartSnapshot = before
+
         grant.consume(target.venue, target.optionId)
         this@PetWorkFlow.state.move(WorkPhase.AUTHORIZED, "grant-consumed", clock())
 
@@ -197,10 +263,12 @@ class PetWorkFlow(
         }
 
         // Re-confirm the page identity and the selected option immediately before the tap. A stale
-        // frame must not authorise a real action.
-        val page = workNavigation.confirmWorkOptionSelected(target.venue, target.optionLabel)
-        if (!page.identityMatched) {
-            this@PetWorkFlow.state.move(WorkPhase.BLOCKED, "启动前页面身份未确认", clock())
+        // frame must not authorise a real action. The duration is the one the PAGE showed during the
+        // preview: the scrolled frame the confirmation runs on no longer carries the option cards.
+        val page = workNavigation.confirmWorkOptionSelected(target.venue, target.optionLabel,
+            actualDurationMinutes.takeIf { it > 0 } ?: catalog.find(target.venue, target.optionId)?.durationMinutes ?: 0)
+        if (!page.identityMatched || !page.optionSelected || page.rewardRow.unreadFields.isNotEmpty()) {
+            this@PetWorkFlow.state.move(WorkPhase.BLOCKED, "启动前页面身份或字段未确认", clock())
             emit("work-start-blocked", "BLOCKED", "WORK_PAGE_IDENTITY_UNCONFIRMED")
             return@with WorkOutcome.Blocked("WORK_PAGE_IDENTITY_UNCONFIRMED")
         }
@@ -209,32 +277,66 @@ class PetWorkFlow(
         actualDurationMinutes = page.rewardRow.durationMinutes
         check(actualDurationMinutes > 0) { "WORK_DURATION_UNREAD_BEFORE_START" }
 
-        val energy = resources.readEnergy()
+        // THE SHIFT'S OWN COST, BOTH HALVES. The page just confirmed above states the cost this shift
+        // will actually charge ("体力 5（当前 26），清洁 2（当前 6）"), and BOTH halves are requirements:
+        // the game greys out 去打工 with "你的宠物清洁值不足，请回家洗澡" when cleanliness cannot pay,
+        // exactly like it does for energy. The catalog is only a cross-check here - if the page and the
+        // catalog disagree, the page wins for what will be spent and the mismatch stops the start
+        // rather than being rounded to whichever number looks friendlier.
+        val pageEnergyCost = page.rewardRow.pageEnergyCost
+        val pageCleanCost = page.rewardRow.pageCleanlinessCost
         val catalogEntry = catalog.find(target.venue, target.optionId)
-        if (catalogEntry != null && catalogEntry.energyCost > 0) {
-            // Rule A: the ONLY resource precondition is the work's own energy cost. No care
-            // threshold, no attribute requirement.
-            val available = (energy as? ObservedValue.Known)?.value
-            if (available != null && available < catalogEntry.energyCost) {
-                this@PetWorkFlow.state.move(WorkPhase.BLOCKED, "精力不足：$available < ${catalogEntry.energyCost}", clock())
-                emit("work-start-blocked", "BLOCKED", "WORK_ENERGY_INSUFFICIENT")
-                return@with WorkOutcome.Blocked("WORK_ENERGY_INSUFFICIENT:$available<${catalogEntry.energyCost}")
-            }
-            // An unreadable energy reading is a blocker, not a pass: starting on an unknown budget
-            // is exactly the unbounded-spend case the brief forbids.
-            if (available == null) {
-                this@PetWorkFlow.state.move(WorkPhase.BLOCKED, "精力读数不可用", clock())
-                emit("work-start-blocked", "BLOCKED", "WORK_ENERGY_UNREADABLE")
-                return@with WorkOutcome.Blocked("WORK_ENERGY_UNREADABLE")
-            }
+        if (catalogEntry != null &&
+            (catalogEntry.energyCost != pageEnergyCost || catalogEntry.cleanlinessCost != pageCleanCost)) {
+            val reason = "WORK_COST_DIFFERS_FROM_CATALOG:" +
+                "page=${pageEnergyCost}/${pageCleanCost} catalog=" +
+                "${catalogEntry.energyCost}/${catalogEntry.cleanlinessCost}"
+            this@PetWorkFlow.state.move(WorkPhase.BLOCKED, reason, clock())
+            emit("work-start-blocked", "BLOCKED", reason)
+            return@with WorkOutcome.Blocked(reason)
         }
 
-        val before = resources.snapshot("before-start")
-        beforeStartSnapshot = before
+        val energy = resources.readEnergy()
+        val cleanliness = resources.readCleanliness()
+        val availableEnergy = (energy as? ObservedValue.Known)?.value
+        val availableClean = (cleanliness as? ObservedValue.Known)?.value
+        // Rule A: the ONLY resource preconditions are the work's own two costs. No care threshold.
+        if (availableEnergy != null && availableEnergy < pageEnergyCost) {
+            this@PetWorkFlow.state.move(WorkPhase.BLOCKED, "精力不足：$availableEnergy < $pageEnergyCost", clock())
+            emit("work-start-blocked", "BLOCKED", "WORK_ENERGY_INSUFFICIENT")
+            return@with WorkOutcome.Blocked("WORK_ENERGY_INSUFFICIENT:$availableEnergy<$pageEnergyCost")
+        }
+        if (availableClean != null && availableClean < pageCleanCost) {
+            val reason = "WORK_CLEANLINESS_INSUFFICIENT:$availableClean<$pageCleanCost"
+            this@PetWorkFlow.state.move(WorkPhase.BLOCKED, "清洁不足：$availableClean < $pageCleanCost", clock())
+            emit("work-start-blocked", "BLOCKED", reason)
+            return@with WorkOutcome.Blocked(reason)
+        }
+        // An unreadable reading is a blocker, not a pass: starting on an unknown budget is exactly the
+        // unbounded-spend case the brief forbids. Only an absence of cost justifies an absence of read.
+        if (availableEnergy == null && pageEnergyCost > 0) {
+            this@PetWorkFlow.state.move(WorkPhase.BLOCKED, "精力读数不可用", clock())
+            emit("work-start-blocked", "BLOCKED", "WORK_ENERGY_UNREADABLE")
+            return@with WorkOutcome.Blocked("WORK_ENERGY_UNREADABLE")
+        }
+        if (availableClean == null && pageCleanCost > 0) {
+            this@PetWorkFlow.state.move(WorkPhase.BLOCKED, "清洁读数不可用", clock())
+            emit("work-start-blocked", "BLOCKED", "WORK_CLEANLINESS_UNREADABLE")
+            return@with WorkOutcome.Blocked("WORK_CLEANLINESS_UNREADABLE")
+        }
 
-        this@PetWorkFlow.state.move(WorkPhase.START_REQUESTED, "start-tap-requested", clock())
-        startConfirmation.markTapDelivered()
-        workNavigation.tapStartWork()
+        // Step 4: locate the 去打工 button on the frame that has just passed every check above. A
+        // missing button must spend nothing, so it is resolved here and the refusal happens before
+        // any budget is reserved.
+        val button = resolveStartButton()
+        if (button == null) {
+            this@PetWorkFlow.state.move(WorkPhase.BLOCKED, "启动前未找到去打工按钮", clock())
+            emit("work-start-blocked", "BLOCKED", "WORK_START_BUTTON_NOT_FOUND")
+            return@with WorkOutcome.Blocked("WORK_START_BUTTON_NOT_FOUND")
+        }
+
+        // Step 5: reserve, then dispatch. This is the last point at which anything can still stop.
+        reserveAndDispatch(button)
         // START_REQUESTED stays the phase: the tap being delivered is NOT the same event as the work
         // being confirmed. The phase only advances on a positively matched WORKING page below.
         emit("work-start-requested", "DELIVERED_UNCONFIRMED", null)
@@ -329,15 +431,71 @@ class PetWorkFlow(
             return@with WorkOutcome.Failed(completion.reason)
         }
 
+        // A matched completion surface is not by itself the work's OWN surface: the payroll page must
+        // name the option that was started. A payroll for a different option, or an unnamed dialog,
+        // proves nothing about this session and must not be booked as if it did.
+        if (!completion.namesOption(target.optionLabel)) {
+            val reason = "COMPLETION_OPTION_NOT_MATCHED:${completion.optionLabel ?: "unnamed"}"
+            this@PetWorkFlow.state.move(WorkPhase.FAILED, reason, clock())
+            emit("work-completion-unconfirmed", "FAIL", reason)
+            return@with WorkOutcome.Failed(reason)
+        }
+
         val after = resources.snapshot("after-completion")
         val beforeSnapshot = beforeStartSnapshot ?: resources.snapshot("before-start-recovered")
         val records = buildRecords(target, startedAt, before = beforeSnapshot, after = after)
 
         this@PetWorkFlow.state.move(WorkPhase.REWARD_VERIFIED, "reward-deltas-read", clock())
 
-        val coins = delta(records, RewardRecordKind.OBSERVED_DELTA, "coins")
+        val observedCoins = delta(records, RewardRecordKind.OBSERVED_DELTA, "coins")
         val score = delta(records, RewardRecordKind.OBSERVED_DELTA, "workScore")
         val energyDelta = delta(records, RewardRecordKind.OBSERVED_DELTA, "energy")
+
+        // THE PAYOUT GATE. Prefer a positive before/after balance delta. When the after-balance is
+        // unread (common on the wage page under ML Kit), accept a positive payroll award line from
+        // the same named completion surface. Never substitute the catalog prediction, and never treat
+        // award lines as balances elsewhere.
+        val coins = when {
+            observedCoins != null && observedCoins > 0 -> observedCoins
+            observedCoins != null && observedCoins <= 0 -> {
+                val reason = "WORK_COIN_DELTA_NOT_POSITIVE:$observedCoins"
+                this@PetWorkFlow.state.move(WorkPhase.FAILED, reason, clock())
+                emit("work-reward-unverified", "FAIL", reason)
+                return@with WorkOutcome.Failed(reason)
+            }
+            (completion.coinAward ?: 0) > 0 -> {
+                emit(
+                    "work-reward-payroll-award",
+                    "PASS",
+                    "award=${completion.coinAward}|balanceDelta=unread",
+                )
+                completion.coinAward
+            }
+            else -> {
+                val reason = "WORK_COIN_DELTA_UNREAD"
+                this@PetWorkFlow.state.move(WorkPhase.FAILED, reason, clock())
+                emit("work-reward-unverified", "FAIL", reason)
+                return@with WorkOutcome.Failed(reason)
+            }
+        }
+        check(coins != null && coins > 0) { "WORK_COIN_ARRIVAL_INVARIANT" }
+
+        // The work's own minutes must be readable and must agree with the duration the page showed
+        // before the tap. A completion surface that cannot state its duration is not a completion
+        // surface for THIS work, and a duration that disagrees means the observed shift is not the
+        // shift that was started.
+        if (completion.actualMinutes <= 0) {
+            val reason = "WORK_ACTUAL_MINUTES_UNREAD"
+            this@PetWorkFlow.state.move(WorkPhase.FAILED, reason, clock())
+            emit("work-completion-unconfirmed", "FAIL", reason)
+            return@with WorkOutcome.Failed(reason)
+        }
+        if (completion.actualMinutes != actualDurationMinutes) {
+            val reason = "WORK_ACTUAL_MINUTES_MISMATCH:${completion.actualMinutes}!=$actualDurationMinutes"
+            this@PetWorkFlow.state.move(WorkPhase.FAILED, reason, clock())
+            emit("work-completion-unconfirmed", "FAIL", reason)
+            return@with WorkOutcome.Failed(reason)
+        }
 
         // Book the reward exactly once. A second call for the same session throws instead of
         // crediting the coins twice. The throw is caught and reported as a blocked duplicate rather
@@ -348,7 +506,10 @@ class PetWorkFlow(
                 venue = target.venue,
                 optionId = target.optionId,
                 startedAtMs = startedAt,
-                coins = coins ?: 0,
+                coins = coins,
+                // 工分 unread is recorded as 0 for the LEDGER only (the ledger has no null slot), and
+                // the record set keeps the Unknown, so the session is never described as
+                // "all rewards confirmed" when the score half was never read.
                 workScore = score ?: 0,
                 energy = energyDelta ?: 0,
             )
@@ -358,7 +519,7 @@ class PetWorkFlow(
             return@with WorkOutcome.Blocked("WORK_REWARD_ALREADY_RECORDED:${e.message}")
         }
 
-        emit("work-reward-confirmed", "PASS", null)
+        emit("work-reward-confirmed", "PASS", if (score == null) "WORK_SCORE_UNREAD" else null)
         this@PetWorkFlow.state.move(WorkPhase.FINISHED, "work-complete-reward-verified", clock())
 
         WorkOutcome.Completed(
@@ -405,15 +566,16 @@ class PetWorkFlow(
         val observedCoins = observedDelta(before.coins, after.coins)
         val observedScore = observedDelta(before.workScore, after.workScore)
         val observedEnergy = observedDelta(before.energy, after.energy)
-        val allReadable = observedCoins != null && observedScore != null
-        if (allReadable) {
+        // A coin delta alone is a real observation and must be recorded: dropping it because the 工分
+        // reader could not see the page would lose the one number that was actually measured. Only a
+        // field that was genuinely unreadable stays Unknown in the record.
+        if (observedCoins != null) {
             records += RewardRecord(
                 kind = RewardRecordKind.OBSERVED_DELTA,
                 at = "session-delta",
-                coins = ObservedValue.Known(observedCoins!!, clock(), 1.0, "资源前后差值", ObservationSource.DIGIT_RECOGNITION),
-                workScore = ObservedValue.Known(observedScore!!, clock(), 1.0, "资源前后差值", ObservationSource.DIGIT_RECOGNITION),
-                energy = ObservedValue.Known(observedEnergy ?: 0, clock(), if (observedEnergy != null) 1.0 else 0.0,
-                    "资源前后差值", ObservationSource.DIGIT_RECOGNITION),
+                coins = ObservedValue.Known(observedCoins, clock(), 1.0, "资源前后差值", ObservationSource.DIGIT_RECOGNITION),
+                workScore = observedScore.wrap("资源前后差值", clock()),
+                energy = observedEnergy.wrap("资源前后差值", clock()),
                 evidence = "session=$startedAtMs",
             )
 
@@ -422,7 +584,7 @@ class PetWorkFlow(
             if (pageRecord != null) {
                 val pageCoins = (pageRecord.coins as? ObservedValue.Known)?.value
                 val pageScore = (pageRecord.workScore as? ObservedValue.Known)?.value
-                if (pageCoins != null && pageScore != null &&
+                if (pageCoins != null && pageScore != null && observedScore != null &&
                     abs(observedCoins - pageCoins) <= rewardTolerance &&
                     abs(observedScore - pageScore) <= rewardTolerance
                 ) {
@@ -431,7 +593,7 @@ class PetWorkFlow(
                         at = "reconciled",
                         coins = ObservedValue.Known(observedCoins, clock(), 1.0, "页面读数与实测一致", ObservationSource.DIGIT_RECOGNITION),
                         workScore = ObservedValue.Known(observedScore, clock(), 1.0, "页面读数与实测一致", ObservationSource.DIGIT_RECOGNITION),
-                        energy = ObservedValue.Known(observedEnergy ?: 0, clock(), 1.0, "页面读数与实测一致", ObservationSource.DIGIT_RECOGNITION),
+                        energy = observedEnergy.wrap("页面读数与实测一致", clock()),
                         evidence = "catalog=${catalogEntry?.id}",
                     )
                 }
@@ -463,6 +625,17 @@ class PetWorkFlow(
         return a - b
     }
 
+    /**
+     * Keeps an unread field UNREAD inside a record.
+     *
+     * This is the whole point: writing 0 here would make an unread 工分 look like a measured "no
+     * change", and the record set would then claim a session whose reward half was never observed.
+     */
+    private fun Int?.wrap(evidence: String, at: Long): ObservedValue<Int> = when (this) {
+        null -> ObservedValue.Unknown("FIELD_NOT_READABLE", at, evidence)
+        else -> ObservedValue.Known(this, at, 1.0, evidence, ObservationSource.DIGIT_RECOGNITION)
+    }
+
     private fun delta(records: List<RewardRecord>, kind: RewardRecordKind, field: String): Int? {
         val record = records.firstOrNull { it.kind == kind } ?: return null
         val value = when (field) {
@@ -491,8 +664,22 @@ data class WorkTarget(
  *
  * Injected rather than read inline so the flow stays testable on the JVM, and so an unreadable
  * value is [ObservedValue.Unknown] instead of a silent 0 that would look like a real delta.
+ *
+ * [snapshot] is suspend because a resource reading needs a frame: the reward is only provable as the
+ * DIFFERENCE between two readings taken on two different pages minutes apart, and handing back a
+ * cached pre-shift value would make that difference come out as 0 and let the flow claim a payout
+ * that never arrived.
  */
 interface WorkResourceReader {
-    fun snapshot(at: String): RewardRecord
+    suspend fun snapshot(at: String): RewardRecord
     fun readEnergy(): ObservedValue<Int>
+
+    /**
+     * Current cleanliness. A shift spends 清洁 as well as 体力 (measured: 帮武馆跑腿 costs 5 energy and
+     * 2 cleanliness), and the game refuses to start when either cannot be paid, so a caller that
+     * cannot read cleanliness gets [ObservedValue.Unknown] and the start is blocked - never a silent 0.
+     */
+    fun readCleanliness(): ObservedValue<Int> = ObservedValue.Unknown(
+        "WORK_CLEANLINESS_READER_UNSUPPORTED", System.currentTimeMillis(),
+        "work-cleanliness-reader-unsupported")
 }

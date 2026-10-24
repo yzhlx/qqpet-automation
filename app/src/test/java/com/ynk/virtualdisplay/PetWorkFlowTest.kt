@@ -46,6 +46,10 @@ class PetWorkFlowTest {
         private var working: Boolean = false,
         private var completion: CompletionResult = CompletionResult(false, 0, "NOT_SET"),
         private var rewardRow: WorkOption = defaultRow,
+        /** When null the 去打工 button is absent: the start must be refused and must spend nothing. */
+        var startButton: PointF? = PointF(360f, 1390f),
+        /** Set by the ordering test so it can see WHERE in the sequence the button was located. */
+        var events: MutableList<String>? = null,
     ) : WorkPageReader {
         companion object {
             val defaultRow = WorkOption(
@@ -53,6 +57,20 @@ class PetWorkFlowTest {
                 durationMinutes = 10, pageCoinReward = 68, pageWorkScoreReward = 10,
                 pageEnergyCost = 5, pageCleanlinessCost = 2,
             )
+
+            /** A matched payroll surface that NAMES the option, as the real page does. */
+            fun payroll(
+                minutes: Int = 10,
+                option: String? = "帮武馆跑腿",
+                coinAward: Int? = null,
+            ) = CompletionResult(true, minutes, "PAYROLL_PAGE", option, coinAward)
+
+            /**
+             * A payroll surface with NO legible award and no option name: the page cannot prove what
+             * this shift paid, which is the case an unread baseline must not silently pass.
+             */
+            fun unnamedZeroAward(minutes: Int = 10) =
+                CompletionResult(true, minutes, "PAYROLL_PAGE", null, null)
         }
 
         override suspend fun locateTownEntry() = PointF(360f, 900f)
@@ -63,10 +81,13 @@ class PetWorkFlowTest {
         // longer be positively identified, which is what must block a real start tap.
         override suspend fun readDetailPage() =
             PetWorkNavigation.TownPage(detailVenue != null, detailVenue != null, detailVenue)
-        override suspend fun readSelectedOptionLabel() = selectedLabel
+        override suspend fun readSelectedOptionLabel(expectedMinutes: Int?) = selectedLabel
         override suspend fun locateWorkOptionCard(venue: String, optionLabel: String) = PointF(360f, 700f)
-        override suspend fun readRewardRow(venue: String, optionLabel: String) = rewardRow
-        override suspend fun locateStartWorkButton() = PointF(360f, 1390f)
+        override suspend fun readRewardRow(venue: String, optionLabel: String, durationMinutes: Int?) = rewardRow
+        override suspend fun locateStartWorkButton(): PointF? {
+            events?.add("locate")
+            return startButton
+        }
         override suspend fun readWorkingPage() = working
         override suspend fun awaitCompletionPage(expectedEndAtMs: Long, extraWindowMs: Long) = completion
     }
@@ -98,11 +119,12 @@ class PetWorkFlowTest {
         private val afterScore: Int? = 10,
         private val beforeEnergy: Int? = 80,
         private val afterEnergy: Int? = 75,
+        private val beforeCleanliness: Int? = 80,
     ) : WorkResourceReader {
         val snapshots = mutableListOf<String>()
         private var index = 0
 
-        override fun snapshot(at: String): RewardRecord {
+        override suspend fun snapshot(at: String): RewardRecord {
             snapshots += at
             val useAfter = index > 0
             index++
@@ -117,6 +139,13 @@ class PetWorkFlowTest {
 
         override fun readEnergy(): ObservedValue<Int> = beforeEnergy.wrap("energy")
 
+        /**
+         * A shift spends cleanliness too (measured 帮武馆跑腿: -2). The stub offers a comfortable
+         * Known value by default so existing energy-focused scenarios still start; the cleanliness
+         * guard itself is exercised by [PetWorkCostGateTest].
+         */
+        override fun readCleanliness(): ObservedValue<Int> = beforeCleanliness.wrap("cleanliness")
+
         private fun Int?.wrap(at: String): ObservedValue<Int> =
             if (this == null) ObservedValue.Unknown("UNREADABLE", 1000L, at)
             else ObservedValue.Known(this, 1000L, 1.0, at, ObservationSource.DIGIT_RECOGNITION)
@@ -124,17 +153,26 @@ class PetWorkFlowTest {
 
     private fun build(
         reader: StubReader = StubReader(),
-        resources: StubResources = StubResources(),
+        resources: WorkResourceReader = StubResources(),
         clock: () -> Long = { 1000L },
         sink: StubSink = StubSink(),
+        beforeStart: (Int) -> Unit = {},
+        /** Every event log the ordering test observes: taps, button locations, reservations. */
+        events: MutableList<String> = mutableListOf(),
     ): Triple<PetWorkFlow, StubSink, StubReader> {
-        val nav = PetWorkNavigation(sink, reader, tap = { _, _ -> }, swipe = { _, _, _, _, _ -> })
+        reader.events = events
+        val nav = PetWorkNavigation(
+            sink, reader,
+            tap = { _, _ -> events += "tap" },
+            swipe = { _, _, _, _, _ -> },
+        )
         val flow = PetWorkFlow(
             flow = sink,
             workNavigation = nav,
             resources = resources,
             sessionLedger = WorkSessionLedger(),
             clock = clock,
+            beforeStart = { beforeStart(it); events += "reserve" },
         )
         return Triple(flow, sink, reader)
     }
@@ -399,7 +437,7 @@ class PetWorkFlowTest {
         // OBSERVED_DELTA (resource delta), CONFIRMED_REWARD (reconciled). They are never collapsed.
         val reader = StubReader(
             detailVenue = "竹影武馆", selectedLabel = "帮武馆跑腿", working = true,
-            completion = CompletionResult(true, 10, "PAYROLL_PAGE"),
+            completion = StubReader.payroll(),
         )
         // Coins 8 -> 76 (+68), score 0 -> 10 (+10), energy 80 -> 75 (-5): the real P5.1 closed loop.
         val (flow, _, _) = build(reader)
@@ -429,7 +467,7 @@ class PetWorkFlowTest {
         // appear, and BOTH the page reading and the observed delta must survive unchanged.
         val reader = StubReader(
             detailVenue = "竹影武馆", selectedLabel = "帮武馆跑腿", working = true,
-            completion = CompletionResult(true, 10, "PAYROLL_PAGE"),
+            completion = StubReader.payroll(),
         )
         val (flow, _, _) = build(
             reader,
@@ -462,7 +500,7 @@ class PetWorkFlowTest {
         // crashing on a terminal phase.
         val reader = StubReader(
             detailVenue = "竹影武馆", selectedLabel = "帮武馆跑腿", working = true,
-            completion = CompletionResult(true, 10, "PAYROLL_PAGE"),
+            completion = StubReader.payroll(),
         )
         val (flow, _, _) = build(reader)
         flow.authorise(
@@ -580,7 +618,7 @@ class PetWorkFlowTest {
         // records nothing. A later run must still be able to re-observe the same completion page.
         val reader = StubReader(
             detailVenue = "竹影武馆", selectedLabel = "帮武馆跑腿", working = true,
-            completion = CompletionResult(true, 10, "PAYROLL_PAGE"),
+            completion = StubReader.payroll(),
         )
         val sink = StubSink()
         val (flow, _, _) = build(reader, sink = sink)
@@ -619,5 +657,447 @@ class PetWorkFlowTest {
         assertEquals("SESSION_INPUT_HALTED", (outcome as WorkOutcome.Blocked).reason)
         assertFalse(flow.startConfirmation.tapDelivered)
         assertEquals(WorkPhase.BLOCKED, flow.state.phase)
+    }
+
+    // ------------------------------------------------------- payout gate
+
+    @Test
+    fun `anUnreadCoinDeltaIsNeverReportedAsAnArrival`() {
+        // THE bug this closes: the old flow booked a Completed outcome with no coin reading at all,
+        // because "unreadable" was allowed to look like a delta of 0. The before-side read is
+        // guarded at start (see the F1 test), so the only way both sides are unread here is the
+        // AFTER-side: the completion surface appeared but no balance line resolved on it AND no
+        // payroll award line was read either. That must fail the payout, never book 0 as if it
+        // were a measurement.
+        val reader = StubReader(
+            detailVenue = "竹影武馆", selectedLabel = "帮武馆跑腿", working = true,
+            completion = StubReader.payroll(coinAward = null),
+        )
+        val (flow, _, _) = build(
+            reader,
+            resources = StubResources(beforeCoins = 8, afterCoins = null),
+        )
+        flow.authorise(
+            WorkStartAuthorisation.grant("竹影武馆", paotuId, 1, 0, 100, "test-operator", 1000L),
+        )
+        runBlocking { flow.run(target) }
+
+        val outcome = runBlocking { flow.waitAndVerify(target) }
+        assertTrue("expected Failed, got $outcome", outcome is WorkOutcome.Failed)
+        assertEquals("WORK_COIN_DELTA_UNREAD", (outcome as WorkOutcome.Failed).reason)
+        // Nothing booked: the ledger has no session, so a later re-read can still book the real one.
+        assertEquals(0, flow.sessionLedger.recordedSessions.size)
+        assertEquals(0, flow.sessionLedger.totalCoins)
+        assertEquals(WorkPhase.FAILED, flow.state.phase)
+    }
+
+    @Test
+    fun `anUnreadAfterBalanceAcceptsAPositivePayrollAwardAsArrival`() {
+        // Measured 2026-10-20 session 1792507371386: wage page showed 金币 +68 / 基础工资68 /
+        // 帮武馆跑腿(10分钟), but ML Kit never resolved a cumulative 余额 line. The named payroll
+        // award is positive proof of arrival when the balance delta cannot be differenced.
+        val reader = StubReader(
+            detailVenue = "竹影武馆", selectedLabel = "帮武馆跑腿", working = true,
+            completion = StubReader.payroll(coinAward = 68),
+        )
+        val (flow, sink, _) = build(
+            reader,
+            resources = StubResources(beforeCoins = 8, afterCoins = null),
+        )
+        flow.authorise(
+            WorkStartAuthorisation.grant("竹影武馆", paotuId, 1, 0, 100, "test-operator", 1000L),
+        )
+        runBlocking { flow.run(target) }
+
+        val outcome = runBlocking { flow.waitAndVerify(target) }
+        assertTrue("expected Completed, got $outcome", outcome is WorkOutcome.Completed)
+        assertEquals(68, flow.sessionLedger.totalCoins)
+        assertEquals(1, flow.sessionLedger.recordedSessions.size)
+        assertEquals(WorkPhase.FINISHED, flow.state.phase)
+        assertTrue(
+            sink.emitted.any {
+                it.first == "work-reward-payroll-award" && it.third?.contains("award=68") == true
+            },
+        )
+    }
+
+    @Test
+    fun `aShiftThatRisksCoinsRefusesAnUnreadBeforeBalance`() {
+        // F1 (measured 2026-10-20): when the grant lets this shift spend coins, a payout can never be
+        // differenced from an unread baseline, so the start refuses and the one-shot grant stays
+        // usable for a later attempt.
+        val reader = StubReader(detailVenue = "竹影武馆", selectedLabel = "帮武馆跑腿", working = true)
+        val (flow, _, _) = build(
+            reader,
+            resources = StubResources(beforeCoins = null, afterCoins = null),
+        )
+        // maxCoinsSpent=5: coins ARE at risk, so the strict baseline rule applies.
+        val grant = WorkStartAuthorisation.grant("竹影武馆", paotuId, 1, 5, 100, "test-operator", 1000L)
+        flow.authorise(grant)
+
+        val outcome = runBlocking { flow.start(target) }
+        assertTrue("expected Blocked, got $outcome", outcome is WorkOutcome.Blocked)
+        assertTrue((outcome as WorkOutcome.Blocked).reason.startsWith("WORK_COIN_BALANCE_UNREAD_BEFORE_START"))
+        assertFalse(flow.startConfirmation.tapDelivered)
+        assertEquals(1, grant.remainingStarts)
+        assertEquals(WorkPhase.BLOCKED, flow.state.phase)
+    }
+
+    @Test
+    fun `aZeroCoinCostShiftStartsOnAnUnreadBalanceAndBooksThePageAward`() {
+        // Device evidence 2026-10-21 19:49: the pre-shift balance could not be read on the job page,
+        // while the page stated "奖励 68". A job that spends no coins (maxCoinsSpent=0) does not need a
+        // coin baseline - refusing it blocked a shift the pet could fully pay (体力 7 >= 5, 清洁 88 >= 2).
+        // Its own award line must then carry the payout, which this stub's payroll page provides.
+        val reader = StubReader(
+            detailVenue = "竹影武馆", selectedLabel = "帮武馆跑腿", working = true,
+            completion = StubReader.payroll(),
+        )
+        val (flow, _, _) = build(
+            reader,
+            resources = StubResources(beforeCoins = null, afterCoins = null),
+        )
+        flow.authorise(
+            WorkStartAuthorisation.grant("竹影武馆", paotuId, 1, 0, 100, "test-operator", 1000L),
+        )
+        // The real order is preview -> start; start() requires PREVIEW_VERIFIED.
+        runBlocking { flow.preview(target) }
+
+        val outcome = runBlocking { flow.start(target) }
+        assertTrue("a zero-coin-cost shift must not be blocked on an unread balance, got $outcome",
+            outcome is WorkOutcome.Started)
+    }
+
+    @Test
+    fun `aZeroCoinCostShiftStillFailsWhenNeitherBalanceNorAwardIsLegible`() {
+        // The relaxation is only about the BASELINE. If the payroll page also cannot state the award,
+        // there is no proof of payment at all and the shift must not be booked as paid.
+        val reader = StubReader(
+            detailVenue = "竹影武馆", selectedLabel = "帮武馆跑腿", working = true,
+            completion = StubReader.unnamedZeroAward(),
+        )
+        val (flow, _, _) = build(
+            reader,
+            resources = StubResources(beforeCoins = null, afterCoins = null),
+        )
+        flow.authorise(
+            WorkStartAuthorisation.grant("竹影武馆", paotuId, 1, 0, 100, "test-operator", 1000L),
+        )
+        runBlocking { flow.preview(target) }
+        val started = runBlocking { flow.start(target) }
+        assertTrue(started is WorkOutcome.Started)
+
+        val done = runBlocking { flow.waitAndVerify(target) }
+        assertTrue("no award and no delta must never be reported as paid, got $done",
+            done is WorkOutcome.Failed || done is WorkOutcome.Blocked)
+    }
+
+    @Test
+    fun `aZeroCoinDeltaIsNeverReportedAsAnArrival`() {
+        // Balance read on both sides and unchanged: the coins did not arrive. The catalog's 68 is a
+        // prediction and must never be substituted for this observation.
+        val reader = StubReader(
+            detailVenue = "竹影武馆", selectedLabel = "帮武馆跑腿", working = true,
+            completion = StubReader.payroll(),
+        )
+        val (flow, _, _) = build(
+            reader,
+            resources = StubResources(beforeCoins = 76, afterCoins = 76),
+        )
+        flow.authorise(
+            WorkStartAuthorisation.grant("竹影武馆", paotuId, 1, 0, 100, "test-operator", 1000L),
+        )
+        runBlocking { flow.run(target) }
+
+        val outcome = runBlocking { flow.waitAndVerify(target) }
+        assertTrue("expected Failed, got $outcome", outcome is WorkOutcome.Failed)
+        assertEquals("WORK_COIN_DELTA_NOT_POSITIVE:0", (outcome as WorkOutcome.Failed).reason)
+        assertEquals(0, flow.sessionLedger.totalCoins)
+    }
+
+    @Test
+    fun `aNegativeCoinDeltaIsNeverReportedAsAnArrival`() {
+        // A drop in the balance is a spend, not a payout. Booking it would corrupt the budget ledger.
+        val reader = StubReader(
+            detailVenue = "竹影武馆", selectedLabel = "帮武馆跑腿", working = true,
+            completion = StubReader.payroll(),
+        )
+        val (flow, _, _) = build(
+            reader,
+            resources = StubResources(beforeCoins = 76, afterCoins = 8),
+        )
+        flow.authorise(
+            WorkStartAuthorisation.grant("竹影武馆", paotuId, 1, 0, 100, "test-operator", 1000L),
+        )
+        runBlocking { flow.run(target) }
+
+        val outcome = runBlocking { flow.waitAndVerify(target) }
+        assertTrue("expected Failed, got $outcome", outcome is WorkOutcome.Failed)
+        assertEquals("WORK_COIN_DELTA_NOT_POSITIVE:-68", (outcome as WorkOutcome.Failed).reason)
+        assertEquals(0, flow.sessionLedger.totalCoins)
+    }
+
+    @Test
+    fun `aPayrollForADifferentOptionIsNotProofOfThisWork`() {
+        // A payroll surface that names ANOTHER option proves that option was paid, not this one.
+        // Booking it would credit the wrong session's coins.
+        val reader = StubReader(
+            detailVenue = "竹影武馆", selectedLabel = "帮武馆跑腿", working = true,
+            completion = StubReader.payroll(option = "陪练基础课"),
+        )
+        val (flow, _, _) = build(reader)
+        flow.authorise(
+            WorkStartAuthorisation.grant("竹影武馆", paotuId, 1, 0, 100, "test-operator", 1000L),
+        )
+        runBlocking { flow.run(target) }
+
+        val outcome = runBlocking { flow.waitAndVerify(target) }
+        assertTrue("expected Failed, got $outcome", outcome is WorkOutcome.Failed)
+        assertTrue((outcome as WorkOutcome.Failed).reason.startsWith("COMPLETION_OPTION_NOT_MATCHED"))
+        assertEquals(0, flow.sessionLedger.recordedSessions.size)
+    }
+
+    @Test
+    fun `anUnnamedPayrollSurfaceIsNotProofOfThisWork`() {
+        // Matched the payroll keywords but named no option: unknown attribution is not evidence.
+        val reader = StubReader(
+            detailVenue = "竹影武馆", selectedLabel = "帮武馆跑腿", working = true,
+            completion = StubReader.payroll(option = null),
+        )
+        val (flow, _, _) = build(reader)
+        flow.authorise(
+            WorkStartAuthorisation.grant("竹影武馆", paotuId, 1, 0, 100, "test-operator", 1000L),
+        )
+        runBlocking { flow.run(target) }
+
+        val outcome = runBlocking { flow.waitAndVerify(target) }
+        assertTrue("expected Failed, got $outcome", outcome is WorkOutcome.Failed)
+        assertEquals(0, flow.sessionLedger.recordedSessions.size)
+    }
+
+    @Test
+    fun `aCompletionSurfaceWithoutMinutesIsNotASuccess`() {
+        // The duration that reached zero is a prediction. A surface that states no minutes cannot be
+        // reconciled with the work that was started, so it must not be reported as Completed - and it
+        // must especially never be treated as a default 0-minute success.
+        val reader = StubReader(
+            detailVenue = "竹影武馆", selectedLabel = "帮武馆跑腿", working = true,
+            completion = CompletionResult(true, 0, "PAYROLL_PAGE", "帮武馆跑腿"),
+        )
+        val (flow, _, _) = build(reader)
+        flow.authorise(
+            WorkStartAuthorisation.grant("竹影武馆", paotuId, 1, 0, 100, "test-operator", 1000L),
+        )
+        runBlocking { flow.run(target) }
+
+        val outcome = runBlocking { flow.waitAndVerify(target) }
+        assertTrue("expected Failed, got $outcome", outcome is WorkOutcome.Failed)
+        assertEquals("WORK_ACTUAL_MINUTES_UNREAD", (outcome as WorkOutcome.Failed).reason)
+        assertEquals(0, flow.sessionLedger.recordedSessions.size)
+    }
+
+    @Test
+    fun `aCompletionWhoseMinutesDisagreeWithTheStartedWorkIsNotASuccess`() {
+        // The page said 10 minutes before the tap; the payroll says 45. That is not the session that
+        // was started, so it must not be booked as one.
+        val reader = StubReader(
+            detailVenue = "竹影武馆", selectedLabel = "帮武馆跑腿", working = true,
+            completion = StubReader.payroll(minutes = 45),
+        )
+        val (flow, _, _) = build(reader)
+        flow.authorise(
+            WorkStartAuthorisation.grant("竹影武馆", paotuId, 1, 0, 100, "test-operator", 1000L),
+        )
+        runBlocking { flow.run(target) }
+
+        val outcome = runBlocking { flow.waitAndVerify(target) }
+        assertTrue("expected Failed, got $outcome", outcome is WorkOutcome.Failed)
+        assertTrue((outcome as WorkOutcome.Failed).reason.startsWith("WORK_ACTUAL_MINUTES_MISMATCH"))
+        assertEquals(0, flow.sessionLedger.recordedSessions.size)
+    }
+
+    @Test
+    fun `anUnreadWorkScoreStillBooksTheCoinPayoutWithoutClaimingTheFullReward`() {
+        // The coin half was measured (+68); the 工分 half was never readable. The session's coins are
+        // booked, but the score is preserved as Unknown so nothing claims the whole reward arrived.
+        val reader = StubReader(
+            detailVenue = "竹影武馆", selectedLabel = "帮武馆跑腿", working = true,
+            completion = StubReader.payroll(),
+        )
+        val (flow, sink, _) = build(
+            reader,
+            resources = StubResources(afterScore = null),
+        )
+        flow.authorise(
+            WorkStartAuthorisation.grant("竹影武馆", paotuId, 1, 0, 100, "test-operator", 1000L),
+        )
+        runBlocking { flow.run(target) }
+
+        val outcome = runBlocking { flow.waitAndVerify(target) }
+        assertTrue("expected Completed, got $outcome", outcome is WorkOutcome.Completed)
+        val completed = outcome as WorkOutcome.Completed
+        assertEquals(68, flow.sessionLedger.totalCoins)
+        // 工分 stays unread in the record set: no CONFIRMED_REWARD, and the delta rung carries Unknown.
+        val observed = completed.records.first { it.kind == RewardRecordKind.OBSERVED_DELTA }
+        assertTrue(observed.workScore is ObservedValue.Unknown)
+        assertFalse(completed.records.any { it.kind == RewardRecordKind.CONFIRMED_REWARD })
+        // The event says so out loud rather than reporting a clean PASS.
+        assertTrue(sink.emitted.any { it.third == "WORK_SCORE_UNREAD" })
+    }
+
+    @Test
+    fun `aCoinOnlyReadingIsNotDroppedFromTheRecords`() {
+        // The old buildRecords required BOTH coins and 工分 to be readable, which threw away the one
+        // number that had actually been measured. A coin-only reading must still produce the delta rung.
+        val reader = StubReader(
+            detailVenue = "竹影武馆", selectedLabel = "帮武馆跑腿", working = true,
+            completion = StubReader.payroll(),
+        )
+        val (flow, _, _) = build(
+            reader,
+            resources = StubResources(afterScore = null),
+        )
+        flow.authorise(
+            WorkStartAuthorisation.grant("竹影武馆", paotuId, 1, 0, 100, "test-operator", 1000L),
+        )
+        runBlocking { flow.run(target) }
+
+        val outcome = runBlocking { flow.waitAndVerify(target) }
+        assertTrue(outcome is WorkOutcome.Completed)
+        val observed = (outcome as WorkOutcome.Completed).records
+            .first { it.kind == RewardRecordKind.OBSERVED_DELTA }
+        assertEquals(68, (observed.coins as ObservedValue.Known).value)
+        assertTrue(observed.workScore is ObservedValue.Unknown)
+    }
+
+    // ------------------------------------------------------- budget reservation
+
+    @Test
+    fun `budgetIsReservedJustBeforeTheTapWithThePagesOwnDuration`() {
+        // The reservation must use the ACTUAL page duration and must happen only once a real tap is
+        // about to go out: earlier would spend budget on a start that may not happen, later would let
+        // a tap land with no budget reserved at all.
+        val reserved = mutableListOf<Int>()
+        val reader = StubReader(
+            detailVenue = "竹影武馆", selectedLabel = "帮武馆跑腿", working = true,
+            completion = StubReader.payroll(),
+        )
+        val (flow, _, _) = build(reader, beforeStart = { reserved += it })
+        flow.authorise(
+            WorkStartAuthorisation.grant("竹影武馆", paotuId, 1, 0, 100, "test-operator", 1000L),
+        )
+
+        // The preview must NOT reserve anything: a preview may never start work.
+        val previewed = runBlocking { flow.preview(target) }
+        assertTrue(previewed is WorkOutcome.Preview)
+        assertEquals("preview must not reserve budget", emptyList<Int>(), reserved)
+
+        runBlocking { flow.start(target) }
+        assertEquals(listOf(10), reserved)
+    }
+
+    @Test
+    fun `aBlockedStartReservesNoBudget`() {
+        // Every way a start can be refused must leave the budget untouched.
+        val reserved = mutableListOf<Int>()
+        val (flow, _, _) = build(
+            StubReader(detailVenue = "竹影武馆", selectedLabel = "帮武馆跑腿", working = true),
+            beforeStart = { reserved += it },
+        )
+        // No grant at all: nothing may be reserved.
+        val outcome = runBlocking { flow.start(target) }
+        assertTrue(outcome is WorkOutcome.Blocked)
+        assertEquals(emptyList<Int>(), reserved)
+
+        // Insufficient energy: the reservation sits after the energy check, so this must also be empty.
+        val (flow2, _, _) = build(
+            StubReader(detailVenue = "竹影武馆", selectedLabel = "帮武馆跑腿", working = true),
+            resources = StubResources(beforeEnergy = 1, afterEnergy = 1),
+            beforeStart = { reserved += it },
+        )
+        flow2.authorise(
+            WorkStartAuthorisation.grant("竹影武馆", paotuId, 1, 0, 100, "test-operator", 1000L),
+        )
+        // start() is only legal after a verified preview. The energy check sits after that, and the
+        // reservation sits after the energy check, so a short reading must still spend nothing.
+        val previewed = runBlocking { flow2.preview(target) }
+        assertTrue(previewed is WorkOutcome.Preview)
+        val second = runBlocking { flow2.start(target) }
+        assertTrue(second is WorkOutcome.Blocked)
+        assertEquals(emptyList<Int>(), reserved)
+    }
+
+    @Test
+    fun `aMissingStartButtonSpendsNoBudgetAndSendsNoTap`() {
+        // THE bug this closes. The 去打工 button is not on the page, so there is no work to start and
+        // no minute to charge. The old order reserved the budget first and only then went looking for
+        // the button, which booked the session's minutes for a shift that never existed.
+        val reserved = mutableListOf<Int>()
+        val reader = StubReader(
+            detailVenue = "竹影武馆", selectedLabel = "帮武馆跑腿", working = true,
+            startButton = null,
+        )
+        val (flow, _, _) = build(reader, beforeStart = { reserved += it })
+        flow.authorise(
+            WorkStartAuthorisation.grant("竹影武馆", paotuId, 1, 0, 100, "test-operator", 1000L),
+        )
+
+        val previewed = runBlocking { flow.preview(target) }
+        assertTrue("preview still runs with no button: $previewed", previewed is WorkOutcome.Preview)
+
+        val outcome = runBlocking { flow.start(target) }
+        assertTrue("expected Blocked, got $outcome", outcome is WorkOutcome.Blocked)
+        assertEquals("WORK_START_BUTTON_NOT_FOUND", (outcome as WorkOutcome.Blocked).reason)
+        // No budget, no tap, and the latch stays IDLE so a later run on a repaired page can proceed.
+        assertEquals("a missing button must spend no budget", emptyList<Int>(), reserved)
+        assertFalse(flow.startConfirmation.tapDelivered)
+        assertEquals(WorkPhase.BLOCKED, flow.state.phase)
+    }
+
+    @Test
+    fun `theReservationHappensAfterEverySafetyCheckAndImmediatelyBeforeTheTap`() {
+        // The ordering property, proven by an observed event log rather than by reading the source:
+        // the energy reading, the pre-start snapshot and the button location must all be recorded
+        // BEFORE the budget is committed, and the tap must be the next event after it. Anything
+        // reserved earlier is budget spent on a start that then gets refused; anything reserved later
+        // is a tap that landed with nothing booked.
+        val order = mutableListOf<String>()
+        val reader = StubReader(detailVenue = "竹影武馆", selectedLabel = "帮武馆跑腿", working = true)
+        val delegate = StubResources()
+        val resources = object : WorkResourceReader {
+            override fun readEnergy(): ObservedValue<Int> {
+                order += "energy"
+                return delegate.readEnergy()
+            }
+
+            override fun readCleanliness(): ObservedValue<Int> {
+                order += "cleanliness"
+                return delegate.readCleanliness()
+            }
+
+            override suspend fun snapshot(at: String): RewardRecord {
+                order += "snapshot"
+                return delegate.snapshot(at)
+            }
+        }
+        val (flow, _, _) = build(reader, resources = resources, events = order)
+        flow.authorise(
+            WorkStartAuthorisation.grant("竹影武馆", paotuId, 1, 0, 100, "test-operator", 1000L),
+        )
+        runBlocking { flow.preview(target) }
+        order.clear()
+
+        val started = runBlocking { flow.start(target) }
+        assertTrue("expected Started, got $started", started is WorkOutcome.Started)
+
+        // Everything that can still refuse the start ran first...
+        assertTrue("energy must be read before the reservation: $order", order.indexOf("energy") < order.indexOf("reserve"))
+        assertTrue("snapshot must be taken before the reservation: $order", order.indexOf("snapshot") < order.indexOf("reserve"))
+        assertTrue("the button must be located before the reservation: $order", order.indexOf("locate") < order.indexOf("reserve"))
+        // ...and the tap is the last thing, immediately after it.
+        assertEquals("reserve", order[order.size - 2])
+        assertEquals("tap", order[order.size - 1])
+        assertEquals(1, order.count { it == "reserve" })
+        assertEquals(1, order.count { it == "tap" })
     }
 }

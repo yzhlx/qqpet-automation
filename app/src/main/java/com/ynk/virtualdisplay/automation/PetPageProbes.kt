@@ -67,6 +67,22 @@ object PetPageProbes {
      */
     val foodScene = mvp("food_scene", 480, 690, 690, 960)
 
+    /**
+     * Empty-cookie stock proof only: the bottom 「兑换食物」 bubble on the food scene.
+     * Measured 2026-10-22 from the live zero-stock frame
+     * `.build-tmp/device-acceptance/care-feed-scene.png` at [275,1330,450,1420).
+     * Present only while cookie stock is empty; absent after a purchase lands on the plate.
+     * Never page identity — always scored after foodScene has already matched.
+     */
+    val foodExchangeBubble = mvp("food_exchange_bubble", 275, 1330, 450, 1420)
+
+    /**
+     * Empty-soap stock proof: the bottom 「兑换洗澡道具」 bubble on the bath scene.
+     * Measured 2026-10-22 from the live zero-stock frame care-bath-now.png at [250,1330,470,1420).
+     * Present only while soap stock is empty. Never page identity.
+     */
+    val bathExchangeBubble = mvp("bath_exchange_bubble", 250, 1330, 470, 1420)
+
     /** Measured soap gesture/tap target on the bath page. Target only, never page identity. */
     val soap = mvp("soap", 280, 1280, 440, 1400)
 
@@ -79,6 +95,24 @@ object PetPageProbes {
     val bath = mvp("bath", 10, 690, 260, 990)
 
     val outdoor = experimental("outdoor", 126, 610, 275, 663)
+
+    /**
+     * QQ HOST page identity: the orange 宠物 mini-program icon in the search result's 功能 row.
+     *
+     * The pet mini-program is hosted by QQ, so the mini-program's own back arrow can pop the
+     * whole mini-program and leave the QQ search page behind (measured 2026-10-21, session
+     * 68564b34: the outdoor-map back arrow at (80,160) landed on the QQ search page instead of
+     * the pet room, and the session died with PAGE_MISMATCH:...:51-health-return-home-after).
+     * Recovering from that needs a positive proof that the pet app is GONE, which this icon
+     * gives: it exists only on the QQ host page.
+     *
+     * The asset is an exact raw-pixel crop of a real VD4 frame (`.build-tmp/vd4.png`, the QQ
+     * search page after the mini-program closed), 104x104 at [48,451,152,555). Host-side replay
+     * of the shipping matcher: 1.000000 on that QQ frame and at most 0.787466 on the pet room,
+     * the outdoor map, the academy map, the course panel and the QQ search page before the
+     * 结果 row is shown - a wide margin under the unchanged 0.97 threshold.
+     */
+    val qqHostSearch = experimental("qq_host_search", 48, 451, 152, 555)
     val academy = experimental("academy", 330, 158, 346, 177)
     val highFive = experimental("high_five", 284, 344, 355, 400)
     val gradeA = experimental("grade_a", 545, 385, 695, 525)
@@ -87,7 +121,7 @@ object PetPageProbes {
     val careUpgradeReward = experimental("care_upgrade_reward", 240, 1020, 480, 1080)
 
     fun byName(): Map<String, PetProfile.Probe> = listOf(
-        home, room, healthPanel, cookie, foodScene, soap, bath, outdoor, academy, highFive,
-        gradeA, upgrade, careUpgradeHint, careUpgradeReward,
+        home, room, healthPanel, cookie, foodScene, foodExchangeBubble, soap, bath, bathExchangeBubble, outdoor, academy, highFive,
+        gradeA, upgrade, careUpgradeHint, careUpgradeReward, qqHostSearch,
     ).associateBy { it.name }
 }

@@ -23,7 +23,14 @@ class WorkCatalog(private val entries: List<WorkCatalogEntry> = defaultEntries()
         val confidence: RewardConfidence,
         val evidence: String,
         val caveat: String? = null,
+        /** Null means the entry fee has not been established; it never means zero. */
+        val entryFeeCoins: Int? = null,
+        val entryFeeEvidence: String? = null,
     )
+
+    fun verifiedZeroEntryIds(): Set<String> = entries.filter {
+        WorkEvidencePolicy.allowsUnknownBaseline(it, 0)
+    }.map { it.id }.toSet()
 
     fun find(venue: String, optionId: String): WorkCatalogEntry? =
         entries.firstOrNull { it.venue == venue && it.id == optionId }
@@ -84,6 +91,8 @@ class WorkCatalog(private val entries: List<WorkCatalogEntry> = defaultEntries()
                 cleanlinessCost = 2,
                 confidence = RewardConfidence.VERIFIED,
                 evidence = "docs/P5-01-career-discovery.md §5 真实打工闭环 2026-10-12 19:18",
+                entryFeeCoins = 0,
+                entryFeeEvidence = "2026-10-21 run13711e66: 消耗行仅体力5/清洁2，单次开工与10分钟工资68已确认",
             ),
             WorkCatalogEntry(
                 id = "work:竹影武馆/陪练基础课",

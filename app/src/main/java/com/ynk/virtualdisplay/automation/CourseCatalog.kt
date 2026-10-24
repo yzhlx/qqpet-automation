@@ -1,4 +1,4 @@
-package com.ynk.virtualdisplay.automation
+﻿package com.ynk.virtualdisplay.automation
 
 import android.content.Context
 import android.graphics.Rect
@@ -11,8 +11,8 @@ import java.io.File
  * One course as read off the academy list. [unlocked] is decided by the scanner from the row's
  * appearance; a locked course is recorded so the UI can show it, but it can never be selected.
  *
- * [durationMinutes] is a page reading, not a closed-loop measurement. The budget guard does not
- * trust it until the course is in [SessionPlan.KNOWN_COURSE_MINUTES].
+ * [durationMinutes] is a page reading. It can authorise a lesson only after a complete scan and a
+ * matching reading of the selected card immediately before the start.
  */
 data class CourseEntry(
     val id: String,
@@ -22,12 +22,15 @@ data class CourseEntry(
     /** Where the row sat on the screen when it was read, in display pixels. */
     val rowTop: Int,
     val rowBottom: Int,
+    val nameLeft: Int = 0,
+    val nameRight: Int = 0,
 ) {
     fun toJson(): JSONObject = JSONObject()
         .put("id", id).put("name", name)
         .put("durationMinutes", durationMinutes ?: JSONObject.NULL)
         .put("unlocked", unlocked)
         .put("rowTop", rowTop).put("rowBottom", rowBottom)
+        .put("nameLeft", nameLeft).put("nameRight", nameRight)
 
     companion object {
         fun idFor(name: String) = "study:$name"
@@ -39,6 +42,8 @@ data class CourseEntry(
             unlocked = json.getBoolean("unlocked"),
             rowTop = json.getInt("rowTop"),
             rowBottom = json.getInt("rowBottom"),
+            nameLeft = json.optInt("nameLeft", 0),
+            nameRight = json.optInt("nameRight", 0),
         )
     }
 }
@@ -59,6 +64,7 @@ fun interface CourseNameReader {
 data class CourseCatalog(
     val scannedAtMs: Long,
     val courses: List<CourseEntry>,
+    val complete: Boolean = false,
 ) {
     fun unlocked(): List<CourseEntry> = courses.filter { it.unlocked }
 
@@ -66,10 +72,13 @@ data class CourseCatalog(
 
     /** A catalog with no scan, or one older than the plan allows, must not authorise a lesson. */
     fun isFresh(nowMs: Long): Boolean =
-        scannedAtMs > 0 && nowMs - scannedAtMs <= SessionPlan.CATALOG_MAX_AGE_MS
+        scannedAtMs > 0 && nowMs >= scannedAtMs && nowMs - scannedAtMs <= SessionPlan.CATALOG_MAX_AGE_MS
+
+    fun isUsable(nowMs: Long): Boolean = complete && courses.isNotEmpty() && isFresh(nowMs)
 
     fun toJson(): JSONObject = JSONObject()
         .put("scannedAtMs", scannedAtMs)
+        .put("complete", complete)
         .put("courses", JSONArray().also { array -> courses.forEach { array.put(it.toJson()) } })
 
     companion object {
@@ -78,6 +87,7 @@ data class CourseCatalog(
             return CourseCatalog(
                 scannedAtMs = json.getLong("scannedAtMs"),
                 courses = (0 until array.length()).map { CourseEntry.fromJson(array.getJSONObject(it)) },
+                complete = json.optBoolean("complete", false),
             )
         }
     }
@@ -108,85 +118,132 @@ class CourseCatalogStore(context: Context) {
     }
 }
 
-/**
- * Turns one screen of OCR lines into course rows. Pure, so the row rules are testable without a
- * device or a model.
- *
- * A course row is a name line with a duration line ("10分钟") sitting beside it at the same
- * height. A name line with no duration beside it is not a course and is dropped, which is what
- * keeps panel titles and buttons out of the catalog. [locked] reports whether a row renders as
- * locked; the scanner passes that from the row's pixels, never from the text.
- */
+/** Pairs each card's name with the duration directly below its own horizontal centre. */
 object CourseListParser {
-    private val durationPattern = Regex("""(\d+)\s*分钟""")
-
-    /** A name starting further left than this is the clipped edge of a card, not a whole card. */
+    val durationPattern = Regex("""(\d+)\s*分钟""")
+    private val namePattern = Regex("""[\p{IsHan}]{2,20}""")
     const val NAME_MIN_LEFT = 40
 
     fun parse(lines: List<TextLine>, locked: (Rect) -> Boolean): List<CourseEntry> {
         val durations = lines.mapIndexedNotNull { index, line ->
-            durationPattern.find(line.text)?.groupValues?.get(1)?.toIntOrNull()?.let { Triple(it, index, line) }
+            durationPattern.find(line.text)?.groupValues?.get(1)?.toIntOrNull()
+                ?.takeIf { it in 1..DailyBudgetStore.HARD_STOP_MINUTES }
+                ?.let { Triple(it, index, line) }
         }
-        // Indices, not the lines themselves: TextLine's equality runs Rect.hashCode, which the JVM
-        // unit-test android.jar leaves unimplemented.
         val consumed = mutableSetOf<Int>()
-        return lines.mapIndexedNotNull { index, line ->
-            if (index in consumed) return@mapIndexedNotNull null
-            if (durationPattern.containsMatchIn(line.text)) return@mapIndexedNotNull null
-            val name = line.text.trim()
-            if (name.length < 2) return@mapIndexedNotNull null
-            // A card sliding in from the screen edge is only partly visible, and the recogniser
-            // reads that sliver as a course of its own. Such a line is cut off at the edge, so it
-            // never starts at the left margin the way a fully shown card does.
-            if (line.bounds.left < NAME_MIN_LEFT) return@mapIndexedNotNull null
-            val duration = durations.firstOrNull { (_, durationIndex, durationLine) ->
-                durationIndex !in consumed && aligned(line.bounds, durationLine.bounds)
-            } ?: return@mapIndexedNotNull null
-            val (_, durationIndex, durationLine) = duration
-            consumed += durationIndex
+        return lines.sortedBy { it.bounds.left }.mapNotNull { line ->
+            val rawName = line.text.trim().replace(" ", "")
+            // Exact observed glyph confusion, verified against the full card in the r7 scan frames.
+            // Do not rewrite arbitrary course suffixes or infer names for other accounts.
+            val name = if (rawName == "世界地理谋") "世界地理课" else rawName
+            if (!namePattern.matches(name) || line.bounds.left < NAME_MIN_LEFT) return@mapNotNull null
+            val candidates = durations.filter { (_, index, duration) ->
+                index !in consumed && aligned(line.bounds, duration.bounds)
+            }.sortedBy { (_, _, duration) ->
+                kotlin.math.abs(line.bounds.left + line.bounds.right - duration.bounds.left - duration.bounds.right)
+            }
+            val duration = candidates.firstOrNull() ?: return@mapNotNull null
+            // Two equally plausible readings cannot authorise a course.
+            if (candidates.size > 1 && centreGap(line.bounds, candidates[0].third.bounds) ==
+                centreGap(line.bounds, candidates[1].third.bounds)) return@mapNotNull null
+            consumed += duration.second
             CourseEntry(
-                id = CourseEntry.idFor(name),
-                name = name,
-                durationMinutes = duration.first,
-                // The name line's own box, not a freshly built Rect: the android.jar used for JVM
-                // tests keeps Rect's fields but its constructor never writes them, so a new Rect
-                // would hand the lock check an empty box and fail every row closed.
-                unlocked = !locked(line.bounds),
-                rowTop = line.bounds.top,
-                rowBottom = line.bounds.bottom,
+                id = CourseEntry.idFor(name), name = name, durationMinutes = duration.first,
+                unlocked = !locked(line.bounds), rowTop = line.bounds.top, rowBottom = line.bounds.bottom,
+                nameLeft = line.bounds.left, nameRight = line.bounds.right,
             )
         }
     }
 
-    /**
-     * Same row: the two boxes' vertical centres are at most the taller one's height apart. Overlap
-     * is the wrong test here. On a real course list the duration line ("用时: 10分钟") renders
-     * shorter than the name and sits just below it, so the two barely overlap and their centres are
-     * roughly one line apart. A full line of separation still cannot reach the next course.
-     */
+    /** Only whole cards in the calibrated panel may enter a scan or become a tap target. */
+    fun completeCards(lines: List<TextLine>, width: Int, height: Int, locked: (Rect) -> Boolean): List<CourseEntry> {
+        val panelLines = lines.filter { line ->
+            val box = line.bounds
+            box.top >= height * 0.46 && box.bottom <= height * 0.66 &&
+                box.left >= width * 0.065 && box.right <= width * 0.915
+        }
+        return parse(panelLines, locked).filter { course ->
+            val centre = (course.nameLeft + course.nameRight) / 2.0
+            // Measured card width 248px, panel viewport [48,672] on 720px. A sliver may
+            // contain complete-looking text, so checking only the name's bounds is insufficient.
+            centre - width * (124.0 / 720) >= width * (48.0 / 720) &&
+                centre + width * (124.0 / 720) <= width * (672.0 / 720)
+        }
+    }
+
+    private fun centreGap(a: Rect, b: Rect): Int =
+        kotlin.math.abs(a.left + a.right - b.left - b.right)
+
     private fun aligned(a: Rect, b: Rect): Boolean {
-        val aHeight = a.bottom - a.top
-        val bHeight = b.bottom - b.top
-        // Both sides are doubled, so this compares the real centre distance against the taller
-        // height without a division that would truncate.
-        val centreGap = kotlin.math.abs((a.top + a.bottom) - (b.top + b.bottom))
-        return centreGap <= 4 * maxOf(aHeight, bHeight)
+        val height = maxOf(a.bottom - a.top, b.bottom - b.top)
+        val below = b.top + b.bottom - a.top - a.bottom
+        return height > 0 && below in 0..4 * height && centreGap(a, b) <= 3 * height
     }
 }
 
-/**
- * Folds several scrolled screens into one catalog. A course whose name was already seen is kept
- * once, at the position of its first sighting, so scrolling back over the same rows cannot
- * duplicate them. [unchanged] is how the scanner knows it has reached the end of the list.
- */
+/** Merges overlapping pages without duplicates; conflicting readings fail instead of replacing facts. */
 object CourseScanAccumulator {
     data class Fold(val courses: List<CourseEntry>, val added: Int) {
         val unchanged: Boolean get() = added == 0
     }
 
     fun fold(collected: List<CourseEntry>, screen: List<CourseEntry>): Fold {
-        val known = collected.map { it.name }.toMutableSet()
-        val fresh = screen.filter { known.add(it.name) }
-        return Fold(collected + fresh, fresh.size)
+        val merged = collected.associateBy { it.id }.toMutableMap()
+        var added = 0
+        screen.forEach { course ->
+            val previous = merged[course.id]
+            if (previous == null) {
+                merged[course.id] = course
+                added++
+            } else {
+                check(previous.durationMinutes == course.durationMinutes) { "COURSE_SCAN_DURATION_CONFLICT:${course.name}" }
+                check(previous.unlocked == course.unlocked) { "COURSE_SCAN_LOCK_CONFLICT:${course.name}" }
+            }
+        }
+        val courses = merged.values.toList()
+        refuseAmbiguousReadings(courses)
+        return Fold(courses, courses.size - collected.size)
     }
+
+    /**
+     * Refuses a scan in which one card was read two different ways.
+     *
+     * Measured on device (2026-10-19): the same card came back as 看图识世界课 in one frame and
+     * 看圈识世界课 in another, and 闪亮自我表达课 as both 闪亮自我表达谍 and 闪亮自我表达谋. Id-based
+     * folding keeps every spelling, so one card silently becomes two or three courses and an
+     * over-reported catalog is saved as complete.
+     *
+     * Picking a winner is not available: each misreading occurs once per page while the true reading
+     * may occur fewer times (the strip shows each card on two consecutive pages, and a misread can
+     * repeat), so neither first-seen nor most-frequent identifies the real name. Two readings of one
+     * card are therefore equally plausible, which under this file's standing rule — conflicting
+     * readings fail instead of replacing facts — means the scan fails and the previous catalog is
+     * kept. A name nobody can spell consistently could not be selected on the course page anyway:
+     * [CourseRowLocator] matches a plan's course by exact name.
+     *
+     * Card geometry is fixed (248px wide, 264px centre pitch), so two readings describe one card
+     * exactly when the durations and lock states match, the lengths match, and one or two glyphs
+     * differ. Distinct courses of equal length differ in most of their glyphs and are untouched.
+     */
+    internal fun refuseAmbiguousReadings(courses: List<CourseEntry>) {
+        for (i in courses.indices) for (j in i + 1 until courses.size) {
+            val a = courses[i]
+            val b = courses[j]
+            if (sameCardReadDifferently(a, b)) {
+                error("COURSE_SCAN_NAME_AMBIGUOUS:${a.name}|${b.name}")
+            }
+        }
+    }
+
+    private fun sameCardReadDifferently(a: CourseEntry, b: CourseEntry): Boolean {
+        if (a.durationMinutes != b.durationMinutes) return false
+        if (a.unlocked != b.unlocked) return false
+        if (a.name.length != b.name.length) return false
+        var different = 0
+        for (k in a.name.indices) if (a.name[k] != b.name[k]) different++
+        return different in 1..OCR_VARIANT_DISTANCE
+    }
+
+    /** Glyphs allowed to differ between two readings of one card's name. */
+    const val OCR_VARIANT_DISTANCE = 2
 }

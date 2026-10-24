@@ -50,11 +50,29 @@ object PetHealthCheck {
         val track = Color.rgb(214, 208, 197)
         fun near(pixel: Int, color: Int) = abs(Color.red(pixel) - Color.red(color)) <= 8 &&
             abs(Color.green(pixel) - Color.green(color)) <= 8 && abs(Color.blue(pixel) - Color.blue(color)) <= 8
-        fun barPresent(pixel: Int, color: Int) = near(pixel, color) || near(pixel, track)
+        // Panel presence is proven by a RUN of fill-or-track pixels along the bar row, not by one
+        // anchor pixel. A single anchor lands on the fill/track boundary's anti-aliased gradient at
+        // low values (measured 2026-10-20: cleanliness 5 put (330,320) at (112,201,20), neither fill
+        // nor track within tolerance, and the session died in BAR_UNCONFIRMED). The page background
+        // is ~(252,246,231), far outside both tolerances, so an absent panel still fails closed.
+        fun barPresent(rowY: Int, color: Int): Boolean {
+            var run = 0
+            for (x in 318..504) {
+                val p = frame.getPixel(x, rowY)
+                if (near(p, color) || near(p, track)) {
+                    run++
+                    if (run >= BAR_RUN_PX) return true
+                } else run = 0
+            }
+            return false
+        }
         val values = ys.zip(colors).map { (y, color) ->
-            check(barPresent(frame.getPixel(330, y), color)) { "Health panel absent or occluded" }
-            val end = (330..504).takeWhile { near(frame.getPixel(it, y), color) }.lastOrNull() ?: 329
-            ((end + 1 - 318) * 100.0 / 188).roundToInt().coerceIn(0, 100)
+            check(barPresent(y, color)) { "Health panel absent or occluded" }
+            // No fill colour from x=330 on means the bar is empty (the left cap alone is too short
+            // to reach the scan), so the reading is the empty bar's own left edge.
+            val end = (330..505).takeWhile { near(frame.getPixel(it, y), color) }.lastOrNull()
+                ?: BAR_LEFT_EDGE - 1
+            barValue(end)
         }
         // Require solid bar colour past the measured 90% boundary. This is conservative
         // around the rounded end cap; a borderline reading never authorizes a course.
@@ -63,4 +81,34 @@ object PetHealthCheck {
         }
         return Health(values[0], values[1], values[2], ready)
     }
+
+    /** Consecutive fill-or-track pixels along one bar row that prove the panel is present. */
+    private const val BAR_RUN_PX = 8
+
+    /**
+     * The number a filled pixel bar reports when its last fully coloured pixel is [end].
+     *
+     * Geometry measured on FOA_AL00 2026-10-21 (session 1792549392632, frames
+     * round-1-20/26/34-open-health-after.png) and cross-checked against the game's own digits
+     * (体力 93/100/12, 清洁 61/6, 心情 20/21/2, plus the older 72/76/15 samples): the bar's fill
+     * starts at the rounded left cap and ends at BAR_LEFT + BAR_WIDTH * value / 100.
+     *
+     * The old normalization ((end + 1 - 318) * 100 / 188, rounded) divided by 188 while counting
+     * the fill from 318, so a FULL bar (fill through x=504) read 99 instead of 100 and the low end
+     * over-read by one to two points (体力 12 read 13). A threshold of 100 was therefore
+     * unreachable: the care loop fed a pet that was already full, the measured gain was 0 and the
+     * session died with FEED_NO_EXPECTED_GAIN_OR_EMPTY (measured 2026-10-21, session 1792549392632).
+     *
+     * The fitted line reproduces ten of the eleven measured digits exactly; the eleventh (心情 2)
+     * reads 3, an over-read in the harmless direction because the digit always wins the minimum.
+     */
+    fun barValue(end: Int): Int =
+        ((end + 1 - BAR_LEFT) * 100.0 / BAR_WIDTH).roundToInt().coerceIn(0, 100)
+
+    /** Left edge of the measured bar fill, in the health panel's own pixels. */
+    private const val BAR_LEFT = 320.4
+    /** Width of the measured bar, in the health panel's own pixels. */
+    private const val BAR_WIDTH = 184.6
+    /** First pixel of the measured bar track, used as the empty bar's boundary. */
+    private const val BAR_LEFT_EDGE = 318
 }

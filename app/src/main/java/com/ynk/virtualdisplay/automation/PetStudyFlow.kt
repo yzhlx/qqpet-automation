@@ -11,24 +11,83 @@ import org.json.JSONObject
 import java.io.File
 
 /** Existing measured learning chain, separate from the experimental runner. */
-class PetStudyFlow(private val flow: PetFlowContext,private val navigation: PetNavigation,private val ledger:PetRoundLedger,private val courses:CourseSelector?=null) {
-    suspend fun start(ready:PetCareReading,plan:SessionPlan=SessionPlan()):JSONObject = with(flow) {
+class PetStudyFlow(private val flow: PetFlowContext,private val navigation: PetNavigation,private val ledger:PetRoundLedger,private val courses:CourseSelector?=null,
+    /** Optional text reader: the running-class panel prints 「正在学习」+ a 「剩余 mm:ss」timer, which
+     *  is a far more stable proof than the pixel template (measured 2026-10-21: the template held at
+     *  0.703 while the panel was clearly on screen). Confirmation via this reader is POSITIVE ONLY; it
+     *  never relaxes the pixel threshold for a negative frame. */
+    private val learningTextReader: CourseNameReader? = null) {
+    /**
+     * Waits (bounded) for the running-class panel to be positively present, where present means the
+     * frame's TEXT shows 「正在学习」+timer OR the pixel template clears the threshold. Returns the
+     * still-live frame; the caller recycles it. A frame that never proves the panel is a real stop.
+     */
+    private suspend fun awaitLearningPanel(name: String, saveAs: String?): Bitmap = with(flow) {
+        val deadline = SystemClock.elapsedRealtime() + 8_000
+        var lastPixels = 0.0
+        while (SystemClock.elapsedRealtime() < deadline) {
+            val f = frame(latest = true)
+            val ok = try {
+                lastPixels = score(f, profile.learningProbes)
+                learningTextConfirmed(f) || lastPixels >= profile.matchThreshold
+            } catch (t: Throwable) { f.recycle(); throw t }
+            if (ok) {
+                if (saveAs != null) try { save(f, saveAs) } catch (_: Throwable) {}
+                return@with f
+            }
+            f.recycle()
+            kotlinx.coroutines.delay(300)
+        }
+        error("PAGE_MISMATCH:$name:$lastPixels:LEARNING_PANEL_UNCONFIRMED")
+    }
+
+    /** True when the frame's recognised text shows the running-class panel header. */
+    private suspend fun learningTextConfirmed(frame: Bitmap): Boolean {
+        val reader = learningTextReader ?: return false
+        return try {
+            LearningPanelObserver(reader).confirms(frame)
+        } catch (t: Throwable) {
+            if (t is kotlinx.coroutines.CancellationException) throw t
+            false
+        }
+    }
+    suspend fun start(ready:PetCareReading?=null,plan:SessionPlan=SessionPlan(),timing:CourseTiming?=null,
+        beforeStart:(Int)->Unit={},freshReady:(suspend ()->PetCareReading)?=null,
+        ensureTuition:suspend ()->Unit={}):JSONObject = with(flow) {
                 state="SELECT_COURSE"
                 val navigationStart=SystemClock.elapsedRealtime()
-                navigation.tap(room,PointF(360f,1390f),outdoor,"outdoor")
+                navigation.enterOutdoor("outdoor")
                 // A selector finds the plan's course by name and proves the detail page. Without
                 // one, the only course ever measured on this device is tapped at its fixed point.
-                if(courses!=null) courses.select(plan)
-                else {
+                val minutes=if(courses!=null) {
+                    val expected=checkNotNull(timing) {"COURSE_TIMING_REQUIRED"}
+                    val selected=courses.select(plan)
+                    expected.confirmDetail(selected.name,selected.durationMinutes ?: error("COURSE_DURATION_UNREAD"))
+                    expected.durationMinutes
+                } else {
                     check(plan.courseId==SessionPlan.DEFAULT_COURSE_ID) {"COURSE_SELECTOR_REQUIRED:${plan.courseId}"}
                     navigation.openAcademyCourseList()
                     navigation.tap(profile.courseListProbe,profile.courseButton,profile.courseDetailProbe,"select-fixed-course")
+                    plan.courseDurationMinutes()
+                }
+                ensureTuition()
+                val currentReady=freshReady?.invoke() ?: ready
+                if(courses!=null) {
+                    val selected=courses.confirm(plan)
+                    timing!!.confirmDetail(selected.name,selected.durationMinutes ?: error("COURSE_DURATION_UNREAD"))
                 }
                 state="START_COURSE"
-                verify(listOf(profile.courseDetailProbe),"course-before-start",latest=true)
-                PetStudyHealthPolicy.requireReady(ready.observations,System.currentTimeMillis(),plan.energyThreshold,plan.cleanlinessThreshold)
+                verify(listOf(if(courses!=null) profile.courseListProbe else profile.courseDetailProbe),"course-before-start",latest=false)
+                // User rule (2026-10-21): the lesson's own requirements are the course, its real
+                // tuition and the daily minutes. 体力/清洁 are recorded observations, never a start
+                // gate: a paid-for lesson must not stop on a low, stale or unreadable health value.
+                emit("study-start-health-observation",result=if(currentReady==null) "NOT_REQUESTED" else
+                    "energy=${currentReady.observations.energy.fields()["status"]} cleanliness=${currentReady.observations.cleanliness.fields()["status"]}")
                 ledger.startAttempt(round)
-                safety();val start=SystemClock.elapsedRealtime();val startWall=System.currentTimeMillis()
+                safety()
+                beforeStart(minutes)
+                emit("course-budget-reserved",result="course=${plan.courseId} minutes=$minutes")
+                val start=SystemClock.elapsedRealtime();val startWall=System.currentTimeMillis()
                 input.tap(profile.startButton.x,profile.startButton.y);delay(profile.pageSettleMs)
                 // Actual run: the first fresh frame after Start was an academy transition.
                 // Read-only settling does not repeat input or relax the matching threshold.
@@ -43,28 +102,35 @@ class PetStudyFlow(private val flow: PetFlowContext,private val navigation: PetN
                     val current=frame()
                     try {
                         val learningScore=score(current,profile.learningProbes)
+                        // Text proof first: the panel header is unambiguous where the pixel template
+                        // is not. Only a POSITIVE text read confirms; a negative one falls through to
+                        // the unchanged pixel threshold, so this never turns a wrong page into a pass.
+                        val textConfirmed = learningTextConfirmed(current)
                         emit("course-start-observe",learningScore,capture.telemetry()
-                            .put("result",if(learningScore>=profile.matchThreshold) "PASS" else "SETTLING").toString())
-                        if(learningScore>=profile.matchThreshold) {
+                            .put("textConfirmed",textConfirmed)
+                            .put("result",if(textConfirmed||learningScore>=profile.matchThreshold) "PASS" else "SETTLING").toString())
+                        if(textConfirmed||learningScore>=profile.matchThreshold) {
                             save(current,"course-start");recovery.confirm(round,"LEARNING","LEARNING");learningConfirmed=true;break
                         }
                     } finally {current.recycle()}
                     delay(300)
                 }
                 check(learningConfirmed) { "LEARNING_NOT_CONFIRMED_AFTER_START" }
-                capture.facts.events.append(EventSource.GAME_OBSERVATION,EventKind.COURSE_STARTED,mapOf("round" to round,"course" to plan.courseId),listOf(evidence.absolutePath))
+                capture.facts.events.append(EventSource.GAME_OBSERVATION,EventKind.COURSE_STARTED,mapOf("round" to round,"course" to plan.courseId,"durationMinutes" to minutes),listOf(evidence.absolutePath))
                 capture.facts.events.append(EventSource.GAME_OBSERVATION,EventKind.LEARNING_CONFIRMED,mapOf("round" to round),listOf(evidence.absolutePath))
-                val course=JSONObject().put("name",plan.courseName).put("courseId",plan.courseId).put("courseStartElapsedRealtime",start)
+                val course=JSONObject().put("name",plan.courseName).put("courseId",plan.courseId).put("durationMinutes",minutes).put("courseStartElapsedRealtime",start)
                     .put("start_ts",startWall).put("enter_course_ms",start-navigationStart)
                 ledger.started(round)
                 course
     }
     suspend fun highFiveWindow(start: Long, course: JSONObject) = with(flow) {
         state="WAIT_HIGH_FIVE_WINDOW"
-        while(SystemClock.elapsedRealtime()-start<30000) {
-            verify(profile.learningProbes,"learning-wait",false)
-            delay(minOf(1000L,30000-(SystemClock.elapsedRealtime()-start)).coerceAtLeast(1))
-        }
+        StudyEncouragementWindow.await(start,SystemClock::elapsedRealtime,
+            observe={
+                val f=frame(latest=true)
+                try { learningTextConfirmed(f) || score(f,profile.learningProbes)>=profile.matchThreshold }
+                finally { f.recycle() }
+            },wait={delay(it)})
         course.put("high_five_attempted",true).put("high_five_target_count",10)
         var sent=0; var first: Long?=null; var last: Long?=null; var bestScore=0.0
         val began=SystemClock.elapsedRealtime()
@@ -76,11 +142,10 @@ class PetStudyFlow(private val flow: PetFlowContext,private val navigation: PetN
         var targetDeadline=0L
         while(sent<10) {
             // The live learning panel can move vertically between captures, and the click
-            // animation of a previous tap can hide it for a moment. Require a positively
-            // matched frame (bounded retry) instead of accepting one transient miss, and
-            // never send the next tap while the learning page is unconfirmed.
-            val f=settleLatest(profile.learningProbes,"high-five-${sent+1}-before",
-                if(sent==0) "before-high-five" else null)
+            // animation of a previous tap can hide it for a moment. Require the panel to be
+            // positively present (text OR pixel, bounded retry) instead of accepting one transient
+            // miss, and never send the next tap while the learning page is unconfirmed.
+            val f=awaitLearningPanel("high-five-${sent+1}-before", if(sent==0) "before-high-five" else null)
             if(targetDeadline==0L) targetDeadline=SystemClock.elapsedRealtime()+20000
             val s=try { score(f,listOf(highFive)) } finally { f.recycle() }
             bestScore=maxOf(bestScore,s)
@@ -108,23 +173,25 @@ class PetStudyFlow(private val flow: PetFlowContext,private val navigation: PetN
                 .put("displayId",4).put("tapIndex",sent).put("tapLimit",10)
                 .put("targetSelected",true).put("currentTargetScore",s).put("offsetMs",offset)
                 .put("result","INPUT_SENT_BUSINESS_UNCONFIRMED").toString())
-            verifySettled(profile.learningProbes,"high-five-$sent-after")
+            awaitLearningPanel("high-five-$sent-after", null).recycle()
             delay(80)
         }
-        verify(profile.learningProbes,"after-high-five")
+        awaitLearningPanel("after-high-five", null).recycle()
         course.put("high_five_sent_count",sent).put("high_five_success_count",JSONObject.NULL)
             .put("high_five_first_offset_ms",first?:JSONObject.NULL).put("high_five_last_offset_ms",last?:JSONObject.NULL)
             .put("high_five_duration_ms",SystemClock.elapsedRealtime()-began).put("high_five_match_score",bestScore)
             .put("high_five_result",when(sent) {0->"MISS";10->"SENT_UNCONFIRMED";else->"PARTIAL"})
         emit("high-five-summary",bestScore,course.toString())
     }
-    suspend fun waitResult(start:Long):JSONObject = with(flow) {
+    suspend fun waitResult(start:Long, durationMinutes:Int = 10):JSONObject = with(flow) {
+                require(durationMinutes in 1..DailyBudgetStore.HARD_STOP_MINUTES)
+                val timeoutMs=durationMinutes * 60_000L + 90_000L
                 var resultGrade="UNKNOWN"
                 state="WAIT_RESULT"
                 val waitStart=SystemClock.elapsedRealtime()
                 var found=false
                 var unconfirmedSince: Long?=null
-                while(SystemClock.elapsedRealtime()-start<690000) {
+                while(SystemClock.elapsedRealtime()-start<timeoutMs) {
                     val f=frame()
                     try {
                         val rs=score(f,listOf(profile.resultProbe))
@@ -136,7 +203,8 @@ class PetStudyFlow(private val flow: PetFlowContext,private val navigation: PetN
                             resultGrade=grade;found=true;break
                         }
                         val learningScore=score(f,profile.learningProbes)
-                        if(learningScore>=profile.matchThreshold) {
+                        val stillLearning = learningScore>=profile.matchThreshold || learningTextConfirmed(f)
+                        if(stillLearning) {
                             recovery.confirm(round,state,"LEARNING");unconfirmedSince=null
                             emit("learning-confirmed",learningScore)
                         }
