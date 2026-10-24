@@ -50,6 +50,24 @@ jobs:
       - name: Unit tests
         run: ./gradlew testDebugUnitTest --stacktrace --no-daemon
 
+      - name: Summarize failed tests
+        if: failure()
+        run: |
+          python3 - <<'PY'
+          import glob, xml.etree.ElementTree as ET
+          total = failed = 0
+          for f in glob.glob('app/build/test-results/**/*.xml', recursive=True):
+              suite = ET.parse(f).getroot()
+              for case in suite.iter('testcase'):
+                  total += 1
+                  bad = case.find('failure') if case.find('failure') is not None else case.find('error')
+                  if bad is not None:
+                      failed += 1
+                      msg = (bad.get('message') or bad.text or '').strip().splitlines()
+                      print(f"FAILED {case.get('classname')}.{case.get('name')}: {msg[0][:300] if msg else ''}")
+          print(f"SUMMARY {failed} failed of {total}")
+          PY
+
       - name: Build debug APK
         run: ./gradlew assembleDebug --stacktrace --no-daemon
 
