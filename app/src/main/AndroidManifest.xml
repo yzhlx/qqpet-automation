@@ -65,6 +65,16 @@
                 android:value="User-started, local, time-bounded automation on an app-owned virtual display" />
         </service>
 
+        <service
+            android:name=".bot.BotService"
+            android:exported="false"
+            android:stopWithTask="true"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="User-started, local automation on an app-owned virtual display" />
+        </service>
+
     </application>
 
 </manifest>

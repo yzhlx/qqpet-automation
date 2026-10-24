@@ -34,6 +34,7 @@ import com.ynk.virtualdisplay.data.model.ShizukuState
 import com.ynk.virtualdisplay.data.repository.ShizukuDisplayRepository
 import com.ynk.virtualdisplay.ui.kit.PetGlyph
 import com.ynk.virtualdisplay.ui.kit.PetIcon
+import com.ynk.virtualdisplay.ui.screens.BotScreen
 import com.ynk.virtualdisplay.ui.screens.PetCalibrationScreen
 import com.ynk.virtualdisplay.ui.screens.PetHomeScreen
 import com.ynk.virtualdisplay.ui.screens.PetLogScreen
@@ -152,11 +153,10 @@ private fun PetApp(uiState: MainUiState, viewModel: MainViewModel) {
                 OverlayScreen.NONE -> when (uiState.currentTab) {
                     ScreenTab.HOST -> Column(Modifier.fillMaxSize()) {
                         PetTitleBar("宠物托管")
-                        PetHomeScreen(
-                            viewModel = viewModel,
-                            onOpenPlanSheet = { viewModel.openOverlay(OverlayScreen.PLAN_SHEET) },
-                            onOpenLogs = { viewModel.openOverlay(OverlayScreen.LOGS) },
-                        )
+                        BotScreen(displayId = uiState.displays.firstOrNull {
+                            it.width == com.ynk.virtualdisplay.automation.PetProfile.calibrated().displayWidth &&
+                                it.height == com.ynk.virtualdisplay.automation.PetProfile.calibrated().displayHeight
+                        }?.id)
                     }
 
                     ScreenTab.RECORDS -> Column(Modifier.fillMaxSize()) {
