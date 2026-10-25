@@ -16,7 +16,10 @@ class PetFlowContext(val context: Context, val capture: HeadlessDisplayCapture,
     val logger: (String, Double?, String, String, String?) -> Unit,
     val onObservation: (String,Double?) -> Unit = {_,_->},
     val onRecovery: (SessionRunState,String,Int)->Unit = {_,_,_->},
-    val reconcile: (SessionCheckpoint,String)->Boolean={_,_->false}) {
+    val reconcile: (SessionCheckpoint,String)->Boolean={_,_->false},
+    val energyThreshold: Int = SessionPlan.DEFAULT_THRESHOLD,
+    val cleanlinessThreshold: Int = SessionPlan.DEFAULT_THRESHOLD,
+    learningEvidence: (suspend (Bitmap)->Boolean)? = null) {
     val profile=PetProfile.calibrated()
     val matcher=TemplateMatcher(context)
     var round=0
@@ -32,11 +35,15 @@ class PetFlowContext(val context: Context, val capture: HeadlessDisplayCapture,
     val cookie = PetPageProbes.cookie
     /** FOOD page IDENTITY: the stable floor/cushion scene region, never the cookie plate. */
     val foodScene = PetPageProbes.foodScene
+    val foodExchangeBubble = PetPageProbes.foodExchangeBubble
+    val bathExchangeBubble = PetPageProbes.bathExchangeBubble
     val soap = PetPageProbes.soap
     /** Bath page IDENTITY: stable scene region, never the pale-repainting soap button. */
     val bath = PetPageProbes.bath
     val outdoor = PetPageProbes.outdoor
     val academy = PetPageProbes.academy
+    /** QQ HOST page: proof that the pet mini-program is gone and QQ's search page is showing. */
+    val qqHostSearch = PetPageProbes.qqHostSearch
     val highFive = PetPageProbes.highFive
     val gradeA = PetPageProbes.gradeA
     val upgrade = PetPageProbes.upgrade
@@ -44,11 +51,19 @@ class PetFlowContext(val context: Context, val capture: HeadlessDisplayCapture,
     val careUpgradeReward = PetPageProbes.careUpgradeReward
     val recovery=PetRecoveryBoundary(context,capture,guard,
         (listOf(home,room,healthPanel,cookie,foodScene,soap,bath,outdoor,academy,highFive,profile.resultProbe,
-            profile.courseListProbe,profile.courseDetailProbe)).associate {it.name to listOf(it)}+
+            profile.courseListProbe,profile.courseDetailProbe,qqHostSearch)).associate {it.name to listOf(it)}+
             mapOf("LEARNING" to profile.learningProbes),onState=onRecovery,reconcile=reconcile,
-            validateHealth=PetStudyHealthPolicy::requireReady)
+            // Recovery around a lesson start must NOT re-impose the care thresholds: a paid-for lesson
+            // is gated by course/tuition/minutes, so this only proves a health value was actually READ
+            // (no Unknown/Stale masquerading as data). A low value is fine; an unreadable one is not
+            // allowed to authorise anything either, but it can no longer block the lesson itself.
+            validateHealth={health,at -> health.current(at);Unit},learningEvidence=learningEvidence)
     suspend fun safety() {
-        recovery.boundary(round,state,state=="START_COURSE")
+        // START_COURSE used to mark health as required, which turned every app restart or capture
+        // hiccup during the lesson-start window into RECOVERY_HEALTH_UNCONFIRMED and stopped a lesson
+        // the pet could pay for. The lesson's inputs are idempotent-guarded by the flow itself (one
+        // tap, then confirm), so recovery only needs the PAGE to match.
+        recovery.boundary(round,state,false)
         recovery.beforeBoundary()
         guard()
         check(!(context.getSystemService(Context.KEYGUARD_SERVICE) as KeyguardManager).isKeyguardLocked) { "PHONE_LOCKED" }
@@ -57,7 +72,7 @@ class PetFlowContext(val context: Context, val capture: HeadlessDisplayCapture,
         onObservation(state, score)
         logger(state, score, "round-$round:$action", result, reason)
         if(reason!=null) capture.facts.events.append(EventSource.APP_AUTOMATION,EventKind.ERROR,
-            mapOf("state" to state,"action" to action,"reason" to reason),listOf(evidence.absolutePath))
+            sessionErrorEventPayload(state, action, result, reason),listOf(evidence.absolutePath))
     }
     fun save(frame: Bitmap, name: String) {
         evidence.mkdirs()
@@ -85,7 +100,7 @@ class PetFlowContext(val context: Context, val capture: HeadlessDisplayCapture,
             emit(name,s,capture.telemetry().put("action",name).put("templateName",best.first.name)
                 .put("matchScore",s).put("result",if(s>=profile.matchThreshold) "PASS" else "FAIL").toString())
             check(s>=profile.matchThreshold) { "PAGE_MISMATCH:$state:$name:$s" }
-            recovery.confirm(round,state,if(best.first in profile.learningProbes) "LEARNING" else best.first.name,state=="START_COURSE")
+            recovery.confirm(round,state,if(best.first in profile.learningProbes) "LEARNING" else best.first.name,false)
             return s
         } finally { f.recycle() }
     }
@@ -101,7 +116,7 @@ class PetFlowContext(val context: Context, val capture: HeadlessDisplayCapture,
                 emit(name,lastScore,capture.telemetry().put("templateName",best.first.name)
                     .put("result",if(matched) "PASS" else "SETTLING").toString())
                 if(matched) {
-                    recovery.confirm(round,state,if(best.first in profile.learningProbes) "LEARNING" else best.first.name,state=="START_COURSE")
+                    recovery.confirm(round,state,if(best.first in profile.learningProbes) "LEARNING" else best.first.name,false)
                     save(current,name);return lastScore
                 }
             } finally {current.recycle()}
@@ -141,6 +156,6 @@ class PetFlowContext(val context: Context, val capture: HeadlessDisplayCapture,
     }
     fun healthJson(h: PetCareReading) = JSONObject().put("stamina",h.energy)
         .put("cleanliness",h.cleanliness)
-        .put("mood",JSONObject(h.observations.mood.at(System.currentTimeMillis(),60000).fields()))
+        .put("mood",JSONObject(h.observations.mood.fields()))
         .put("observations",JSONObject(h.observations.fields()))
 }

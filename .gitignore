@@ -40,3 +40,12 @@ evidence/screencap-err.txt
 /work/
 /tools/digit-recon/frames/
 /tools/digit-recon/__pycache__/
+
+# Local execution scratch and signing material must stay private.
+/.foreman/
+/phys-*.png
+__pycache__/
+*.pyc
+*.keystore
+*.jks
+.env*

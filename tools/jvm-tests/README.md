@@ -1,4 +1,4 @@
-﻿# JVM unit-test runners
+# JVM unit-test runners
 
 `gradle :app:testDebugUnitTest` cannot run in this project: the Gradle test
 worker writes and reads its own classpath @argfile, and with the project at
@@ -23,7 +23,10 @@ command.
     python tools/jvm-tests/capture_cp.py
 
     # Requires an already prepared .build-tmp/cp.lst and compiled classes.
-    python tools/jvm-tests/run_tests.py
+    python tools/jvm-tests/run_tests.py --log .build-tmp/junit-current.log
+
+    # Run only the relevant compiled classes during a fix; empty matches fail.
+    python tools/jvm-tests/run_tests.py '*Payroll*Test' --log .build-tmp/junit-payroll.log
 
 `capture_cp.py` copies a worker file to `.build-tmp/captured-classpath.txt`. It
 can select an older file and does not generate `cp.lst`. Before running the
@@ -35,8 +38,9 @@ after source changes; running this helper alone does not compile anything.
 
 `run_tests.py` writes `.build-tmp/junit.args` and starts JUnit in `app/`. These
 scratch files and the classpath list are ignored and are not included in Git.
-The helper currently prints JUnit's exit code but does not propagate a failing
-exit code to its own process, so check both the JUnit result and printed `EXIT`.
+The helper prints JUnit's `EXIT` value and propagates that exit code to its own
+process (updated 2026-10-21). Check the JUnit result as well as the process status;
+a successful shell alone does not prove that the classpath used fresh classes.
 
 The last recorded run returned `OK (273 tests)` and printed `EXIT 0`. This
 validates the compiled classes used for that run; it is not device acceptance.

@@ -4,6 +4,7 @@ import android.graphics.Bitmap
 import android.graphics.PointF
 import android.graphics.Rect
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.ensureActive
 import org.json.JSONObject
 import java.io.File
 
@@ -27,7 +28,14 @@ import java.io.File
  * readable, and the minus stepper clamps at 1, so the terminal state is always reachable.
  */
 class PetExchangeFlow(private val flow: PetFlowContext, private val navigation: PetNavigation,
-    private val budget: ExchangeBudget = ExchangeBudget()) {
+    private val budget: ExchangeBudget = ExchangeBudget(),
+    /** Legacy source-compatible argument; not a purchase authorization or wallet source. */
+    private val payGuard: ((Consumable, Int, Int, Int) -> Unit)? = null,
+    private val freshPayGuard: (suspend (Consumable,Int,Int,Int,ObservedValue<Int>)->Unit)? = null,
+    private val walletReader: DeviceWalletReader = DeviceWalletReader(MlKitCourseNameReader()),
+    private val beforeConsumingInput: ((Consumable)->Unit)? = null,
+) {
+    private val paymentAttempt=CarePaymentAttemptGate()
 
     val qtyReader: DialogDigitReader by lazy {
         DialogDigitReader(DialogDigitReader.parse(
@@ -153,13 +161,18 @@ class PetExchangeFlow(private val flow: PetFlowContext, private val navigation: 
      * tap could dismiss it or select something else). Returns the recorded allowance after the
      * dialog verifiably closed; the flow ends back on the scene.
      */
-    suspend fun buy(item: Consumable, quantity: Int, origin: String, dialogAlreadyOpen: Boolean = false): ExchangeBudget.Allowance = with(flow) {
+    suspend fun buy(item: Consumable, quantity: Int, origin: String, dialogAlreadyOpen: Boolean = false,
+        ownedCount: ObservedValue<Int>? = null): ExchangeBudget.Allowance = with(flow) {
+        paymentAttempt.requireNoPending()
+        val stock=ownedCount ?: error("CARE_PURCHASE_INVENTORY_UNCONFIRMED")
+        CareResourceGate.requirePurchase(stock,quantity,System.currentTimeMillis())
+        val authorize=freshPayGuard ?: error("CARE_FRESH_PAYMENT_GUARD_MISSING")
         state = "EXCHANGE_BUY"
         val unit = unitPrice(item)
         // Budget is a precondition: refuse BEFORE any dialog interaction.
         val allowance = budget.reserve(item.name, quantity, unit)
         budgetEvent("purchase-reserve", allowance, origin)
-        var payDelivered = false
+        var payAttempted = false
         var callsBefore = 0
         try {
             if (!dialogAlreadyOpen) {
@@ -176,10 +189,23 @@ class PetExchangeFlow(private val flow: PetFlowContext, private val navigation: 
             } finally { dialog.recycle() }
             val finalQty = stepTo(item, quantity)
             // Terminal full verification: quantity and pay total must both be readable numbers.
+            // Any recovery/navigation must precede the final same-frame payment proof.
+            safety()
+            val payObservationStartedMs=System.currentTimeMillis()
             val f = frame(latest = true)
-            val qtyRead: Int; val totalRead: Int
+            val qtyRead: Int; val totalRead: Int; val wallet: ObservedValue<Int>
             try {
+                check(f.width==720 && f.height==1600) { "EXCHANGE_DISPLAY_UNSUPPORTED" }
+                check(titleScore(f,item)>=0.95) { "EXCHANGE_DIALOG_UNCONFIRMED_BEFORE_PAY" }
+                check(matcher.match(f,selectedProbe(item),0.5).score>=0.90) { "EXCHANGE_PRODUCT_UNCONFIRMED_BEFORE_PAY" }
+                val observedAt=System.currentTimeMillis()
                 save(f, "exchange-before-pay")
+                val roi=ExchangeWalletParser.roiBounds()
+                val local=Bitmap.createBitmap(f,roi.left,roi.top,roi.width(),roi.height())
+                val walletEvidence=File(evidence,"round-$round-exchange-wallet-${System.nanoTime()}.png")
+                try { walletEvidence.outputStream().use { check(local.compress(Bitmap.CompressFormat.PNG,100,it)) } }
+                finally { if(local!==f) local.recycle() }
+                wallet=walletReader.readExchange(f,observedAt,walletEvidence.absolutePath,pageIdentityVerified=true)
                 val q = readQuantity(f)
                 check(q.known) { "EXCHANGE_QUANTITY_UNREADABLE:${q.reason}" }
                 qtyRead = q.value()
@@ -192,17 +218,30 @@ class PetExchangeFlow(private val flow: PetFlowContext, private val navigation: 
             check(totalRead == expected) { "EXCHANGE_TOTAL_MISMATCH:$totalRead!=$expected" }
             emit("exchange-verified", result = JSONObject().put("item", item.name).put("quantity", qtyRead)
                 .put("total", totalRead).put("unit", unit).toString())
-            // Pay. The tap baseline decides whether an unknown outcome could have spent coins.
+            CareResourceGate.requireWallet(wallet,totalRead,0,System.currentTimeMillis(),payObservationStartedMs)
+            authorize(item,qtyRead,unit,totalRead,wallet)
+            // Recheck freshness after the caller's suspendable tuition decision. No page recovery
+            // may run after this proof: it could replace the dialog that supplied the wallet.
+            CareResourceGate.requireWallet(wallet,totalRead,0,System.currentTimeMillis(),payObservationStartedMs)
+            emit("exchange-affordability",result=EventJson.encode(mapOf("total" to totalRead,
+                "unit" to unit,"wallet" to wallet.fields())))
+            beforeConsumingInput?.invoke(item)
+            CareResourceGate.requireWallet(wallet,totalRead,0,System.currentTimeMillis(),payObservationStartedMs)
+            kotlinx.coroutines.currentCoroutineContext().ensureActive()
+            guard()
             callsBefore = input.injectionAttempts
-            safety(); input.tap(360f, 1425f)
-            payDelivered = input.injectionAttempts > callsBefore
+            paymentAttempt.beforePay()
+            payAttempted = true
+            input.tap(360f, 1425f)
             confirmClosed(item)
+            paymentAttempt.confirmedPaid()
             allowance.confirmPaid()
             budgetEvent("purchase-paid", allowance, "total=$totalRead")
             emit("exchange-paid", result = JSONObject().put("item", item.name).put("quantity", qtyRead)
                 .put("total", totalRead).put("origin", origin).toString())
         } catch (t: Throwable) {
             // No re-pay here and no second attempt anywhere: an unconfirmed outcome is retained.
+            val payDelivered = consumableDeliveryEvidence(payAttempted,callsBefore,input.injectionAttempts)>0
             val outcome = allowance.settleAfterFailure(payDelivered)
             budgetEvent("purchase-settle", allowance, outcome.name)
             throw t
@@ -224,6 +263,7 @@ class PetExchangeFlow(private val flow: PetFlowContext, private val navigation: 
                 lastScene = matcher.match(f, sceneProbe(item), 0.5).score
                 if (lastTitle < 0.90 && lastScene >= profile.matchThreshold) {
                     save(f, "exchange-after-pay")
+                    recovery.confirm(round,"EXCHANGE_PAID",sceneProbe(item).name,false)
                     return@with
                 }
             } finally { f.recycle() }

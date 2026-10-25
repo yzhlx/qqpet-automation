@@ -1,5 +1,11 @@
 package com.ynk.virtualdisplay.ui.data
 
+import android.content.Intent
+import com.ynk.virtualdisplay.automation.PlanV2
+import com.ynk.virtualdisplay.automation.PlanV2JsonCodec
+import com.ynk.virtualdisplay.automation.PetRuntime
+import com.ynk.virtualdisplay.automation.StudyStep
+import com.ynk.virtualdisplay.automation.PlanStepType
 import com.ynk.virtualdisplay.automation.SessionMode
 
 /**
@@ -17,8 +23,44 @@ import com.ynk.virtualdisplay.automation.SessionMode
  * offered here, which is why choosing 10 needs no service-side change.
  */
 object SessionStartRequest {
-    /** Batch sizes offered in the UI. 1 is the default so a careless tap never multiplies the cost. */
-    val ROUND_OPTIONS: List<Int> = listOf(1, 3, 10)
+    const val ACTION_START = "com.ynk.virtualdisplay.pet.START"
+    const val EXTRA_PLAN_JSON = "plan_json"
+    const val EXTRA_REQUEST_ID = "request_id"
+    const val EXTRA_DISPLAY_ID = "display_id"
+
+    /** A plan always carries an explicit virtual-display target, never default display 0. */
+    fun forPlan(plan: PlanV2, displayId: Int, requestId: String): Intent {
+        require(displayId > 0) { "PLAN_DISPLAY_NOT_READY" }
+        require(requestId.isNotBlank()) { "PLAN_REQUEST_ID_BLANK" }
+        val study = plan.steps.filterIsInstance<StudyStep>().singleOrNull()
+        val mode = if (plan.steps.size == 1) when (plan.steps.single().type) {
+            PlanStepType.WORK -> SessionMode.WORK
+            PlanStepType.CARE -> SessionMode.CARE
+            PlanStepType.STUDY -> SessionMode.STUDY
+        } else SessionMode.FULL
+        return Intent(ACTION_START)
+            .setClassName("com.ynk.virtualdisplay", "com.ynk.virtualdisplay.automation.PetAutomationService")
+            .putExtra(EXTRA_DISPLAY_ID, displayId)
+            .putExtra(EXTRA_PLAN_JSON, PlanV2JsonCodec.encode(plan))
+            .putExtra(EXTRA_REQUEST_ID, requestId)
+            .putExtra("rounds", study?.rounds ?: DEFAULT_ROUNDS)
+            .putExtra("session_mode", mode.wire)
+    }
+
+    fun forPlan(plan: PlanV2, requestId: String): Intent {
+        val displayId = PetRuntime.state.value.displayId
+        check(displayId != null && displayId > 0) { "PLAN_DISPLAY_NOT_READY" }
+        return forPlan(plan, displayId, requestId)
+    }
+
+    /**
+     * Batch sizes offered in the UI. 1 is the default so a careless tap never multiplies the cost.
+     *
+     * Was listOf(1, 3, 10): the plan sheet already allowed 1..10, so choosing 2, 4, 5... silently
+     * became 1 through [sanitize]. Every value the plan can hold is offered here now, and the
+     * service/controller both accept 1..10, so nothing is quietly rewritten.
+     */
+    val ROUND_OPTIONS: List<Int> = (1..10).toList()
 
     /** 一节: what a session asks for unless the user explicitly chose a longer batch. */
     const val DEFAULT_ROUNDS: Int = 1
@@ -32,6 +74,12 @@ object SessionStartRequest {
     fun plannedRounds(mode: SessionMode, selected: Int): Int =
         if (mode.runsStudy) selected else DEFAULT_ROUNDS
 
-    /** Clamps arbitrary UI state onto an offered option, so the request never carries a stray value. */
+    /**
+     * Clamps arbitrary UI state onto the accepted range 1..10.
+     *
+     * The accepted range is the plan's own range, so 2 and 4 are valid requests rather than being
+     * replaced by 1. Anything outside it (a stale UI value, a corrupted store) still falls back to
+     * one lesson instead of being sent blindly.
+     */
     fun sanitize(selected: Int): Int = if (selected in ROUND_OPTIONS) selected else DEFAULT_ROUNDS
 }

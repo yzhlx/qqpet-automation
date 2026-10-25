@@ -1,5 +1,6 @@
 package com.ynk.virtualdisplay.ui.screens
 
+import android.content.Intent
 import android.os.SystemClock
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -53,6 +54,7 @@ import com.ynk.virtualdisplay.ui.data.PetEvidenceRepository
 import com.ynk.virtualdisplay.ui.data.SessionEvidence
 import com.ynk.virtualdisplay.ui.data.SessionRunRecord
 import com.ynk.virtualdisplay.ui.data.SessionStartRequest
+import com.ynk.virtualdisplay.ui.display.DisplayActivity
 import com.ynk.virtualdisplay.ui.kit.PetButtonTone
 import com.ynk.virtualdisplay.ui.kit.PetCard
 import com.ynk.virtualdisplay.ui.kit.PetChevron
@@ -137,7 +139,9 @@ fun PetHomeScreen(
             logRows = PetLogPresentation.timeline(repo.logEntries(limit = 600))
             budgetUsed = DailyBudgetStore(context).usedMinutes()
             plan = SessionPlanStore(context).load()
-            catalogFresh = CourseCatalogStore(context).load()?.isFresh(System.currentTimeMillis()) == true
+            val catalog = CourseCatalogStore(context).load()
+            catalogFresh = catalog?.isUsable(System.currentTimeMillis()) == true &&
+                catalog.find(plan.courseId)?.let { it.unlocked && it.durationMinutes in 1..DailyBudgetStore.HARD_STOP_MINUTES } == true
         }
         reload()
         while (runtime.running) {
@@ -218,20 +222,35 @@ fun PetHomeScreen(
                 // Three separate entries, one per capability. v0.1 bundled 健康检查+护理+学习 into a
                 // single 开始托管, so reading the pet's current 体力/清洁 also spent coins and burned
                 // the shared daily budget. Each stage now runs on its own.
-                if (!catalogFresh) {
-                    PetNote("还没有课程档案，托管暂不可用。先到「托管方案」里读取本号已解锁的课程。", Modifier.padding(bottom = 7.dp))
+                if (!runtime.running && (!controls.startEnabled || !catalogFresh)) {
+                    SetupChecklistCard(
+                        startReady = controls.startEnabled,
+                        shizukuReady = uiState.shizukuState is ShizukuState.Ready,
+                        displayReady = readyDisplay != null && readyDisplay.id in managedIds,
+                        catalogReady = catalogFresh,
+                        onOpenDisplay = {
+                            context.startActivity(Intent(context, DisplayActivity::class.java))
+                        },
+                        onOpenPlanSheet = onOpenPlanSheet,
+                        modifier = Modifier.padding(bottom = 7.dp),
+                    )
                 }
                 SessionModeRow(
                     enabled = controls.startEnabled,
                     studyEnabled = controls.startEnabled && catalogFresh,
+                    workEnabled = controls.startEnabled,
                     displayId = readyDisplay?.id,
                     rounds = plan.rounds,
                     context = context,
                 )
                 Spacer(Modifier.height(7.dp))
-                PetNote("托管：${plan.courseName} × ${plan.rounds} 节；健康检查/护理仅执行一次，不上课")
+                PetNote("托管：${plan.courseName} × ${plan.rounds} 节；打工/护理/学习各自独立，只做所选动作")
                 Spacer(Modifier.height(2.dp))
-                PetNote("健康检查只读数，不花金币不占时长；护理会买饼干/香皂片；托管=护理+上课")
+                PetNote("打工：按岗位体力/清洁消耗和固定时长换金币；不查课表、不护理")
+                Spacer(Modifier.height(2.dp))
+                PetNote("学习：只花学费，不要求体力/清洁；金币不足会停止，不会自动去打工")
+                Spacer(Modifier.height(2.dp))
+                PetNote("护理：先用背包里的饼干/香皂，缺了才买；购买前核对真实金币并保留学费")
                 Spacer(Modifier.height(2.dp))
                 PetNote("今日已记 $budgetUsed / $budgetCap 分钟 · 剩余 $budgetLeft")
             } else {
@@ -291,6 +310,89 @@ fun PetHomeScreen(
 }
 
 private enum class HomeDialog { PauseUnavailable, ConfirmStop }
+
+/**
+ * Shown instead of a dead, greyed-out footer: when the environment gate is closed the user gets the
+ * three concrete preconditions with their real state and a jump target for each. This exists because
+ * "buttons disabled + one sentence of prose" is indistinguishable from "点运行没反应" on a fresh
+ * install (the automation needs a managed 720×1600 display and a course catalog first).
+ */
+@Composable
+private fun SetupChecklistCard(
+    startReady: Boolean,
+    shizukuReady: Boolean,
+    displayReady: Boolean,
+    catalogReady: Boolean,
+    onOpenDisplay: () -> Unit,
+    onOpenPlanSheet: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    PetCard(modifier) {
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                if (startReady) "还差一步：读取课表后才能上课/托管"
+                else "还不能开始：先完成以下 3 步",
+                fontSize = 14.sp, fontWeight = FontWeight.Bold, color = PetTokens.Ink,
+                modifier = Modifier.weight(1f),
+            )
+            PetChip(
+                if (startReady) "差课表" else "未就绪",
+                PetTokens.AmberSoft, PetTokens.AmberInk,
+            )
+        }
+        Spacer(Modifier.height(8.dp))
+        SetupStepRow(
+            index = "1", title = "特权服务",
+            state = if (shizukuReady) "已连接" else "未连接", done = shizukuReady,
+        )
+        SetupStepRow(
+            index = "2", title = "720×1600 虚拟屏",
+            state = if (displayReady) "已托管" else "未托管", done = displayReady,
+            actionText = "打开控制台", onAction = onOpenDisplay,
+        )
+        SetupStepRow(
+            index = "3", title = "课表已读取",
+            state = if (catalogReady) "已完成" else "未完成", done = catalogReady,
+            actionText = "去刷新", onAction = onOpenPlanSheet,
+        )
+        Spacer(Modifier.height(6.dp))
+        PetNote(
+            "三步全部完成前，下面的按钮保持灰色；这些步骤都不消耗游戏内金币。" +
+                "第 1 步在「设置 › 虚拟屏控制台」点『重启服务』；第 2 步创建后点该屏幕的『启动』拉起 QQ。"
+        )
+    }
+}
+
+@Composable
+private fun SetupStepRow(
+    index: String,
+    title: String,
+    state: String,
+    done: Boolean,
+    actionText: String? = null,
+    onAction: (() -> Unit)? = null,
+) {
+    Row(
+        Modifier.fillMaxWidth().padding(vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        PetDot(if (done) PetTokens.GreenInk else PetTokens.AmberInk)
+        Spacer(Modifier.width(7.dp))
+        Text("$index. $title", fontSize = 13.sp, fontWeight = FontWeight(650), color = PetTokens.Ink)
+        Spacer(Modifier.width(6.dp))
+        Text(
+            state, fontSize = 12.sp,
+            color = if (done) PetTokens.GreenInk else PetTokens.AmberInk,
+            modifier = Modifier.weight(1f),
+        )
+        if (actionText != null && onAction != null) {
+            Text(
+                actionText, fontSize = 12.5.sp, fontWeight = FontWeight(650), color = PetTokens.Blue,
+                modifier = Modifier.clickable(onClick = onAction).padding(horizontal = 6.dp, vertical = 4.dp),
+            )
+        }
+    }
+}
 
 @Composable
 private fun HealthStatCell(stat: HealthStat, modifier: Modifier = Modifier) {
@@ -745,13 +847,14 @@ private fun RoundSelectorRow(selected: Int, enabled: Boolean, onSelect: (Int) ->
 private fun SessionModeRow(
     enabled: Boolean,
     studyEnabled: Boolean,
+    workEnabled: Boolean,
     displayId: Int?,
     rounds: Int,
     context: android.content.Context,
 ) {
     fun start(mode: SessionMode) {
         if (!enabled || displayId == null) return
-        // 托管 carries the selected batch; 健康检查/护理 are always one pass (see SessionStartRequest).
+        // 托管/学习 carry the selected batch; 健康检查/护理/打工 are always a single pass.
         val requested = SessionStartRequest.plannedRounds(mode, SessionStartRequest.sanitize(rounds))
         ContextCompat.startForegroundService(
             context,
@@ -759,12 +862,20 @@ private fun SessionModeRow(
         )
     }
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        PetFootButton(
-            text = "健康检查",
-            tone = if (enabled) PetButtonTone.PRIMARY else PetButtonTone.DISABLED,
-            onClick = { start(SessionMode.HEALTH_CHECK) },
-            modifier = Modifier.fillMaxWidth(),
-        )
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            PetFootButton(
+                text = "健康检查",
+                tone = if (enabled) PetButtonTone.PRIMARY else PetButtonTone.DISABLED,
+                onClick = { start(SessionMode.HEALTH_CHECK) },
+                modifier = Modifier.weight(1f),
+            )
+            PetFootButton(
+                text = "打工",
+                tone = if (workEnabled) PetButtonTone.PRIMARY else PetButtonTone.DISABLED,
+                onClick = { if (workEnabled) start(SessionMode.WORK) },
+                modifier = Modifier.weight(1f),
+            )
+        }
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             PetFootButton(
                 text = "护理",
@@ -773,11 +884,17 @@ private fun SessionModeRow(
                 modifier = Modifier.weight(1f),
             )
             PetFootButton(
-                text = "托管",
+                text = "学习",
                 tone = if (studyEnabled) PetButtonTone.PRIMARY else PetButtonTone.DISABLED,
-                onClick = { if (studyEnabled) start(SessionMode.FULL) },
+                onClick = { if (studyEnabled) start(SessionMode.STUDY) },
                 modifier = Modifier.weight(1f),
             )
         }
+        PetFootButton(
+            text = "托管（护理+上课）",
+            tone = if (studyEnabled) PetButtonTone.PRIMARY else PetButtonTone.DISABLED,
+            onClick = { if (studyEnabled) start(SessionMode.FULL) },
+            modifier = Modifier.fillMaxWidth(),
+        )
     }
 }

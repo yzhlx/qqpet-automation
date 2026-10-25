@@ -21,14 +21,35 @@ class SessionModeTest {
         val mode = SessionMode.HEALTH_CHECK
         assertFalse(mode.runsCare)
         assertFalse(mode.runsStudy)
+        assertFalse(mode.runsWork)
     }
 
     @Test
-    fun `care runs care but never a lesson`() {
+    fun `care runs care but never a lesson or a shift`() {
         val mode = SessionMode.CARE
         assertTrue(mode.runsCare)
         // The whole point of the split: care must not touch the shared daily budget.
         assertFalse(mode.runsStudy)
+        assertFalse(mode.runsWork)
+    }
+
+    @Test
+    fun `standalone work runs exactly one shift`() {
+        val mode = SessionMode.WORK
+        assertTrue(mode.runsWork)
+        // 打工 spends the job's own 体力/清洁 for coins: no course, no care, no lesson.
+        assertFalse(mode.runsStudy)
+        assertFalse(mode.runsCare)
+    }
+
+    @Test
+    fun `standalone study runs a lesson without care`() {
+        val mode = SessionMode.STUDY
+        assertTrue(mode.runsStudy)
+        // User rule 2026-10-21: a lesson needs course + tuition + minutes, not 体力/清洁, so study is
+        // startable on its own. It must NOT quietly run care or a funding shift.
+        assertFalse(mode.runsCare)
+        assertFalse(mode.runsWork)
     }
 
     @Test
@@ -36,21 +57,28 @@ class SessionModeTest {
         val mode = SessionMode.FULL
         assertTrue(mode.runsCare)
         assertTrue(mode.runsStudy)
+        assertFalse("托管 works only as a funding step, not as its own action", mode.runsWork)
     }
 
     @Test
-    fun `stages are strictly nested`() {
-        // A mode that runs a lesson must also run care, because a lesson requires a verified
-        // >=90 reading and producing that reading is the care stage.
-        for (mode in SessionMode.entries) {
-            if (mode.runsStudy) assertTrue("$mode runs a lesson without care", mode.runsCare)
-        }
+    fun `no standalone mode gains a second action`() {
+        // Each of the three independent entries performs exactly one action; only FULL combines two.
+        assertEquals(1, listOf(SessionMode.CARE.runsCare, SessionMode.CARE.runsStudy,
+            SessionMode.CARE.runsWork).count { it })
+        assertEquals(1, listOf(SessionMode.WORK.runsCare, SessionMode.WORK.runsStudy,
+            SessionMode.WORK.runsWork).count { it })
+        assertEquals(1, listOf(SessionMode.STUDY.runsCare, SessionMode.STUDY.runsStudy,
+            SessionMode.STUDY.runsWork).count { it })
+        assertEquals(0, listOf(SessionMode.HEALTH_CHECK.runsCare,
+            SessionMode.HEALTH_CHECK.runsStudy, SessionMode.HEALTH_CHECK.runsWork).count { it })
     }
 
     @Test
     fun `wire names round trip`() {
         assertEquals("health_check", SessionMode.HEALTH_CHECK.wire)
         assertEquals("care", SessionMode.CARE.wire)
+        assertEquals("work", SessionMode.WORK.wire)
+        assertEquals("study", SessionMode.STUDY.wire)
         assertEquals("full", SessionMode.FULL.wire)
         for (mode in SessionMode.entries) {
             assertEquals(mode, SessionMode.fromWire(mode.wire))

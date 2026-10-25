@@ -21,7 +21,8 @@ import kotlin.coroutines.coroutineContext
 import kotlin.math.abs
 
 /** Only measured page edges, not a general path finder. */
-class PetNavigation(private val flow: PetFlowContext) {
+class PetNavigation(private val flow: PetFlowContext, private val workReader: WorkPageReader? = null,
+    private val roomExitReader: CourseNameReader? = null) {
     /**
      * The ONLY failure that may lead to a second academy tap: the course panel was probed for
      * its full settle window at the unchanged threshold and never appeared.
@@ -608,6 +609,14 @@ class PetNavigation(private val flow: PetFlowContext) {
          */
         const val labelClusterPx=8f
 
+        // Back control observed in the 720x1600 town header (r18-vd4.png).
+        private const val BACK_X=80f
+        private const val BACK_Y=160f
+        /** The venue detail page is two levels below the outdoor map, so two back taps at most. */
+        private const val TOWN_EXIT_MAX_HOPS=2
+        private const val TOWN_READ_ATTEMPTS=3
+        private const val TOWN_READ_RETRY_MS=900L
+
         /**
          * How far either side of a candidate's OWN measured width the window width is swept.
          *
@@ -1183,6 +1192,70 @@ class PetNavigation(private val flow: PetFlowContext) {
         verifySettled(listOf(foodScene,bath,room),"care-upgrade-after")
         true
     }
+    /**
+     * Room -> outdoor must follow the drawer's CURRENT layout, not a stored globe coordinate.
+     * Two fresh room frames must independently identify the same unique 出门 label. OCR never
+     * authorises input on its own: room identity, calibrated geometry and observation age all gate
+     * the one tap. A failed destination check stops here and never retries the input.
+     * The optional injected reader is borrowed; the fallback recognizer is closed on every exit.
+     */
+    suspend fun enterOutdoor(action: String): Unit = with(flow) {
+        val recognizer = if (roomExitReader == null)
+            com.google.mlkit.vision.text.TextRecognition.getClient(
+                com.google.mlkit.vision.text.chinese.ChineseTextRecognizerOptions.Builder().build()) else null
+        val reader = roomExitReader ?: CourseNameReader { bitmap ->
+            val done = java.util.concurrent.CountDownLatch(1)
+            val result = java.util.concurrent.atomic.AtomicReference<List<TextLine>>(emptyList())
+            val failure = java.util.concurrent.atomic.AtomicReference<Exception>()
+            recognizer!!.process(com.google.mlkit.vision.common.InputImage.fromBitmap(bitmap, 0))
+                .addOnSuccessListener { text ->
+                    result.set(text.textBlocks.flatMap { block -> block.lines.mapNotNull { line ->
+                        line.boundingBox?.let { bounds -> TextLine(line.text, Rect(bounds)) }
+                    } })
+                }
+                .addOnFailureListener { failure.set(it) }
+                .addOnCompleteListener { done.countDown() }
+            check(done.await(8_000, java.util.concurrent.TimeUnit.MILLISECONDS)) { "ROOM_EXIT_OCR_TIMEOUT" }
+            failure.get()?.let { throw IllegalStateException("ROOM_EXIT_OCR_FAILED", it) }
+            result.get()
+        }
+        try {
+            suspend fun locate(): Pair<RoomExitPolicy.Target, Long> {
+                val current = frame(latest = true)
+                val capturedAt = SystemClock.elapsedRealtime()
+                try {
+                    val roomScore = score(current, listOf(room))
+                    check(roomScore >= profile.matchThreshold) { "ROOM_EXIT_NOT_ROOM:$action:$roomScore" }
+                    check(current.width == 720 && current.height == 1600) { "ROOM_EXIT_DISPLAY_UNSUPPORTED" }
+                    val lines = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { reader.read(current) }
+                    check(SystemClock.elapsedRealtime() - capturedAt <= 3_000) { "ROOM_EXIT_OBSERVATION_STALE:$action" }
+                    val target = RoomExitPolicy.select(lines.map {
+                        RoomExitPolicy.Label(it.text, it.bounds.left, it.bounds.top, it.bounds.right, it.bounds.bottom)
+                    }, current.width, current.height) ?: error("ROOM_EXIT_LABEL_UNCONFIRMED:$action")
+                    recovery.confirm(round, state, room.name, false)
+                    emit("$action-room-exit-label", roomScore, JSONObject()
+                        .put("label", "出门").put("centreX", target.x).put("centreY", target.y)
+                        .put("capturePath", "FRESH").toString())
+                    return target to capturedAt
+                } finally { current.recycle() }
+            }
+            val first = locate().first
+            // Safety may recover/navigate, so do it BEFORE the final independent fresh room proof.
+            safety()
+            val (target, capturedAt) = locate()
+            check(RoomExitPolicy.stable(first, target)) { "ROOM_EXIT_LABEL_MOVED:$action" }
+            // frame() already ran full safety. Do not run recovery again AFTER its final room
+            // proof: a recovered page could invalidate the OCR point. Preserve stop/cancel checks.
+            coroutineContext.ensureActive()
+            guard()
+            check(SystemClock.elapsedRealtime() - capturedAt <= 3_000) { "ROOM_EXIT_OBSERVATION_STALE:$action" }
+            input.tap(target.x, target.y)
+            delay(profile.pageSettleMs)
+            verifySettled(listOf(outdoor), "${serial++}-$action-after")
+            Unit
+        } finally { recognizer?.close() }
+    }
+
     suspend fun tap(before: PetProfile.Probe, point: PointF, after: PetProfile.Probe, action: String) = with(flow) {
         verify(listOf(before),"${serial++}-$action-before",latest=true)
         safety(); input.tap(point.x,point.y)
@@ -1209,18 +1282,85 @@ class PetNavigation(private val flow: PetFlowContext) {
         val panelOpen=try {score(current,listOf(profile.courseListProbe))>=profile.matchThreshold} finally {current.recycle()}
         if(panelOpen) tap(profile.courseListProbe,PointF(80f,160f),academy,"$action-close-course")
         tap(academy,PointF(80f,160f),outdoor,"$action-leave-academy")
-        // The outdoor map can pop a random NPC story bubble ("武侠之路...") that covers the
-        // home button and the room probe (measured: round-4 return-home-after 0.803). Dismiss
-        // it with a tap on the bubble, then retry the return tap once.
-        try {
-            tap(outdoor,PointF(80f,160f),room,"$action-return-home")
-        } catch (t: Throwable) {
-            if (t.message?.contains("PAGE_MISMATCH") != true) throw t
-            val retry=frame()
-            val stillOutdoor=try {score(retry,listOf(outdoor))>=profile.matchThreshold} finally {retry.recycle()}
-            if (!stillOutdoor) throw t
-            safety(); input.tap(608f,1450f); delay(profile.pageSettleMs)
-            tap(outdoor,PointF(80f,160f),room,"$action-return-home-retry")
+        returnHomeFromMap(action)
+    }
+    /**
+     * Re-open the pet mini-program after its own back arrow closed it.
+     *
+     * The mini-program is hosted by QQ, so closing it leaves QQ's search page on the display.
+     * That page lists the pet mini-program itself, and one tap on its orange icon re-opens the
+     * mini-program on the pet ROOM page (measured on the device, 2026-10-21: a single tap at
+     * (209,506) after the mini-program closed landed on the room again). The tap is only allowed
+     * after the QQ host page itself was positively matched, so no input is ever sent into the
+     * pet app by mistake.
+     */
+    suspend fun reenterPetApp(label: String) = with(flow) {
+        val current=frame()
+        val host=try {score(current,listOf(qqHostSearch))>=profile.matchThreshold} finally {current.recycle()}
+        check(host) { "PET_APP_NOT_EXITED:$label" }
+        emit("$label-reenter-pet-app",null,"QQ_HOST_PAGE")
+        safety();input.tap(209f,506f);delay(profile.pageSettleMs)
+        verifySettled(listOf(room),"$label-reenter-pet-app-after")
+    }
+    /**
+     * The outdoor map's back arrow is the only way home, and the mini-program's own history can
+     * pop one level too far: measured 2026-10-21 (session 68564b34) the very same tap that had
+     * returned to the room earlier in the session landed on the QQ search page instead, which
+     * ended the session with `PAGE_MISMATCH:...:51-health-return-home-after`.
+     *
+     * Two recoveries, both driven by what the screen actually shows:
+     *  - the QQ host page means the mini-program was closed, so it is re-opened through its own
+     *    entry and the chain continues on the room;
+     *  - the map is still there, so the back arrow was covered by a story bubble ("武侠之路..."),
+     *    which is dismissed with a tap on the bubble before the arrow is tried again.
+     */
+    suspend fun returnHomeFromMap(label: String) = with(flow) {
+        returnHomeFromPage(outdoor,label,PointF(608f,1450f))
+    }
+    /**
+     * Back out of a pet page to the room, and survive the two ways that can go wrong.
+     *
+     * The mini-program's own history can pop one level too far: measured 2026-10-21 (session
+     * 68564b34) the very same tap that had returned to the room earlier in the session landed
+     * on the QQ search page instead, which ended the session with
+     * `PAGE_MISMATCH:...:51-health-return-home-after`. When that happens the pet app is
+     * re-opened through its own QQ entry and the chain continues on the room.
+     *
+     * The back arrow can also be covered (a story bubble on the outdoor map), which leaves the
+     * page untouched; [overlayTap] dismisses that overlay before the arrow is tried again.
+     */
+    suspend fun returnHomeFromPage(before: PetProfile.Probe,label: String,overlayTap: PointF?=null) = with(flow) {
+        var attempt=1
+        while(true) {
+            try {
+                tap(before,PointF(80f,160f),room,"$label-return-home")
+                return@with
+            } catch(t: Throwable) {
+                if(t.message?.contains("PAGE_MISMATCH")!=true) throw t
+                val current=frame()
+                val host: Boolean
+                val stillThere: Boolean
+                try {
+                    host=score(current,listOf(qqHostSearch))>=profile.matchThreshold
+                    stillThere=if(host) false else score(current,listOf(before))>=profile.matchThreshold
+                } finally {current.recycle()}
+                when(PetBackNavigation.recovery(host,stillThere,attempt)) {
+                    PetBackNavigation.Recovery.REENTER_MINI_PROGRAM -> {
+                        emit("$label-return-home-exited",null,"QQ_HOST_PAGE")
+                        reenterPetApp(label)
+                        return@with
+                    }
+                    PetBackNavigation.Recovery.DISMISS_OVERLAY_AND_RETRY -> {
+                        emit("$label-return-home-overlay",null,"RETRY")
+                        if(overlayTap!=null) {
+                            safety();input.tap(overlayTap.x,overlayTap.y);delay(profile.pageSettleMs)
+                        }
+                    }
+                    PetBackNavigation.Recovery.STOP ->
+                        throw IllegalStateException("RETURN_HOME_UNRECOVERED:$label",t)
+                }
+                attempt++
+            }
         }
     }
     /** Enter the academy map, then explicitly open the unlocked primary academy course panel. */
@@ -1344,7 +1484,7 @@ class PetNavigation(private val flow: PetFlowContext) {
         }
         error("ACADEMY_COURSE_PANEL_NOT_OPENED_AFTER_${taps}_TAPS")
     }
-    suspend fun initialise() = with(flow) {
+    suspend fun initialise(healthAlreadyClosed: Boolean = false): Unit = with(flow) {
         dismissCareUpgradeIfPresent()
         dismissUpgradeIfPresent("initial")
         val current=frame()
@@ -1352,14 +1492,17 @@ class PetNavigation(private val flow: PetFlowContext) {
         val sHealth=score(current,listOf(healthPanel))
         val sOutdoor=score(current,listOf(outdoor))
         val sResult=score(current,listOf(profile.resultProbe))
+        val sHost=score(current,listOf(qqHostSearch))
         val unknownDump=try {ByteArrayOutputStream().also {current.compress(Bitmap.CompressFormat.PNG,80,it)}} catch(t:Throwable) {null}
         val page=try {
             when {
+                sHost>=profile.matchThreshold -> "qq_host"
                 score(current,listOf(foodScene))>=profile.matchThreshold -> "food_scene"
                 score(current,listOf(bath))>=profile.matchThreshold -> "bath"
                 score(current,listOf(profile.resultProbe))>=profile.matchThreshold -> "result"
                 score(current,profile.learningProbes)>=profile.matchThreshold -> "LEARNING"
-                score(current,listOf(room))>=profile.matchThreshold && score(current,listOf(healthPanel))<profile.matchThreshold -> "room"
+                score(current,listOf(healthPanel))>=profile.matchThreshold -> "health"
+                score(current,listOf(room))>=profile.matchThreshold -> "room"
                 score(current,listOf(profile.courseListProbe))>=profile.matchThreshold -> "course_list"
                 score(current,listOf(academy))>=profile.matchThreshold -> "academy"
                 score(current,listOf(outdoor))>=profile.matchThreshold -> "outdoor"
@@ -1367,23 +1510,97 @@ class PetNavigation(private val flow: PetFlowContext) {
             }
         } finally {current.recycle()}
         when(page) {
-            "food_scene" -> tap(foodScene,PointF(80f,160f),room,"initial-leave-food")
-            "bath" -> tap(bath,PointF(80f,160f),room,"initial-leave-bath")
+            "qq_host" -> {
+                // The mini-program is closed and QQ's search page is showing: re-open the pet
+                // app through its own entry instead of failing the session with an unknown page.
+                emit("initial-page-qq-host",sHost,"QQ_HOST_PAGE")
+                reenterPetApp("initial")
+            }
+            "food_scene" -> returnHomeFromPage(foodScene,"initial-leave-food")
+            "bath" -> returnHomeFromPage(bath,"initial-leave-bath")
             "result" -> returnHomeFromResult("initial-unowned-result")
             "room" -> verify(listOf(room),"initial-home")
+            "health" -> {
+                check(!healthAlreadyClosed) {"INITIAL_HEALTH_PANEL_NOT_CLOSED"}
+                verify(listOf(healthPanel),"initial-health-before")
+                safety();input.tap(355f,454f);delay(profile.pageSettleMs)
+                initialise(healthAlreadyClosed = true)
+            }
             "course_list" -> {tap(profile.courseListProbe,PointF(80f,160f),academy,"initial-close-panel")
                 tap(academy,PointF(80f,160f),outdoor,"initial-leave-academy")
-                tap(outdoor,PointF(80f,160f),room,"initial-home")}
+                returnHomeFromMap("initial")}
             "academy" -> {tap(academy,PointF(80f,160f),outdoor,"initial-leave-academy")
-                tap(outdoor,PointF(80f,160f),room,"initial-home")}
-            "outdoor" -> tap(outdoor,PointF(80f,160f),room,"initial-home")
+                returnHomeFromMap("initial")}
+            "outdoor" -> returnHomeFromMap("initial")
             "LEARNING" -> error("ACTIVE_COURSE_WITHOUT_OWNED_CHECKPOINT")
             else -> {
                 if (unknownDump!=null) {evidence.mkdirs();File(evidence,"round-0-initial-unknown-page.png").outputStream().use {it.write(unknownDump.toByteArray())}}
                 emit("initial-page-scores",null,capture.telemetry().put("room",sRoom)
                     .put("healthPanel",sHealth).put("outdoor",sOutdoor).put("result",sResult).toString())
-                error("INITIAL_PAGE_UNKNOWN")
+                // The career-town pages carry no template probe, so a session stopped inside the work
+                // flow leaves the pet here and no probe above can name them. They are recognised by
+                // OCR and walked back out; a page that is still not the town stops as before.
+                val town=workReader?.let { readTownPage(it) }
+                if(town==null) error("INITIAL_PAGE_UNKNOWN")
+                emit("initial-page-town",null,if(town.isDetailPage) "DETAIL" else "LIST")
+                leaveTownAndReturnHome(town)
             }
         }
+    }
+    /**
+     * Walks back out of the career town and ends in the room.
+     *
+     * The town is the one part of the game the work flow can leave the pet standing on, so it is
+     * the one page `initialise` had no way home from (measured 2026-10-20: two consecutive managed
+     * sessions, r16 and r17, both stopped at INITIAL_PAGE_UNKNOWN with zero consumption while the
+     * virtual display sat on the 竹影武馆 detail page).
+     *
+     * The exit is anchored on the OUTDOOR MAP, the one page of this chain that can be proven by
+     * template, and not on the town map: the town map's venue labels move with the map's scroll and
+     * its OCR reading is not guaranteed to name three known venues, so requiring the town map would
+     * make the recovery depend on a reading nobody can promise. The venue DETAIL page sits two
+     * levels below the outdoor map (detail -> town map -> outdoor), so at most two back taps are
+     * spent, each one bounded, and the outdoor map is confirmed by its own probe before the hop to
+     * the room. A back that misses stops the session - it never taps on.
+     *
+     * The back point is the one every other sub-page already uses, (80,160). It is measured, not
+     * assumed: on the venue detail page the affordance is a chevron spanning x 44..116, y 118..202 -
+     * centre (76,160), in the same sticky header that the academy and course-list pages put theirs
+     * in.
+     */
+    private suspend fun leaveTownAndReturnHome(start: PetWorkNavigation.TownPage) = with(flow) {
+        val reader=workReader ?: error("TOWN_PAGE_READER_UNAVAILABLE")
+        // The page must still be the town: the caller identified it, and a page that moved since
+        // must not be walked with taps that were planned for the town.
+        check(readTownPage(reader)?.isDetailPage==start.isDetailPage) {"INITIAL_TOWN_PAGE_MOVED"}
+        emit("initial-leave-town",null,if(start.isDetailPage) "DETAIL" else "LIST")
+        var hops=0
+        while(!isOutdoorMap() && hops<TOWN_EXIT_MAX_HOPS) {
+            safety();input.tap(BACK_X,BACK_Y);delay(profile.pageSettleMs);hops++
+            emit("initial-leave-town-back",null,"hop=$hops")
+        }
+        check(isOutdoorMap()) {"TOWN_EXIT_UNCONFIRMED_AFTER_${hops}_BACKS"}
+        returnHomeFromMap("initial-leave-town")
+    }
+    /**
+     * True when the CURRENT frame is the outdoor map, by the same template probe every page of
+     * this flow is recognised with. One frame, no settle: this only decides whether another back
+     * tap is needed, and the decision that counts is the outdoor probe's own settle check inside
+     * [tap].
+     */
+    private suspend fun isOutdoorMap(): Boolean {
+        val current=flow.frame()
+        return try {
+            flow.score(current,listOf(flow.outdoor))>=flow.profile.matchThreshold
+        } finally {current.recycle()}
+    }
+    /** Retry OCR on fresh frames; a failed read never authorises a back tap. */
+    private suspend fun readTownPage(reader: WorkPageReader): PetWorkNavigation.TownPage? {
+        repeat(TOWN_READ_ATTEMPTS){ attempt ->
+            val page=reader.readTownPage()
+            if(page.identityMatched) return page
+            if(attempt<TOWN_READ_ATTEMPTS-1) delay(TOWN_READ_RETRY_MS)
+        }
+        return null
     }
 }
