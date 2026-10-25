@@ -341,9 +341,14 @@ class WorkCompletionWritebackTest {
             org.junit.Assume.assumeTrue("Symbolic links are unsupported: ${unsupported.message}", false)
         } catch (failure: java.nio.file.FileSystemException) {
             val message = "${failure.reason.orEmpty()} ${failure.message.orEmpty()}"
+            // Windows reports the missing SeCreateSymbolicLinkPrivilege in the OS locale (here
+            // "客户端没有所需的特权。"), so English keywords alone miss it; on Windows any
+            // FileSystemException from createSymbolicLink is exactly that privilege gap.
+            val windows = System.getProperty("os.name").orEmpty().contains("windows", ignoreCase = true)
             val unsupported = message.contains("privilege", ignoreCase = true) ||
                 message.contains("not supported", ignoreCase = true) ||
-                message.contains("unsupported", ignoreCase = true)
+                message.contains("unsupported", ignoreCase = true) ||
+                windows
             if (unsupported) {
                 org.junit.Assume.assumeTrue("Symbolic links are unsupported: $message", false)
             }

@@ -67,6 +67,8 @@ class CommittedPlanFinalizationTest {
     }
     @Test fun realArchivedWorkCareRunFinalizesFromPersistedProofNotCurrentHealth() {
         val archive=File("../.build-tmp/device-acceptance/continuation-20261022-211328-845483-plan-work-care-recovered")
+        // The archive is local device evidence that is never committed; skip where it is absent (CI).
+        org.junit.Assume.assumeTrue(File(archive,"persisted-plan-run.json").isFile)
         val source=File(archive,"persisted-plan-run.json").readBytes()
         val record=PlanRunJsonCodec.decode(source.toString(Charsets.UTF_8))
         assertEquals("b5600c4f-f334-4013-9db8-f95d5fc4cb0a",record.snapshot.runId)

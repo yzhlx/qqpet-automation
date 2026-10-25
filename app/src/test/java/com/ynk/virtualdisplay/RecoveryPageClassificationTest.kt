@@ -130,7 +130,10 @@ class RecoveryPageClassificationTest {
                 com.ynk.virtualdisplay.automation.RecoveryObservation(true, true, page)
             }
         }.exceptionOrNull()
-        assertSame(cancelled, failure)
+        // With assertions on (Gradle's test runner), coroutine stack-trace recovery rethrows a copy
+        // of the exception, so compare type and message rather than identity.
+        assertTrue(failure is kotlinx.coroutines.CancellationException)
+        assertEquals(cancelled.message, failure?.message)
         assertEquals(1, reads)
         assertEquals(0, resumed)
         assertEquals(com.ynk.virtualdisplay.automation.SessionRunState.STOPPED, recovery.state)
