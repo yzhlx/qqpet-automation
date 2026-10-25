@@ -27,7 +27,18 @@ class ExchangeWalletParserTest {
     @Test fun unsupportedDisplayCannotReuseReferenceRoi() { assertTrue(parse(listOf(line("86")),w=1084,h=2412) is ObservedValue.Unknown) }
     @Test fun malformedOrPartlyOutsideBoundsAreRejected() {
         assertTrue(parse(listOf(line("86",638,865,637,895))) is ObservedValue.Unknown)
-        assertTrue(parse(listOf(line("86",620,865,676,895))) is ObservedValue.Unknown)
+        // Left of the accepted region: this is where the gold coin glyph itself sits (ends x≈610).
+        assertTrue(parse(listOf(line("86",610,865,676,895))) is ObservedValue.Unknown)
+    }
+    @Test fun threeDigitBalanceIsReadAtItsRealRightAlignedPosition() {
+        // Measured on device 2026-10-25 (session 1792931844569, round-1-exchange-before-pay.png):
+        // the 3-digit "130" occupies x 626..669, y 866..883. The pre-fix left bound of 628 clipped its
+        // leading digit, so every balance of 100 or more was reported unread and care could never
+        // restock. A line whose left edge is right-aligned further out must still be read.
+        assertEquals(130, (parse(listOf(line("130",626,866,669,883))) as ObservedValue.Known).value)
+        assertEquals(1_234, (parse(listOf(line("1234",618,866,669,883))) as ObservedValue.Known).value)
+        // And one that starts on the coin glyph is still refused, not silently accepted.
+        assertTrue(parse(listOf(line("130",612,866,669,883))) is ObservedValue.Unknown)
     }
     @Test fun clippedDigitAtCropEdgeCannotAuthorizeAResourceCount() {
         assertTrue(parse(listOf(line("86",638,865,692,895))) is ObservedValue.Unknown)

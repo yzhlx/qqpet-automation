@@ -74,9 +74,25 @@ object RoomWalletParser {
     }
 }
 
-/** The sheet's own coin pill, measured in the local s21 before-pay frame (86 at x≈655/y880). */
+/**
+ * The sheet's own coin pill. The number is RIGHT-aligned, so it grows leftwards as the balance gains
+ * digits: the 2-digit "86" measured in the local s21 before-pay frame ends at x≈669, and the 3-digit
+ * "130" measured on 2026-10-25 (session 1792931844569, evidence `round-1-exchange-before-pay.png`,
+ * digit ink x 626..669 / y 866..883, with the gold coin glyph ending at x≈610) ends at the same right
+ * edge and starts further left.
+ *
+ * The accepted region therefore reaches left to [COIN_LEFT] (616) — past the start of a 3-digit
+ * number but still clear of the coin glyph — instead of beginning at the 2-digit number's left edge.
+ * A left bound of 628 clipped the leading digit of every balance of 100 or more, so care could never
+ * restock: each purchase stopped fail-closed with CARE_WALLET_UNCONFIRMED before the pay tap.
+ */
 object ExchangeWalletParser {
-    fun roiBounds() = android.graphics.Rect(628, 848, 692, 915)
+    const val COIN_LEFT = 616
+    const val COIN_RIGHT = 692
+    const val COIN_TOP = 848
+    const val COIN_BOTTOM = 915
+
+    fun roiBounds() = android.graphics.Rect(COIN_LEFT, COIN_TOP, COIN_RIGHT, COIN_BOTTOM)
     fun parse(lines: List<TextLine>, frameWidth: Int, frameHeight: Int, observedAt: Long,
         evidence: String, pageIdentityVerified: Boolean): ObservedValue<Int> {
         if (!pageIdentityVerified) return ObservedValue.Unknown("WALLET_DIALOG_UNCONFIRMED",observedAt,evidence)
@@ -84,7 +100,7 @@ object ExchangeWalletParser {
             return ObservedValue.Unknown("WALLET_FRAME_SIZE_INVALID",observedAt,evidence)
         val candidates=lines.filter { line ->
             val b=line.bounds
-            b.left>628 && b.right<692 && b.top>848 && b.bottom<915 &&
+            b.left>COIN_LEFT && b.right<COIN_RIGHT && b.top>COIN_TOP && b.bottom<COIN_BOTTOM &&
                 b.left<b.right && b.top<b.bottom && Regex("^[0-9]{1,6}$").matches(line.text.trim())
         }.mapNotNull { it.text.trim().toIntOrNull() }
         return when(candidates.size) {
