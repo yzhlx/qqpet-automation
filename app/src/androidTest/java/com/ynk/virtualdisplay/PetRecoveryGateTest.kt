@@ -69,15 +69,22 @@ class PetRecoveryGateTest {
         }
         val capture=HeadlessDisplayCapture(repository,id,720,1600)
         val states=mutableListOf<String>()
-        val room=PetProfile.Probe("HOME",Rect(320,1340,405,1465),"pet_experimental/room.png")
-        val boundary=PetRecoveryBoundary(app,capture,::guard,mapOf("HOME" to listOf(room)),0) {state,reason,attempt ->
+        // Same ROI and asset as the shipping room identity; the map key below stays "HOME"
+        // because that is the checkpoint page name this gate asserts on. A private rect here
+        // previously drifted from production, so the gate could pass while the flow aborted.
+        val room=PetProfile.Probe("HOME",Rect(PetPageProbes.room.rect),PetPageProbes.room.assetPath)
+        // onState must be passed BY NAME: the constructor's last parameter is learningEvidence,
+        // so a trailing lambda silently bound to it and the whole androidTest source set failed
+        // to compile on release/v0.1 (Bitmap vs SessionRunState errors at every use of `state`).
+        val boundary=PetRecoveryBoundary(app,capture,::guard,mapOf("HOME" to listOf(room)),0,
+            onState = {state,reason,attempt ->
             states.add(state.name);status("${state.name}:$reason:$attempt")
             if(state==SessionRunState.PAUSED || state==SessionRunState.RESUMING)
                 assertTrue(runCatching {capture.facts.requireInput()}.isFailure)
             if(state==SessionRunState.PAUSED && attempt==1 && mode!="lock") {
                 broken=false;wrongPage=mode=="mismatch"
             }
-        }
+        })
         var physical=0
         var lockSamples: MutableList<String>?=null
         withContext(Dispatchers.Main) {app.acquireDisplayRepository("PetRecoveryGate")}

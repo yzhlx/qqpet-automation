@@ -1,0 +1,17 @@
+{
+  "assetSha256": "a6e9a3c4e0f39d14235bf30d7764704cd32dff06bd3080656a4d9d98623d782e",
+  "assetSize": [
+    100,
+    120
+  ],
+  "probe": "room",
+  "roi": [
+    20,
+    720,
+    120,
+    840
+  ],
+  "sourceFrame": "1792910695731_round-0-initial-home.png",
+  "sourceFrameSha256": "ef701aff0c815a2b4671564c8f8ad8b32b3546da159f10a1f0a64111f76a3d6b",
+  "sourceVerification": "round-0:initial-home templateName=room result=PASS"
+}

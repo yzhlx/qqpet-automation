@@ -22,13 +22,27 @@ object PetPageProbes {
 
     val home = experimental("home", 600, 130, 670, 190)
     /**
-     * Room page IDENTITY: the left icon column (back / gear / bell / notebook / hat). Chosen over
-     * the 出门 button region because that button drifts vertically between sessions (measured
-     * y1354 in one session, y1332 in the next), which broke full-frame identification with
-     * INITIAL_PAGE_UNKNOWN. The icon column measured 0.9991 across two independent sessions and
-     * at most 0.771 on the outdoor map, so the 0.97 threshold keeps a wide margin.
+     * Room page IDENTITY: the pet bed / chair arm at the left of the scene, a stable SCENE region.
+     *
+     * It used to be the left icon column (back / gear / avatar / notebook / hat). That column is
+     * QQ's own chrome, NOT the pet game: it carries the signed-in user's avatar and an unread
+     * badge, both of which the app does not control. Measured on the real device (2026-10-25):
+     * the column scored 0.9593 against the shipped template on a frame the app itself had
+     * verified as the room page, and 0.8420 on the 22:57 frames - the badge repaint inside the
+     * ROI alone aborted a managed session with `INITIAL_PAGE_UNKNOWN`. The same column also
+     * leaks: it measures 0.9738..0.9888 on the FOOD page, above the shipping gate of 0.95, so
+     * room only avoided misclassifying food because `initialise` tests foodScene first.
+     *
+     * The scene region is static furniture with no chrome and no state-dependent pixels. Replay
+     * of the shipping matcher over 85 recorded frames (every state the app ever proved, the room
+     * page under the health sheet, the 22:57 abort frames, and the four room-* fixtures):
+     *   1.0000 on ALL 29 room frames (worst foreign 0.8097 bath, 0.7936 food, 0.8089 academy,
+     *   0.7957 outdoor, 0.7591 QQ message list) - a 0.19 margin under the 0.95 gate and 0.16
+     *   under the 0.97 the identity test asserts, versus the old region's 0.01 and its leak.
+     * Asset provenance: pet_experimental/room.json (exact raw-pixel crop of a verified
+     * `round-0:initial-home` PASS frame at this ROI, so the rescale branch is skipped).
      */
-    val room = experimental("room", 40, 120, 130, 560)
+    val room = experimental("room", 20, 720, 120, 840)
     val healthPanel = experimental("health", 169, 228, 250, 415)
 
     /**
