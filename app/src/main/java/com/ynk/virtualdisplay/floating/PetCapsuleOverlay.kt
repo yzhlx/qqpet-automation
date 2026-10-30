@@ -191,9 +191,7 @@ object PetCapsuleOverlay {
             var sawSession = false
             while (isActive) {
                 refreshModel()
-                if (model.visible && !expanded) {
-                    attachBubbleIfNeeded()
-                }
+                if (model.visible) syncBubbleVisibility()
                 if (model.visible) {
                     sawSession = true
                     if (model.visual in TERMINAL_STATES) {
@@ -252,18 +250,26 @@ object PetCapsuleOverlay {
     private fun closeCard() {
         if (!expanded) return
         expanded = false
-        attachBubbleIfNeeded()
+        syncBubbleVisibility()
     }
 
     /**
-     * The bubble floats above other apps only. While QQPet itself is in the foreground the in-app
-     * PiP shows the same preview, so a second floating bubble would just be noise.
+     * The bubble floats above other apps only: it is attached while another app is in front and
+     * taken off screen again the moment QQPet returns, because the in-app PiP covers that case.
+     * One place owns both directions, so an already-attached window cannot survive the switch.
      */
+    private fun syncBubbleVisibility() {
+        if (CapsuleBubblePolicy.shouldAttach(AppForegroundState.isForeground, expanded)) {
+            attachBubbleIfNeeded()
+        } else {
+            detachBubble()
+        }
+    }
+
     private fun attachBubbleIfNeeded() {
         val wm = windowManager ?: return
         val bubble = bubbleView ?: return
         val params = bubbleParams ?: return
-        if (expanded || AppForegroundState.isForeground) return
         if (bubble.parent == null) {
             runCatching { wm.addView(bubble, params) }
         }

@@ -3,6 +3,7 @@ package com.ynk.virtualdisplay
 import com.ynk.virtualdisplay.automation.ManagedRuntimeState
 import com.ynk.virtualdisplay.automation.PetRuntime
 import com.ynk.virtualdisplay.automation.SessionRunState
+import com.ynk.virtualdisplay.floating.CapsuleBubblePolicy
 import com.ynk.virtualdisplay.floating.CapsuleUiMapper
 import com.ynk.virtualdisplay.floating.CapsuleVisualState
 import org.junit.Assert.assertEquals
@@ -43,5 +44,17 @@ class CapsuleUiMapperTest {
         )
         assertFalse(model.visible)
         assertFalse(model.canStop)
+    }
+
+    /**
+     * The bubble belongs to other apps only. Returning to QQPet has to take it off screen, because
+     * the in-app PiP is already showing the same preview there.
+     */
+    @Test
+    fun bubbleFloatsOnlyWhileAnotherAppIsInFront() {
+        assertTrue(CapsuleBubblePolicy.shouldAttach(appForeground = false, expanded = false))
+        assertFalse(CapsuleBubblePolicy.shouldAttach(appForeground = true, expanded = false))
+        assertFalse(CapsuleBubblePolicy.shouldAttach(appForeground = false, expanded = true))
+        assertFalse(CapsuleBubblePolicy.shouldAttach(appForeground = true, expanded = true))
     }
 }

@@ -46,6 +46,37 @@ class SessionPlanTest {
         assertRejected("PLAN_COURSE_DURATION_UNKNOWN") { plan.courseDurationMinutes() }
     }
 
+    /**
+     * The one rule both the picker and the 托管 button read. Only the measured course may start a
+     * session, because only its length can be charged against the daily budget.
+     */
+    @Test fun onlyAMeasuredCourseMayStartASession() {
+        assertTrue(SessionPlan().hasKnownDuration)
+        assertTrue(SessionPlan(courseId = SessionPlan.DEFAULT_COURSE_ID).hasKnownDuration)
+        assertFalse(SessionPlan(courseId = "study:别的课").hasKnownDuration)
+        assertTrue(SessionPlan.hasMeasuredDuration(SessionPlan.DEFAULT_COURSE_ID))
+        assertFalse(SessionPlan.hasMeasuredDuration("study:别的课"))
+    }
+
+    /**
+     * Typing "6" on the way to "65" used to be committed as 6, and the plan's own range check threw
+     * out of composition. Partial input must stay uncommitted instead.
+     */
+    @Test fun halfTypedNumbersAreNotPlanValues() {
+        val threshold = SessionPlan.THRESHOLD_RANGE
+        assertNull(SessionPlan.parseIntOrNull("6", threshold))
+        assertNull(SessionPlan.parseIntOrNull("10", threshold))
+        assertEquals(65, SessionPlan.parseIntOrNull("65", threshold))
+        assertEquals(100, SessionPlan.parseIntOrNull("100", threshold))
+        assertNull(SessionPlan.parseIntOrNull("101", threshold))
+        assertNull(SessionPlan.parseIntOrNull("", threshold))
+        assertNull(SessionPlan.parseIntOrNull("-9", threshold))
+        assertEquals(10, SessionPlan.parseIntOrNull("10", SessionPlan.ROUNDS_RANGE))
+        assertNull(SessionPlan.parseIntOrNull("11", SessionPlan.ROUNDS_RANGE))
+        assertEquals(480, SessionPlan.parseIntOrNull("480", SessionPlan.BUDGET_RANGE))
+        assertNull(SessionPlan.parseIntOrNull("0", SessionPlan.BUDGET_RANGE))
+    }
+
     @Test fun parserPairsANameWithItsDurationAndDropsTheRest() {
         val lines = listOf(
             line("学院", 0, 40),

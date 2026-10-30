@@ -28,6 +28,18 @@ data class CapsuleUiModel(
     val canStop: Boolean,
 )
 
+/**
+ * Where the cross-app bubble belongs.
+ *
+ * The bubble exists for OTHER apps. While QQPet itself is in the foreground the in-app PiP already
+ * shows the same preview, so a floating bubble on top of it would be a second, redundant preview.
+ * The answer is symmetric on purpose: the state that keeps the bubble away is also the state that
+ * takes it off screen, so returning to the app can never leave a stale system window behind.
+ */
+object CapsuleBubblePolicy {
+    fun shouldAttach(appForeground: Boolean, expanded: Boolean): Boolean = !appForeground && !expanded
+}
+
 object CapsuleUiMapper {
     fun from(managed: ManagedRuntimeState, legacy: PetRuntime.Snapshot, wallNowMs: Long, elapsedNowMs: Long): CapsuleUiModel {
         val view = ManagedRuntimePresentation.of(managed, legacy, wallNowMs, elapsedNowMs)
