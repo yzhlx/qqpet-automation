@@ -35,6 +35,7 @@ import com.ynk.virtualdisplay.automation.DailyBudgetStore
 import com.ynk.virtualdisplay.automation.PetAutomationService
 import com.ynk.virtualdisplay.automation.PetProfile
 import com.ynk.virtualdisplay.data.model.ShizukuState
+import com.ynk.virtualdisplay.floating.OverlayPermission
 import com.ynk.virtualdisplay.ui.data.PetEvidenceRepository
 import com.ynk.virtualdisplay.ui.kit.PetCard
 import com.ynk.virtualdisplay.ui.kit.PetChip
@@ -102,6 +103,19 @@ fun PetSettingsScreen(
         // ── 权限与环境 ──
         PetCard(pad0 = true) {
             GroupHeader("权限与环境")
+            val overlayGranted = OverlayPermission.canDrawOverlays(context)
+            Column(Modifier.clickable { context.startActivity(OverlayPermission.settingsIntent(context)) }) {
+                PetListRow(
+                    tileBg = if (overlayGranted) PetTokens.GreenSoft else PetTokens.AmberSoft,
+                    icon = { PetIcon(PetGlyph.TabSet, 18.dp, if (overlayGranted) PetTokens.GreenInk else PetTokens.AmberInk) },
+                    title = "悬浮窗权限",
+                    sub = if (overlayGranted) "已授权，跨应用胶囊可用" else "未授权：托管仍可运行，离开 App 后看不到胶囊",
+                    trailing = {
+                        if (overlayGranted) PetChip("已授权", PetTokens.GreenSoft, PetTokens.GreenInk)
+                        else PetChip("未授权", PetTokens.AmberSoft, PetTokens.AmberInk)
+                    },
+                )
+            }
             PetListRow(
                 tileBg = PetTokens.BlueSoft,
                 icon = { PetIcon(PetGlyph.Shield, 17.dp) },

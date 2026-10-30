@@ -38,6 +38,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
+import com.ynk.virtualdisplay.floating.OverlayPermission
 import com.ynk.virtualdisplay.automation.CourseCatalogStore
 import com.ynk.virtualdisplay.automation.DailyBudgetStore
 import com.ynk.virtualdisplay.automation.PetAutomationService
@@ -220,6 +221,11 @@ fun PetHomeScreen(
                 // the shared daily budget. Each stage now runs on its own.
                 if (!catalogFresh) {
                     PetNote("还没有课程档案，托管暂不可用。先到「托管方案」里读取本号已解锁的课程。", Modifier.padding(bottom = 7.dp))
+                }
+                val overlayHint = if (OverlayPermission.canDrawOverlays(context)) null
+                    else "未开启悬浮窗权限：托管照常运行，但离开 App 后看不到状态胶囊（设置 → 悬浮窗权限）。"
+                if (overlayHint != null) {
+                    PetNote(overlayHint, Modifier.padding(bottom = 7.dp))
                 }
                 SessionModeRow(
                     enabled = controls.startEnabled,
