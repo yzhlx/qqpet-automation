@@ -38,7 +38,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
-import com.ynk.virtualdisplay.automation.CourseCatalogStore
+import com.ynk.virtualdisplay.floating.OverlayPermission
 import com.ynk.virtualdisplay.automation.DailyBudgetStore
 import com.ynk.virtualdisplay.automation.PetAutomationService
 import com.ynk.virtualdisplay.automation.PetManagedRuntime
@@ -127,7 +127,6 @@ fun PetHomeScreen(
     // The saved plan decides the batch: course, round count, thresholds and budget. It replaces the
     // old in-memory 1/3/10 selector, which reset every time the screen was left.
     var plan by remember { mutableStateOf(SessionPlan()) }
-    var catalogFresh by remember { mutableStateOf(false) }
 
     LaunchedEffect(runtime.running, managed.sessionId) {
         suspend fun reload() = withContext(Dispatchers.IO) {
@@ -137,7 +136,6 @@ fun PetHomeScreen(
             logRows = PetLogPresentation.timeline(repo.logEntries(limit = 600))
             budgetUsed = DailyBudgetStore(context).usedMinutes()
             plan = SessionPlanStore(context).load()
-            catalogFresh = CourseCatalogStore(context).load()?.isFresh(System.currentTimeMillis()) == true
         }
         reload()
         while (runtime.running) {
@@ -196,7 +194,7 @@ fun PetHomeScreen(
                 HomeLogCard(logRows, onOpenLogs)
             } else {
                 LastRunCard(latest, fmt)
-                PlanCard(plan, catalogFresh, onOpenPlanSheet)
+                PlanCard(plan, onOpenPlanSheet)
                 ThresholdCard(plan)
                 PetNote("金币、属性、库存当前无法从游戏可靠读取，记录里不以估算值代填。")
             }
@@ -218,12 +216,20 @@ fun PetHomeScreen(
                 // Three separate entries, one per capability. v0.1 bundled 健康检查+护理+学习 into a
                 // single 开始托管, so reading the pet's current 体力/清洁 also spent coins and burned
                 // the shared daily budget. Each stage now runs on its own.
-                if (!catalogFresh) {
-                    PetNote("还没有课程档案，托管暂不可用。先到「托管方案」里读取本号已解锁的课程。", Modifier.padding(bottom = 7.dp))
+                // 托管 needs one thing from the plan: a course whose minutes the budget can charge.
+                // A scanned catalog is only what the picker shows, so an unscanned account still
+                // runs the historical default course exactly as it did before.
+                if (!plan.hasKnownDuration) {
+                    PetNote("所选课程还没有实测时长，托管暂不可用。先到「托管方案」里选一门已验证的课程。", Modifier.padding(bottom = 7.dp))
+                }
+                val overlayHint = if (OverlayPermission.canDrawOverlays(context)) null
+                    else "未开启悬浮窗权限：托管照常运行，但离开 App 后看不到状态胶囊（设置 → 悬浮窗权限）。"
+                if (overlayHint != null) {
+                    PetNote(overlayHint, Modifier.padding(bottom = 7.dp))
                 }
                 SessionModeRow(
                     enabled = controls.startEnabled,
-                    studyEnabled = controls.startEnabled && catalogFresh,
+                    studyEnabled = controls.startEnabled && plan.hasKnownDuration,
                     displayId = readyDisplay?.id,
                     rounds = plan.rounds,
                     context = context,
@@ -527,7 +533,7 @@ private fun StripCell(value: Int, label: String, modifier: Modifier = Modifier) 
 }
 
 @Composable
-private fun PlanCard(plan: SessionPlan, catalogFresh: Boolean, onOpenPlanSheet: () -> Unit) {
+private fun PlanCard(plan: SessionPlan, onOpenPlanSheet: () -> Unit) {
     PetCard(pad0 = true) {
         Row(Modifier.fillMaxWidth().padding(top = 2.dp, bottom = 4.dp),
             verticalAlignment = Alignment.CenterVertically) {

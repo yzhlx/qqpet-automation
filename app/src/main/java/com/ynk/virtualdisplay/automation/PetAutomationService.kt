@@ -15,6 +15,7 @@ import android.os.PowerManager
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import com.ynk.virtualdisplay.MyApplication
+import com.ynk.virtualdisplay.floating.PetCapsuleOverlay
 import com.ynk.virtualdisplay.R
 import com.ynk.virtualdisplay.data.repository.ConnectionStatus
 import kotlinx.coroutines.*
@@ -136,6 +137,7 @@ class PetAutomationService : Service() {
                 onWorkCompleted={minutes ->budget.addCourse(minutes)})
             capture.start()
             try {
+                PetCapsuleOverlay.show(this)
                 PetRuntime.update {it.copy(running=true,runState=SessionRunState.RUNNING,displayId=displayId,cycles=0,status=modeLabel(mode))}
                 val verdict=controller.run()
                 stopReason=if(verdict=="MANAGED_BATCH_PASS") "BATCH_PASS ${controller.completed}/$rounds" else controller.stopReason ?: "STOPPED"
@@ -188,6 +190,7 @@ class PetAutomationService : Service() {
     }
 
     private fun finalizeStop() {
+        PetCapsuleOverlay.hide()
         val reason = stopReason
         logLine("SESSION_STOP $reason")
         PetRuntime.update { it.copy(running = false, runState = SessionRunState.STOPPED, status = reason, nextCheckAtMs = null) }
@@ -242,6 +245,7 @@ class PetAutomationService : Service() {
     }
 
     override fun onDestroy() {
+        PetCapsuleOverlay.hide()
         job?.cancel(); job = null
         wakeLock?.let { if (it.isHeld) it.release() }
         wakeLock = null

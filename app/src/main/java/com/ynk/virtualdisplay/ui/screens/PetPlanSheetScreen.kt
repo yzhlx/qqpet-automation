@@ -25,6 +25,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
@@ -94,6 +95,9 @@ fun PetPlanSheetScreen(onClose: () -> Unit, onOpenConsole: () -> Unit, displayId
                 } else {
                     unlocked.forEach { course ->
                         val selected = course.id == plan.courseId
+                        // Only a course whose lesson length was measured can be charged against the
+                        // daily budget, so it is the only kind this sheet lets a session start on.
+                        val verified = SessionPlan.hasMeasuredDuration(course.id)
                         Row(
                             Modifier.fillMaxWidth().padding(vertical = 4.dp)
                                 .background(
@@ -107,15 +111,29 @@ fun PetPlanSheetScreen(onClose: () -> Unit, onOpenConsole: () -> Unit, displayId
                                 Text(course.name, fontSize = 14.sp, fontWeight = FontWeight(650),
                                     color = if (selected) PetTokens.BlueInk else PetTokens.Ink)
                                 val duration = course.durationMinutes?.let { "$it 分钟" } ?: "时长未读出"
-                                Text(duration, fontSize = 11.5.sp, color = PetTokens.Ink3)
+                                Text(if (verified) duration else "$duration · 时长未实测",
+                                    fontSize = 11.5.sp, color = PetTokens.Ink3)
                             }
                             PetFootButton(
-                                text = if (selected) "已选" else "选择",
-                                tone = if (selected) PetButtonTone.DISABLED else PetButtonTone.PRIMARY,
-                                onClick = { plan = plan.copy(courseId = course.id); saved = false },
+                                text = when {
+                                    selected -> "已选"
+                                    !verified -> "未实测"
+                                    else -> "选择"
+                                },
+                                tone = if (selected || !verified) PetButtonTone.DISABLED else PetButtonTone.PRIMARY,
+                                onClick = {
+                                    if (verified) {
+                                        plan = plan.copy(courseId = course.id); saved = false
+                                    }
+                                },
                             )
                         }
                     }
+                    PetNote("托管只接受时长已实测的课程：每日上限按时长记账，没测过的时长会让这条判断失真。")
+                }
+                if (!plan.hasKnownDuration) {
+                    Spacer(Modifier.height(6.dp))
+                    PetNote("当前方案里的课程还没有实测时长，托管会拒绝启动。请在下面选一门已验证的课程。")
                 }
                 Spacer(Modifier.height(8.dp))
                 val scannedAt = catalog?.scannedAtMs?.takeIf { it > 0 }?.let {
@@ -135,17 +153,17 @@ fun PetPlanSheetScreen(onClose: () -> Unit, onOpenConsole: () -> Unit, displayId
             PetCard {
                 PetSection("节数与阈值")
                 Spacer(Modifier.height(8.dp))
-                NumberField("节数（1–10）", plan.rounds.toString()) {
-                    it.toIntOrNull()?.let { value -> plan = plan.copy(rounds = value); saved = false }
+                NumberField("节数（${SessionPlan.MIN_ROUNDS}–${SessionPlan.MAX_ROUNDS}）", plan.rounds, SessionPlan.ROUNDS_RANGE) {
+                    plan = plan.copy(rounds = it); saved = false
                 }
-                NumberField("体力阈值（60–100）", plan.energyThreshold.toString()) {
-                    it.toIntOrNull()?.let { value -> plan = plan.copy(energyThreshold = value); saved = false }
+                NumberField("体力阈值（${SessionPlan.MIN_THRESHOLD}–${SessionPlan.MAX_THRESHOLD}）", plan.energyThreshold, SessionPlan.THRESHOLD_RANGE) {
+                    plan = plan.copy(energyThreshold = it); saved = false
                 }
-                NumberField("清洁阈值（60–100）", plan.cleanlinessThreshold.toString()) {
-                    it.toIntOrNull()?.let { value -> plan = plan.copy(cleanlinessThreshold = value); saved = false }
+                NumberField("清洁阈值（${SessionPlan.MIN_THRESHOLD}–${SessionPlan.MAX_THRESHOLD}）", plan.cleanlinessThreshold, SessionPlan.THRESHOLD_RANGE) {
+                    plan = plan.copy(cleanlinessThreshold = it); saved = false
                 }
-                NumberField("每日上限（分钟，最多 ${DailyBudgetStore.HARD_STOP_MINUTES}）", plan.dailyBudgetMinutes.toString()) {
-                    it.toIntOrNull()?.let { value -> plan = plan.copy(dailyBudgetMinutes = value); saved = false }
+                NumberField("每日上限（分钟，最多 ${DailyBudgetStore.HARD_STOP_MINUTES}）", plan.dailyBudgetMinutes, SessionPlan.BUDGET_RANGE) {
+                    plan = plan.copy(dailyBudgetMinutes = it); saved = false
                 }
                 PetNote("低于阈值会先护理再开课。每日上限只能调低，不能超过游戏的 480 分钟。")
             }
@@ -197,14 +215,31 @@ private fun startCourseScan(context: Context, displayId: Int) {
     ContextCompat.startForegroundService(context, PetAutomationService.scanCoursesIntent(context, displayId))
 }
 
+/**
+ * A numeric plan field.
+ *
+ * The field owns its text while it is being typed, and only text that already is a legal value
+ * reaches the plan: "6" on the way to "65" stays in the box instead of being committed and
+ * rejected. Leaving the field drops whatever is left over, so the box can never show a number the
+ * plan does not hold.
+ */
 @Composable
-private fun NumberField(label: String, value: String, onValue: (String) -> Unit) {
+private fun NumberField(label: String, value: Int, range: IntRange, onValue: (Int) -> Unit) {
+    var text by remember { mutableStateOf(value.toString()) }
+    LaunchedEffect(value) { if (text.toIntOrNull() != value) text = value.toString() }
     OutlinedTextField(
-        value = value,
-        onValueChange = onValue,
+        value = text,
+        onValueChange = { raw ->
+            if (raw.all { it.isDigit() }) {
+                text = raw
+                SessionPlan.parseIntOrNull(raw, range)?.let(onValue)
+            }
+        },
         label = { Text(label) },
         singleLine = true,
+        isError = SessionPlan.parseIntOrNull(text, range) == null,
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-        modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+        modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)
+            .onFocusChanged { if (!it.isFocused) text = value.toString() },
     )
 }
