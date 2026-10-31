@@ -2,6 +2,7 @@ package com.ynk.virtualdisplay
 
 import android.app.Application
 import android.util.Log
+import com.ynk.virtualdisplay.floating.AppForegroundState
 import com.ynk.virtualdisplay.data.repository.IDisplayRepository
 import com.ynk.virtualdisplay.data.repository.ShizukuDisplayRepository
 
@@ -36,6 +37,8 @@ class MyApplication : Application() {
 
     override fun onCreate() {
         super.onCreate()
+        // Lets the overlay capsule know when QQPet itself is visible.
+        registerActivityLifecycleCallbacks(AppForegroundState)
         Log.i(TAG, "MyApplication onCreate, initializing ShizukuDisplayRepository")
         displayRepository = ShizukuDisplayRepository(this)
     }

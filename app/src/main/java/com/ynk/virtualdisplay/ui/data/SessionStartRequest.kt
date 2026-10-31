@@ -12,8 +12,8 @@ import com.ynk.virtualdisplay.automation.SessionMode
  * The one place that decides "how many 节 does this particular start request ask for".
  *
  * The user picks a batch size once (1 / 3 / 10). Only 托管 ([SessionMode.FULL]) runs lessons, so only
- * 托管 may carry that choice. 健康检查 reads the pet a single time and 护理 repairs to the 90/90
- * threshold: neither is a batch of lessons, so both must stay on exactly one pass no matter what the
+ * 托管 may carry that choice. 健康检查 reads the pet a single time and 护理 repairs to the plan's
+ * thresholds: neither is a batch of lessons, so both must stay on exactly one pass no matter what the
  * selector shows. Routing every entry through this object keeps the three buttons from each
  * re-inventing that rule — and, because it is plain Kotlin, it is the only part of the start path a
  * JVM unit test can observe.

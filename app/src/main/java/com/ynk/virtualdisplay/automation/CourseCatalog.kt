@@ -76,6 +76,13 @@ data class CourseCatalog(
 
     fun isUsable(nowMs: Long): Boolean = complete && courses.isNotEmpty() && isFresh(nowMs)
 
+    /**
+     * Whether a finished scan may replace this catalog. Courses are not expected to vanish, so a
+     * shorter list means a card went unread; it only wins once this catalog has expired anyway.
+     */
+    fun mayBeReplacedBy(next: CourseCatalog, nowMs: Long): Boolean =
+        next.courses.size >= courses.size || !isFresh(nowMs)
+
     fun toJson(): JSONObject = JSONObject()
         .put("scannedAtMs", scannedAtMs)
         .put("complete", complete)
@@ -118,6 +125,34 @@ class CourseCatalogStore(context: Context) {
     }
 }
 
+/**
+ * Corrects OCR slips in course titles. On fully shown cards the recogniser has read 世界地理课 as
+ * 世界地理谍, 看图识世界课 as 香图识世界谍 and 演说表达课 as 演濱说衷达谋. So the look-alikes it was
+ * measured to swap are folded together, and a title then within one edit of exactly one measured
+ * course is that course. A shorter title is a clipped card, not a slip. Any other text is left
+ * alone: a course not listed here must match exactly, and a miss stays a miss.
+ */
+object CourseNames {
+    /** All seven courses of the 初级学园 list, as shown on the measured account. */
+    val MEASURED = listOf("蹦蹦跳跳体能课", "看图识世界课", "闪亮自我表达课", "田径运动课", "世界地理课", "演说表达课", "萌芽夏令营")
+
+    private val LOOK_ALIKES = mapOf('谍' to '课', '谋' to '课', '年' to '课', '远' to '运', '香' to '看', '衷' to '表')
+
+    fun canonical(text: String): String {
+        // The card's rounded edge is sometimes read as a leading bar: |蹦蹦跳跳体能课.
+        val name = text.trim().trimStart('|', '｜', '丨').trim()
+        if (name in MEASURED) return name
+        val folded = name.map { LOOK_ALIKES[it] ?: it }.joinToString("")
+        return MEASURED.singleOrNull { withinOneEdit(folded, it) } ?: name
+    }
+
+    private fun withinOneEdit(read: String, course: String): Boolean = when (read.length) {
+        course.length -> read.indices.count { read[it] != course[it] } <= 1
+        course.length + 1 -> read.indices.any { read.removeRange(it, it + 1) == course }
+        else -> false
+    }
+}
+
 /** Pairs each card's name with the duration directly below its own horizontal centre. */
 object CourseListParser {
     val durationPattern = Regex("""(\d+)\s*分钟""")
@@ -133,10 +168,9 @@ object CourseListParser {
         val consumed = mutableSetOf<Int>()
         return lines.sortedBy { it.bounds.left }.mapNotNull { line ->
             val rawName = line.text.trim().replace(" ", "")
-            // Exact observed glyph confusion, verified against the full card in the r7 scan frames.
-            // Do not rewrite arbitrary course suffixes or infer names for other accounts.
-            val name = if (rawName == "世界地理谋") "世界地理课" else rawName
-            if (!namePattern.matches(name) || line.bounds.left < NAME_MIN_LEFT) return@mapNotNull null
+            // A title with punctuation is a merged sliver; only clean Han text may be corrected.
+            if (!namePattern.matches(rawName) || line.bounds.left < NAME_MIN_LEFT) return@mapNotNull null
+            val name = CourseNames.canonical(rawName)
             val candidates = durations.filter { (_, index, duration) ->
                 index !in consumed && aligned(line.bounds, duration.bounds)
             }.sortedBy { (_, _, duration) ->
@@ -183,9 +217,7 @@ object CourseListParser {
 
 /** Merges overlapping pages without duplicates; conflicting readings fail instead of replacing facts. */
 object CourseScanAccumulator {
-    data class Fold(val courses: List<CourseEntry>, val added: Int) {
-        val unchanged: Boolean get() = added == 0
-    }
+    data class Fold(val courses: List<CourseEntry>, val added: Int)
 
     fun fold(collected: List<CourseEntry>, screen: List<CourseEntry>): Fold {
         val merged = collected.associateBy { it.id }.toMutableMap()

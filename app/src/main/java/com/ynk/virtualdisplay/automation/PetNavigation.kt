@@ -1363,6 +1363,10 @@ class PetNavigation(private val flow: PetFlowContext, private val workReader: Wo
             }
         }
     }
+    private suspend fun coursePanelOpen(): Boolean = with(flow) {
+        val current=frame()
+        try {score(current,listOf(profile.courseListProbe))>=profile.matchThreshold} finally {current.recycle()}
+    }
     /** Enter the academy map, then explicitly open the unlocked primary academy course panel. */
     suspend fun openAcademyCourseList() = with(flow) {
         state="SELECT_COURSE"
@@ -1399,6 +1403,9 @@ class PetNavigation(private val flow: PetFlowContext, private val workReader: Wo
         while(taps<maxAcademyTaps) {
             val gateDeadline=SystemClock.elapsedRealtime()+labelLocateMs
             val target=stableAcademyLabel("enter-primary-academy-label",gateDeadline)
+            // The map zooms in and opens the panel on its own (measured 2026-10-31, panel 0.996),
+            // which also takes the label out of reach. That is the page this function wants.
+            if(target==null && coursePanelOpen()) return@with
             check(target!=null) { "ACADEMY_LABEL_NOT_UNIQUELY_LOCATED" }
             // The panel AND the label are both re-checked on a FRESH frame as the last thing before
             // the tap, after safety() and as close to input.tap() as the controller allows. The
@@ -1428,7 +1435,7 @@ class PetNavigation(private val flow: PetFlowContext, private val workReader: Wo
                     capture.telemetry().put("templateName",profile.courseListProbe.name)
                         .put("tapIndex",taps)
                         .put("result","PANEL_ALREADY_OPEN_NO_INPUT").toString())
-                error("ACADEMY_PANEL_OPEN_BEFORE_ENTRY_TAP:$panelBeforeTap")
+                return@with
             }
             // A fresh frame that no longer carries one unambiguous label must send no input. The
             // fail-closed default is a stop, never a reuse of the pre-safety coordinate.

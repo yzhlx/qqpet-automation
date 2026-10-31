@@ -289,12 +289,12 @@ internal object CourseCardReader {
 
 object CourseRowLocator {
     fun locate(lines: List<TextLine>, courseName: String): PointF? {
-        val line = lines.firstOrNull { it.text.trim() == courseName } ?: return null
+        val line = lines.firstOrNull { CourseNames.canonical(it.text) == courseName } ?: return null
         return PointF((line.bounds.left + line.bounds.right) / 2f, (line.bounds.top + line.bounds.bottom) / 2f)
     }
 
     fun titleMatches(lines: List<TextLine>, courseName: String): Boolean =
-        lines.any { it.text.trim() == courseName }
+        lines.any { CourseNames.canonical(it.text) == courseName }
 }
 
 /** Selects a complete card, then requires its selected border and re-reads its own duration. */

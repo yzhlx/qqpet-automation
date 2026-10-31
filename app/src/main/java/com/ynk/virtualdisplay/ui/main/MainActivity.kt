@@ -35,6 +35,7 @@ import com.ynk.virtualdisplay.data.repository.ShizukuDisplayRepository
 import com.ynk.virtualdisplay.ui.kit.PetGlyph
 import com.ynk.virtualdisplay.ui.kit.PetIcon
 import com.ynk.virtualdisplay.ui.screens.PetCalibrationScreen
+import com.ynk.virtualdisplay.floating.PetAgentPipHost
 import com.ynk.virtualdisplay.ui.screens.PetHomeScreen
 import com.ynk.virtualdisplay.ui.screens.PetLogScreen
 import com.ynk.virtualdisplay.ui.screens.PetPlanSheetScreen
@@ -125,6 +126,7 @@ class MainActivity : ComponentActivity() {
  */
 @Composable
 private fun PetApp(uiState: MainUiState, viewModel: MainViewModel) {
+    Box(Modifier.fillMaxSize()) {
     Column(Modifier.fillMaxSize()) {
         Box(Modifier.weight(1f)) {
             when (uiState.overlay) {
@@ -177,9 +179,12 @@ private fun PetApp(uiState: MainUiState, viewModel: MainViewModel) {
                 }
             }
         }
-        if (uiState.overlay == OverlayScreen.NONE) {
-            PetTabBar(uiState.currentTab) { viewModel.switchTab(it) }
+            if (uiState.overlay == OverlayScreen.NONE) {
+                PetTabBar(uiState.currentTab) { viewModel.switchTab(it) }
+            }
         }
+    // In-app floating preview sits above tabs/content but below system dialogs.
+        PetAgentPipHost(Modifier.fillMaxSize())
     }
 }
 

@@ -15,6 +15,7 @@ import android.os.PowerManager
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import com.ynk.virtualdisplay.MyApplication
+import com.ynk.virtualdisplay.floating.PetCapsuleOverlay
 import com.ynk.virtualdisplay.R
 import com.ynk.virtualdisplay.data.repository.ConnectionStatus
 import kotlinx.coroutines.*
@@ -365,7 +366,12 @@ class PetAutomationService : Service() {
                 navigation.initialise()
                 navigation.enterOutdoor("outdoor")
                 val catalog = CourseScanFlow(flow, navigation, reader).scan()
-                CourseCatalogStore(this).save(catalog)
+                val store = CourseCatalogStore(this)
+                val existing = store.load()
+                check(existing == null || existing.mayBeReplacedBy(catalog, System.currentTimeMillis())) {
+                    "COURSE_SCAN_INCOMPLETE:READ_${catalog.courses.size}_OF_${existing?.courses?.size}"
+                }
+                store.save(catalog)
                 navigation.tap(profile.courseListProbe, android.graphics.PointF(80f, 160f), flow.academy, "scan-close-panel")
                 navigation.tap(flow.academy, android.graphics.PointF(80f, 160f), flow.outdoor, "scan-leave-academy")
                 navigation.returnHomeFromMap("scan")
@@ -496,6 +502,7 @@ class PetAutomationService : Service() {
                 planAttemptBudget=selectedBudget)
             capture.start()
             try {
+                PetCapsuleOverlay.show(this)
                 PetRuntime.update {it.copy(running=true,runState=SessionRunState.RUNNING,displayId=displayId,cycles=0,status=modeLabel(mode))}
                 val verdict=controller.run()
                 // Each independent entry has its OWN success verdict; only 托管 counts rounds. A
@@ -573,6 +580,7 @@ class PetAutomationService : Service() {
     private fun finalizeStop(owner:String?=ownerRunId) {
         if(owner!=null && ownerRunId!=null && owner!=ownerRunId) return
         ownerRunId=null
+        PetCapsuleOverlay.hide()
         val reason = stopReason
         logLine("SESSION_STOP $reason")
         PetRuntime.update { it.copy(running = false, runState = SessionRunState.STOPPED, status = reason, nextCheckAtMs = null) }
@@ -627,6 +635,7 @@ class PetAutomationService : Service() {
     }
 
     override fun onDestroy() {
+        PetCapsuleOverlay.hide()
         job?.cancel(); job = null
         wakeLock?.let { if (it.isHeld) it.release() }
         wakeLock = null

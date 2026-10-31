@@ -42,10 +42,10 @@ data class SessionPlan(
 ) {
     init {
         require(courseId.isNotBlank()) { "PLAN_COURSE_BLANK" }
-        require(rounds in MIN_ROUNDS..MAX_ROUNDS) { "PLAN_ROUNDS_OUT_OF_RANGE:$rounds" }
-        require(energyThreshold in MIN_THRESHOLD..MAX_THRESHOLD) { "PLAN_ENERGY_THRESHOLD_OUT_OF_RANGE:$energyThreshold" }
-        require(cleanlinessThreshold in MIN_THRESHOLD..MAX_THRESHOLD) { "PLAN_CLEANLINESS_THRESHOLD_OUT_OF_RANGE:$cleanlinessThreshold" }
-        require(dailyBudgetMinutes in 1..DailyBudgetStore.HARD_STOP_MINUTES) { "PLAN_BUDGET_OUT_OF_RANGE:$dailyBudgetMinutes" }
+        require(rounds in ROUNDS_RANGE) { "PLAN_ROUNDS_OUT_OF_RANGE:$rounds" }
+        require(energyThreshold in THRESHOLD_RANGE) { "PLAN_ENERGY_THRESHOLD_OUT_OF_RANGE:$energyThreshold" }
+        require(cleanlinessThreshold in THRESHOLD_RANGE) { "PLAN_CLEANLINESS_THRESHOLD_OUT_OF_RANGE:$cleanlinessThreshold" }
+        require(dailyBudgetMinutes in BUDGET_RANGE) { "PLAN_BUDGET_OUT_OF_RANGE:$dailyBudgetMinutes" }
         require(!workBeforeStudy || !workOptionId.isNullOrBlank()) { "PLAN_WORK_OPTION_MISSING" }
     }
 
@@ -88,6 +88,11 @@ data class SessionPlan(
          * too, but until that reading is closed-loop verified the budget guard trusts only this.
          */
         val KNOWN_COURSE_MINUTES: Map<String, Int> = mapOf(DEFAULT_COURSE_ID to 10)
+
+        /** The ranges a plan may hold, shared by the [SessionPlan] checks above. */
+        val ROUNDS_RANGE = MIN_ROUNDS..MAX_ROUNDS
+        val THRESHOLD_RANGE = MIN_THRESHOLD..MAX_THRESHOLD
+        val BUDGET_RANGE = 1..DailyBudgetStore.HARD_STOP_MINUTES
 
         /** A missing or older file decodes as the defaults, so an upgrade changes nothing. */
         fun fromJson(json: JSONObject): SessionPlan = SessionPlan(

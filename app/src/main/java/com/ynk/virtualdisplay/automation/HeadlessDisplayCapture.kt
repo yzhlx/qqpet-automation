@@ -19,6 +19,7 @@ import org.json.JSONObject
 import com.ynk.virtualdisplay.data.repository.ConnectionStatus
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
+import com.ynk.virtualdisplay.floating.DisplayPreviewHub
 
 /**
  * Headless capture for one VirtualDisplay. No MediaProjection / Accessibility / network.
@@ -76,6 +77,8 @@ class HeadlessDisplayCapture(
         // entry or a queued buffer must keep its original, older instant so that age is measured
         // from when the pixels were captured rather than from when someone looked at them.
         renderedAtMs = observedAtMs
+        // Read-only scaled preview for in-app PiP / overlay capsule. Never rebinds Surface.
+        DisplayPreviewHub.publishFrom(renderedSnapshot ?: frame, observedAtMs)
         return frame
     }
 
@@ -232,6 +235,7 @@ class HeadlessDisplayCapture(
         pendingSignal.getAndSet(null)?.cancel()
         latestImage.getAndSet(null)?.close()
         renderedSnapshot?.recycle(); renderedSnapshot = null
+        DisplayPreviewHub.clear()
         // The upstream service interprets null as: restore its own fallback ImageReader Surface.
         withContext(NonCancellable) {
             runCatching { repository.setDisplaySurface(displayId, null).getOrThrow() }

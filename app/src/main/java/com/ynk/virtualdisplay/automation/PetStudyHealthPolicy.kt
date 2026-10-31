@@ -3,7 +3,9 @@ package com.ynk.virtualdisplay.automation
 /** User policy: only energy and cleanliness authorize study; mood is observation only. */
 object PetStudyHealthPolicy {
     data class Reading(val energy:Int,val cleanliness:Int,val energyThreshold:Int=SessionPlan.DEFAULT_THRESHOLD,val cleanlinessThreshold:Int=SessionPlan.DEFAULT_THRESHOLD) {
-        val ready get()=energy>=energyThreshold && cleanliness>=cleanlinessThreshold
+        val needsFeed get()=energy<energyThreshold
+        val needsClean get()=cleanliness<cleanlinessThreshold
+        val ready get()=!needsFeed && !needsClean
     }
     fun read(health:HealthObservations,now:Long,energyThreshold:Int=SessionPlan.DEFAULT_THRESHOLD,cleanlinessThreshold:Int=SessionPlan.DEFAULT_THRESHOLD):Reading {
         val energy=minOf(health.energy.requireCurrent(now,60000),health.barEnergy.requireCurrent(now,60000))

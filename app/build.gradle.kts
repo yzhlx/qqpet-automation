@@ -22,7 +22,9 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.ynk.virtualdisplay"
+        // QQPET_APP_ID_OVERRIDE lets a side-by-side smoke build install without touching the
+        // installed app; unset it for a normal release build.
+        applicationId = (System.getenv("QQPET_APP_ID_OVERRIDE") ?: "com.ynk.virtualdisplay")
         minSdk = 29
         targetSdk = 35 // targetSdk 36 is not yet stable, 35 is recommended for now
 

@@ -47,6 +47,7 @@ import com.ynk.virtualdisplay.automation.PetProfile
 import com.ynk.virtualdisplay.automation.PetRuntime
 import com.ynk.virtualdisplay.automation.SessionMode
 import com.ynk.virtualdisplay.automation.SessionPlan
+import com.ynk.virtualdisplay.floating.OverlayPermission
 import com.ynk.virtualdisplay.automation.SessionPlanStore
 import com.ynk.virtualdisplay.data.model.ShizukuState
 import com.ynk.virtualdisplay.ui.data.LogEntry
@@ -234,6 +235,11 @@ fun PetHomeScreen(
                         onOpenPlanSheet = onOpenPlanSheet,
                         modifier = Modifier.padding(bottom = 7.dp),
                     )
+                }
+                val overlayHint = if (OverlayPermission.canDrawOverlays(context)) null
+                    else "未开启悬浮窗权限：托管照常运行，但离开 App 后看不到状态胶囊（设置 → 悬浮窗权限）。"
+                if (overlayHint != null) {
+                    PetNote(overlayHint, Modifier.padding(bottom = 7.dp))
                 }
                 SessionModeRow(
                     enabled = controls.startEnabled,
