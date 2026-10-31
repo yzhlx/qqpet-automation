@@ -98,7 +98,12 @@ class PetAutomationService : Service() {
                 navigation.initialise()
                 navigation.tap(flow.room, android.graphics.PointF(360f, 1390f), flow.outdoor, "outdoor")
                 val catalog = CourseScanFlow(flow, navigation, MlKitCourseNameReader()).scan()
-                CourseCatalogStore(this).save(catalog)
+                val store = CourseCatalogStore(this)
+                val existing = store.load()
+                check(existing == null || existing.mayBeReplacedBy(catalog, System.currentTimeMillis())) {
+                    "COURSE_SCAN_INCOMPLETE:READ_${catalog.courses.size}_OF_${existing?.courses?.size}"
+                }
+                store.save(catalog)
                 stopReason = "课程读取完成 ${catalog.courses.size} 门"
             } finally { capture.stop() }
         } catch (ce: CancellationException) {

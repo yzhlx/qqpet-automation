@@ -68,6 +68,13 @@ data class CourseCatalog(
     fun isFresh(nowMs: Long): Boolean =
         scannedAtMs > 0 && nowMs - scannedAtMs <= SessionPlan.CATALOG_MAX_AGE_MS
 
+    /**
+     * Whether a finished scan may replace this catalog. Courses are not expected to vanish, so a
+     * shorter list means a card went unread; it only wins once this catalog has expired anyway.
+     */
+    fun mayBeReplacedBy(next: CourseCatalog, nowMs: Long): Boolean =
+        next.courses.size >= courses.size || !isFresh(nowMs)
+
     fun toJson(): JSONObject = JSONObject()
         .put("scannedAtMs", scannedAtMs)
         .put("courses", JSONArray().also { array -> courses.forEach { array.put(it.toJson()) } })
@@ -109,6 +116,34 @@ class CourseCatalogStore(context: Context) {
 }
 
 /**
+ * Corrects OCR slips in course titles. On fully shown cards the recogniser has read 世界地理课 as
+ * 世界地理谍, 看图识世界课 as 香图识世界谍 and 演说表达课 as 演濱说衷达谋. So the look-alikes it was
+ * measured to swap are folded together, and a title then within one edit of exactly one measured
+ * course is that course. A shorter title is a clipped card, not a slip. Any other text is left
+ * alone: a course not listed here must match exactly, and a miss stays a miss.
+ */
+object CourseNames {
+    /** All seven courses of the 初级学园 list, as shown on the measured account. */
+    val MEASURED = listOf("蹦蹦跳跳体能课", "看图识世界课", "闪亮自我表达课", "田径运动课", "世界地理课", "演说表达课", "萌芽夏令营")
+
+    private val LOOK_ALIKES = mapOf('谍' to '课', '谋' to '课', '年' to '课', '远' to '运', '香' to '看', '衷' to '表')
+
+    fun canonical(text: String): String {
+        // The card's rounded edge is sometimes read as a leading bar: |蹦蹦跳跳体能课.
+        val name = text.trim().trimStart('|', '｜', '丨').trim()
+        if (name in MEASURED) return name
+        val folded = name.map { LOOK_ALIKES[it] ?: it }.joinToString("")
+        return MEASURED.singleOrNull { withinOneEdit(folded, it) } ?: name
+    }
+
+    private fun withinOneEdit(read: String, course: String): Boolean = when (read.length) {
+        course.length -> read.indices.count { read[it] != course[it] } <= 1
+        course.length + 1 -> read.indices.any { read.removeRange(it, it + 1) == course }
+        else -> false
+    }
+}
+
+/**
  * Turns one screen of OCR lines into course rows. Pure, so the row rules are testable without a
  * device or a model.
  *
@@ -120,8 +155,17 @@ class CourseCatalogStore(context: Context) {
 object CourseListParser {
     private val durationPattern = Regex("""(\d+)\s*分钟""")
 
-    /** A name starting further left than this is the clipped edge of a card, not a whole card. */
-    const val NAME_MIN_LEFT = 40
+    /**
+     * The panel clips at x=48 and x=672, and a cut-off title's box runs right up to that edge
+     * (measured 45..51 and 673..674), so a box staying clear of both is a whole title even when its
+     * card is partly hidden. This must stay wider than one swipe moves the list (measured 425 px),
+     * or a card can jump from one side of the window to the other without ever being read.
+     */
+    const val TITLE_MIN_LEFT = 60
+    const val TITLE_MAX_RIGHT = 660
+
+    /** A title and its duration are centred on the same card, and cards are 248 wide. */
+    const val CARD_HALF_WIDTH = 124
 
     fun parse(lines: List<TextLine>, locked: (Rect) -> Boolean): List<CourseEntry> {
         val durations = lines.mapIndexedNotNull { index, line ->
@@ -133,14 +177,11 @@ object CourseListParser {
         return lines.mapIndexedNotNull { index, line ->
             if (index in consumed) return@mapIndexedNotNull null
             if (durationPattern.containsMatchIn(line.text)) return@mapIndexedNotNull null
-            val name = line.text.trim()
+            val name = CourseNames.canonical(line.text)
             if (name.length < 2) return@mapIndexedNotNull null
-            // A card sliding in from the screen edge is only partly visible, and the recogniser
-            // reads that sliver as a course of its own. Such a line is cut off at the edge, so it
-            // never starts at the left margin the way a fully shown card does.
-            if (line.bounds.left < NAME_MIN_LEFT) return@mapIndexedNotNull null
+            if (line.bounds.left < TITLE_MIN_LEFT || line.bounds.right > TITLE_MAX_RIGHT) return@mapIndexedNotNull null
             val duration = durations.firstOrNull { (_, durationIndex, durationLine) ->
-                durationIndex !in consumed && aligned(line.bounds, durationLine.bounds)
+                durationIndex !in consumed && aligned(line.bounds, durationLine.bounds) && sameCard(line.bounds, durationLine.bounds)
             } ?: return@mapIndexedNotNull null
             val (_, durationIndex, durationLine) = duration
             consumed += durationIndex
@@ -157,6 +198,9 @@ object CourseListParser {
             )
         }
     }
+
+    private fun sameCard(a: Rect, b: Rect) =
+        kotlin.math.abs((a.left + a.right) / 2 - (b.left + b.right) / 2) < CARD_HALF_WIDTH
 
     /**
      * Same row: the two boxes' vertical centres are at most the taller one's height apart. Overlap
@@ -177,12 +221,10 @@ object CourseListParser {
 /**
  * Folds several scrolled screens into one catalog. A course whose name was already seen is kept
  * once, at the position of its first sighting, so scrolling back over the same rows cannot
- * duplicate them. [unchanged] is how the scanner knows it has reached the end of the list.
+ * duplicate them.
  */
 object CourseScanAccumulator {
-    data class Fold(val courses: List<CourseEntry>, val added: Int) {
-        val unchanged: Boolean get() = added == 0
-    }
+    data class Fold(val courses: List<CourseEntry>, val added: Int)
 
     fun fold(collected: List<CourseEntry>, screen: List<CourseEntry>): Fold {
         val known = collected.map { it.name }.toMutableSet()

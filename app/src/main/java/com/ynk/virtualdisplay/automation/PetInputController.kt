@@ -218,8 +218,11 @@ class PetInputController(
         }
     }
 
-    /** One continuous, display-scoped gesture, used only for the measured soap interaction. */
-    suspend fun drag(points: List<PointF>, stepMs: Long = 250L) {
+    /**
+     * One continuous, display-scoped gesture. [holdMs] presses before moving, as the measured soap
+     * interaction needs; scrolling a list passes 0 so the gesture is a swipe rather than a long press.
+     */
+    suspend fun drag(points: List<PointF>, stepMs: Long = 250L, holdMs: Long = 650L) {
         require(points.size >= 2)
         points.forEach { require(it.x in 0f..<width.toFloat() && it.y in 0f..<height.toFloat()) }
         facts.beginAction()
@@ -244,7 +247,7 @@ class PetInputController(
             var primary: Throwable? = null
             try {
                 send(MotionEvent.ACTION_DOWN, last)
-                delay(650)
+                delay(holdMs)
                 for (point in points.drop(1)) {
                     last = point
                     send(MotionEvent.ACTION_MOVE, point)
