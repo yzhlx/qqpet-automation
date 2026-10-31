@@ -41,7 +41,7 @@ class SessionModeTest {
     @Test
     fun `stages are strictly nested`() {
         // A mode that runs a lesson must also run care, because a lesson requires a verified
-        // >=90 reading and producing that reading is the care stage.
+        // reading at the plan's thresholds and producing that reading is the care stage.
         for (mode in SessionMode.entries) {
             if (mode.runsStudy) assertTrue("$mode runs a lesson without care", mode.runsCare)
         }

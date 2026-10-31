@@ -153,7 +153,7 @@ class PetSessionController(context:Context,capture:HeadlessDisplayCapture,input:
      *
      * The stage boundaries are the mode's, not the loop's: a CARE session reads and recovers but
      * never calls beforeCourse()/study, so it never touches the shared daily budget and never
-     * requires the ≥90 precondition that only a lesson needs.
+     * requires the threshold precondition that only a lesson needs.
      */
     private suspend fun runRounds():String=coroutineScope {
             repeat(totalRounds) {index ->
@@ -162,7 +162,7 @@ class PetSessionController(context:Context,capture:HeadlessDisplayCapture,input:
                 val before=care.readHealth("before")
                 val beforeRecord=flow.healthJson(before)
                 if(mode.runsCare) {
-                    care.recover(before)
+                    care.recover(before,plan)
                     flow.state="VERIFY_READY"
                 }
                 val ready=if(mode.runsCare) care.readHealth("ready") else before

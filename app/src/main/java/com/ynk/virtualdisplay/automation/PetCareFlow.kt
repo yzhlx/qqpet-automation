@@ -213,7 +213,7 @@ class PetCareFlow(private val flow: PetFlowContext,private val navigation: PetNa
         navigation.tap(healthPanel,PointF(355f,454f),parent,"close-health")
         h
     }
-    suspend fun recover(initial: PetCareReading): PetCareReading = with(flow) {
+    suspend fun recover(initial: PetCareReading, plan: SessionPlan): PetCareReading = with(flow) {
         state="RECOVER_IF_NEEDED"
         var h = initial
         val recovery=JSONObject().put("feed_count",0).put("feed_duration_ms",0L)
@@ -221,7 +221,7 @@ class PetCareFlow(private val flow: PetFlowContext,private val navigation: PetNa
         careStatistics=recovery
         var feeds=0
         var restocks=0
-        while(h.energy<90) {
+        while(h.against(plan).needsFeed) {
             check(feeds<5) { "FEED_RETRY_LIMIT" }
             // The batch-wide limit, checked BEFORE the action begins, and then reserved on the spot:
             // from here the allowance is spent-or-possibly-spent and a failed feed cannot free it.
@@ -302,7 +302,7 @@ class PetCareFlow(private val flow: PetFlowContext,private val navigation: PetNa
         }
         var cleans=0
         var soapRestocks=0
-        while(h.cleanliness<90) {
+        while(h.against(plan).needsClean) {
             check(cleans<3) { "CLEAN_RETRY_LIMIT" }
             // Batch-wide soap limit, checked before the gesture begins and reserved on the spot.
             val reservation=budget.reserveSoap()
