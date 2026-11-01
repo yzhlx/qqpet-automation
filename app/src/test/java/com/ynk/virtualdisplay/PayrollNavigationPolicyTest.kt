@@ -86,4 +86,9 @@ class PayrollNavigationPolicyTest {
         assertEquals(Policy.Page.UNKNOWN, Policy.exitPage(true, true, false, false))
         assertEquals(Policy.Page.UNKNOWN, Policy.exitPage(true, false, false, true))
     }
+    @Test fun promotionPopupNeedsItsOwnWording() {
+        assertTrue(Policy.promotionPopup(listOf("恭喜狗子完成‘习武小童0星’的晋升", "要求，解锁‘习武小童1星’", "基础工资获得少量增加!")))
+        assertFalse(Policy.promotionPopup(listOf("出门", "宠物学园", "职业小镇", "冒险")))
+        assertFalse(Policy.promotionPopup(listOf("工资明细", "基础工资68")))
+    }
 }

@@ -83,4 +83,10 @@ object PayrollNavigationPolicy {
         if (payroll || listOf(outdoor, room, workDetail).count { it } != 1) return Page.UNKNOWN
         return when { outdoor -> Page.OUTDOOR; room -> Page.ROOM; workDetail -> Page.WORK_DETAIL; else -> Page.UNKNOWN }
     }
+
+    /** The job star-up card that can cover the map after payroll (measured 2026-11-01). */
+    fun promotionPopup(lines: List<String>): Boolean {
+        val text = lines.joinToString(" ")
+        return text.contains("晋升") && text.contains("解锁") && text.contains("基础工资")
+    }
 }

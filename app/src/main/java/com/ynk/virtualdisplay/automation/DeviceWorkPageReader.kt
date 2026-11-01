@@ -264,10 +264,13 @@ class DeviceWorkPageReader(
         payrollReturnAttempted = true
         input.tap(target.x, target.y)
         delay(DISMISS_SETTLE_MS)
-        repeat(4) {
+        var promotionClosed = false
+        repeat(8) {
             val after = frame(latest = true)
+            var promotion = false
             val page = try {
                 val lines = reader.read(after).map { it.copy(text = normaliseGlyphs(it.text)) }
+                promotion = PayrollNavigationPolicy.promotionPopup(lines.map { line -> line.text })
                 val payrollStillVisible = WorkPageParser.parseCompletionSurface(lines) != null
                 val detail = classify(lines).let { it.identityMatched && it.isDetailPage }
                 val destination = PayrollNavigationPolicy.exitPage(
@@ -279,13 +282,21 @@ class DeviceWorkPageReader(
                 if (destination != PayrollNavigationPolicy.Page.UNKNOWN) save(after, "work-payroll-return-${destination.name.lowercase()}")
                 destination
             } finally { after.recycle() }
+            if (promotion && !promotionClosed) {
+                promotionClosed = true
+                safety()
+                input.tap(PROMOTION_CLOSE_X, PROMOTION_CLOSE_Y)
+                emit("work-promotion-popup-closed", result = "PASS", reason = null)
+                delay(DISMISS_SETTLE_MS)
+                return@repeat
+            }
             if (page != PayrollNavigationPolicy.Page.UNKNOWN) {
                 val reason = "PAYROLL_RETURNED_${page.name}"
                 val result = PayrollNavigationPolicy.ExitResult(page, reason)
                 emit("work-completion-dismiss", result = if (result.homeReached) "PASS" else "OBSERVED", reason = reason)
                 return@with result
             }
-            if (it < 3) delay(300)
+            if (it < 7) delay(300)
         }
         emit("work-completion-dismiss", result = "FAIL", reason = "PAYROLL_RETURN_DESTINATION_UNCONFIRMED")
         PayrollNavigationPolicy.ExitResult(PayrollNavigationPolicy.Page.UNKNOWN, "PAYROLL_RETURN_DESTINATION_UNCONFIRMED")
@@ -353,6 +364,8 @@ class DeviceWorkPageReader(
         const val COMPLETION_LEAD_MS = 30_000L
         const val COMPLETION_POLL_MS = 5_000L
         const val DISMISS_SETTLE_MS = 1200L
+        const val PROMOTION_CLOSE_X = 360f
+        const val PROMOTION_CLOSE_Y = 1230f
 
         /** The page-identity rule and its vocabulary live in [WorkPageParser]; one truth, testable. */
         val KNOWN_OPTION_LABELS = WorkPageParser.KNOWN_OPTION_LABELS

@@ -48,12 +48,22 @@ class PetWorkNavigation(
         emit("enter-town-start", "PASS", null)
         // The reader's locate already retries fresh frames (ML Kit's read of the outdoor map is not
         // stable frame to frame, measured 2026-10-20). Read-only until a positive match.
-        val entry = reader.locateTownEntry()
-        check(entry != null) { "CAREER_TOWN_ENTRY_NOT_FOUND" }
-        tap(entry, TOWN_SETTLE_MS)
-        val page = reader.readTownPage()
-        check(page.identityMatched) { "CAREER_TOWN_PAGE_UNCONFIRMED" }
-        emit("enter-town-ok", if (page.isDetailPage) "DETAIL" else "LIST", null)
+        // The map can swallow the first tap (measured 2026-11-01), and the label is gone once the town
+        // has opened, so a second tap only ever lands on a map that is still showing the entry.
+        for (attempt in 1..TOWN_ENTRY_ATTEMPTS) {
+            val entry = reader.locateTownEntry()
+            check(entry != null || attempt > 1) { "CAREER_TOWN_ENTRY_NOT_FOUND" }
+            if (entry != null) tap(entry, TOWN_SETTLE_MS)
+            repeat(TOWN_PAGE_READS) {
+                val page = reader.readTownPage()
+                if (page.identityMatched) {
+                    emit("enter-town-ok", if (page.isDetailPage) "DETAIL" else "LIST", null)
+                    return@with
+                }
+                delay(TOWN_READ_GAP_MS)
+            }
+        }
+        error("CAREER_TOWN_PAGE_UNCONFIRMED")
     }
 
     /** Opens one venue's detail page. Never assumes a cached coordinate: re-locates every time. */
@@ -223,6 +233,9 @@ class PetWorkNavigation(
 
     companion object {
         const val TOWN_SETTLE_MS = 2400L
+        const val TOWN_ENTRY_ATTEMPTS = 2
+        const val TOWN_PAGE_READS = 3
+        const val TOWN_READ_GAP_MS = 800L
         const val VENUE_SETTLE_MS = 2400L
         const val OPTION_SETTLE_MS = 1200L
         const val WORKING_SETTLE_MS = 2000L
