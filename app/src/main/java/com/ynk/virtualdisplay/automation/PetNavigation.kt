@@ -611,6 +611,7 @@ class PetNavigation(private val flow: PetFlowContext, private val workReader: Wo
 
         // Back control observed in the 720x1600 town header (r18-vd4.png).
         private const val BACK_X=80f
+        private const val PAYROLL_BACK_X=41f
         private const val BACK_Y=160f
         /** The venue detail page is two levels below the outdoor map, so two back taps at most. */
         private const val TOWN_EXIT_MAX_HOPS=2
@@ -1491,7 +1492,7 @@ class PetNavigation(private val flow: PetFlowContext, private val workReader: Wo
         }
         error("ACADEMY_COURSE_PANEL_NOT_OPENED_AFTER_${taps}_TAPS")
     }
-    suspend fun initialise(healthAlreadyClosed: Boolean = false): Unit = with(flow) {
+    suspend fun initialise(healthAlreadyClosed: Boolean = false, payrollAlreadyLeft: Boolean = false): Unit = with(flow) {
         dismissCareUpgradeIfPresent()
         dismissUpgradeIfPresent("initial")
         val current=frame()
@@ -1548,6 +1549,14 @@ class PetNavigation(private val flow: PetFlowContext, private val workReader: Wo
                 // The career-town pages carry no template probe, so a session stopped inside the work
                 // flow leaves the pet here and no probe above can name them. They are recognised by
                 // OCR and walked back out; a page that is still not the town stops as before.
+                // A shift stopped by hand settles later and leaves its payroll page here (measured
+                // 2026-11-01, WO-072 r4 V10), whose back arrow sits further left than the sub-pages'.
+                if(workReader?.readPayrollPage()==true) {
+                    check(!payrollAlreadyLeft) {"INITIAL_PAYROLL_NOT_LEFT"}
+                    emit("initial-leave-payroll",null,"PAYROLL")
+                    safety();input.tap(PAYROLL_BACK_X,BACK_Y);delay(profile.pageSettleMs)
+                    return@with initialise(healthAlreadyClosed,payrollAlreadyLeft=true)
+                }
                 val town=workReader?.let { readTownPage(it) }
                 if(town==null) error("INITIAL_PAGE_UNKNOWN")
                 emit("initial-page-town",null,if(town.isDetailPage) "DETAIL" else "LIST")

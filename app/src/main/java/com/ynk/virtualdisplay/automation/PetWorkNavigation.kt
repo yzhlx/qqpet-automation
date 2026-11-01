@@ -259,6 +259,9 @@ interface WorkPageReader {
     /** Reads the current town page: list or detail, and which venue if detail. */
     suspend fun readTownPage(): PetWorkNavigation.TownPage
 
+    /** True when the current page is the 工资明细 page a finished shift leaves behind. */
+    suspend fun readPayrollPage(): Boolean = false
+
     /** Locates a venue label at the current scroll position. Null when not visible. */
     suspend fun locateVenueLabel(venue: String): PointF?
 

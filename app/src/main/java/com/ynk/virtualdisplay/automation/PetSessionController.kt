@@ -468,7 +468,7 @@ class PetSessionController(context:Context,capture:HeadlessDisplayCapture,input:
             lessons++
             completed=ledger.completedCount
             flow.emit("ROUND_RESULT_CONFIRMED",result="round=${flow.round} completed=$completed")
-            navigation.returnHomeFromResult("result")
+            if(result.getBoolean("result_page")) navigation.returnHomeFromResult("result") else navigation.initialise()
         }
         snapshot=snapshot.copy(completedRounds=lessons)
         return StepOutcome.Completed()
@@ -579,7 +579,7 @@ class PetSessionController(context:Context,capture:HeadlessDisplayCapture,input:
                 snapshot=snapshot.copy(completedRounds=completed,nextStep="处理成绩及升级弹窗")
                 publish()
                 flow.emit("ROUND_RESULT_CONFIRMED",result="round=${flow.round} completed=$completed")
-                navigation.returnHomeFromResult("result")
+                if(result.getBoolean("result_page")) navigation.returnHomeFromResult("result") else navigation.initialise()
                 val afterRecord:JSONObject = if(!mode.runsCare) JSONObject().put("status","NOT_REQUESTED") else try {
                     flow.healthJson(care.readHealth("after"))
                 } catch(t:Throwable) {

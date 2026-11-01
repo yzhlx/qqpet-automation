@@ -190,6 +190,7 @@ class PetStudyFlow(private val flow: PetFlowContext,private val navigation: PetN
                 state="WAIT_RESULT"
                 val waitStart=SystemClock.elapsedRealtime()
                 var found=false
+                var leftCourse=false
                 var unconfirmedSince: Long?=null
                 while(SystemClock.elapsedRealtime()-start<timeoutMs) {
                     val f=frame()
@@ -210,15 +211,24 @@ class PetStudyFlow(private val flow: PetFlowContext,private val navigation: PetN
                         }
                         else {
                             val now=SystemClock.elapsedRealtime()
-                            if(unconfirmedSince==null) unconfirmedSince=now
+                            if(unconfirmedSince==null) {unconfirmedSince=now;save(f,"result-unconfirmed-first")}
                             emit("result-transition-observe",maxOf(rs,learningScore),capture.telemetry().put("result","SETTLING").toString())
-                            check(now-unconfirmedSince!!<8000) { "UNKNOWN_WAIT_RESULT_PAGE" }
+                            val knownPage=score(f,listOf(outdoor,academy,profile.courseListProbe))>=profile.matchThreshold
+                            when(ResultWaitPolicy.decide(now-unconfirmedSince!!,now-start,durationMinutes*60_000L,knownPage)) {
+                                ResultWaitPolicy.Decision.KEEP_WAITING -> Unit
+                                ResultWaitPolicy.Decision.COURSE_OVER_NO_RESULT -> {
+                                    save(f,"result-page-skipped");emit("result-page-skipped",maxOf(rs,learningScore))
+                                    leftCourse=true
+                                }
+                                ResultWaitPolicy.Decision.STOP -> {save(f,"result-unconfirmed-last");error("UNKNOWN_WAIT_RESULT_PAGE")}
+                            }
+                            if(leftCourse) break
                         }
                     } finally { f.recycle() }
                     delay(1000)
                 }
-                check(found) { "RESULT_TIMEOUT" }
-                JSONObject().put("grade",resultGrade).put("course_ms",SystemClock.elapsedRealtime()-start)
+                check(found||leftCourse) { "RESULT_TIMEOUT" }
+                JSONObject().put("grade",resultGrade).put("result_page",found).put("course_ms",SystemClock.elapsedRealtime()-start)
                     .put("result_wait_ms",SystemClock.elapsedRealtime()-waitStart)
     }
 }

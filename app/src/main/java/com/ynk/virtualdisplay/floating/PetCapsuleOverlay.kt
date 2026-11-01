@@ -169,9 +169,10 @@ object PetCapsuleOverlay {
             }
         }
 
-        // The card stays attached for the whole session; the bubble is attached only while the
-        // user is in another app, because the in-app PiP already covers the QQPet foreground.
-        wm.addView(card, cParams)
+        // Neither window is attached here. The bubble is attached only while the user is in another
+        // app, because the in-app PiP already covers the QQPet foreground, and the card only while
+        // it is open: an attached card with empty content keeps showing its last frame on screen
+        // (measured 2026-11-01, WO-072 r4 V4) and keeps taking touches.
         lifecycleOwner.onResume()
 
         appContext = app
@@ -244,13 +245,32 @@ object PetCapsuleOverlay {
         if (expanded) return
         expanded = true
         detachBubble()
+        attachCard()
         layoutCard()
     }
 
     private fun closeCard() {
         if (!expanded) return
         expanded = false
+        detachCard()
         syncBubbleVisibility()
+    }
+
+    private fun attachCard() {
+        val wm = windowManager ?: return
+        val card = cardView ?: return
+        val params = cardParams ?: return
+        if (card.parent == null) {
+            runCatching { wm.addView(card, params) }
+        }
+    }
+
+    private fun detachCard() {
+        val wm = windowManager ?: return
+        val card = cardView ?: return
+        if (card.parent != null) {
+            runCatching { wm.removeViewImmediate(card) }
+        }
     }
 
     /**
