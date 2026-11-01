@@ -1,6 +1,5 @@
 package com.ynk.virtualdisplay.automation
 
-import org.json.JSONObject
 import java.io.File
 
 /**
@@ -40,9 +39,9 @@ class InterruptedAttemptRecovery(private val filesDir: File, private val store: 
         val file = File(filesDir, "pet-checkpoints/$sessionId.json")
         if (!file.isFile || file.length() > 1_000_000) return null
         return runCatching {
-            val checkpoint = JSONObject(file.readText(Charsets.UTF_8))
-            check(checkpoint.getString("sessionId") == sessionId)
-            checkpoint.getLong("observedAt")
+            val checkpoint = LegacySettlementJson.objectAt(file.readText(Charsets.UTF_8))
+            check(checkpoint.string("sessionId") == sessionId)
+            checkpoint.long("observedAt")
         }.getOrNull()
     }
 
