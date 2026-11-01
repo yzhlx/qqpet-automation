@@ -24,7 +24,8 @@ data class PetProfile(
     val courseDurationMs: Long = 10L * 60L * 1000L,
     val courseFinishGraceMs: Long = 8_000L,
 ) {
-    data class Probe(val name: String, val rect: Rect, val assetPath: String)
+    /** [exactDrift]: find the drift to the pixel, for a page read or tapped at fixed coordinates. */
+    data class Probe(val name: String, val rect: Rect, val assetPath: String, val exactDrift: Boolean = false)
 
     fun validate(healthGuardInstalled:Boolean=false): List<String> = buildList {
         if(!healthGuardInstalled) add("健康前置检查未接入：每次开课前体力与清洁必须≥90")

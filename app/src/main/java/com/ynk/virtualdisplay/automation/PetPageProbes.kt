@@ -43,7 +43,7 @@ object PetPageProbes {
      * `round-0:initial-home` PASS frame at this ROI, so the rescale branch is skipped).
      */
     val room = experimental("room", 20, 720, 120, 840)
-    val healthPanel = experimental("health", 169, 228, 250, 415)
+    val healthPanel = experimental("health", 169, 228, 250, 415).copy(exactDrift = true)
 
     /**
      * The cookie/plate item. A legitimate page TARGET and legacy measured item, but NOT the FOOD

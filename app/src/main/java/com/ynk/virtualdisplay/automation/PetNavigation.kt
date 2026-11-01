@@ -1497,6 +1497,7 @@ class PetNavigation(private val flow: PetFlowContext, private val workReader: Wo
         val current=frame()
         val sRoom=score(current,listOf(room))
         val sHealth=score(current,listOf(healthPanel))
+        val panelDrift=healthDrift(current)
         val sOutdoor=score(current,listOf(outdoor))
         val sResult=score(current,listOf(profile.resultProbe))
         val sHost=score(current,listOf(qqHostSearch))
@@ -1530,7 +1531,7 @@ class PetNavigation(private val flow: PetFlowContext, private val workReader: Wo
             "health" -> {
                 check(!healthAlreadyClosed) {"INITIAL_HEALTH_PANEL_NOT_CLOSED"}
                 verify(listOf(healthPanel),"initial-health-before")
-                safety();input.tap(355f,454f);delay(profile.pageSettleMs)
+                safety();input.tap(355f,PetHealthCheck.closeY(panelDrift));delay(profile.pageSettleMs)
                 initialise(healthAlreadyClosed = true)
             }
             "course_list" -> {tap(profile.courseListProbe,PointF(80f,160f),academy,"initial-close-panel")

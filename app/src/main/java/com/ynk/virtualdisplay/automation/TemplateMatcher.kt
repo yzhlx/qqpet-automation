@@ -8,8 +8,33 @@ import kotlin.math.abs
 
 /** Simple deterministic ROI matcher for MVP. No OCR/ML/LLM. */
 class TemplateMatcher(private val context: Context) {
-    data class Result(val matched: Boolean, val score: Double)
+    /** [drift] is the vertical offset of the best match; exact only for an exactDrift probe. */
+    data class Result(val matched: Boolean, val score: Double, val drift: Int = 0)
     private val cache = mutableMapOf<String, Bitmap>()
+
+    companion object {
+        private val COARSE_DRIFTS = intArrayOf(-64,-56,-48,-40,-32,-24,-16,-8,8,16,24,32,40,48,56,64).toList()
+        private val EXACT_DRIFTS = (-64..64).filter { it != 0 }
+
+        fun drifts(exact: Boolean): List<Int> = if (exact) EXACT_DRIFTS else COARSE_DRIFTS
+
+        /**
+         * The drift to report and its score. A coarse probe stops at the first pass; an exact probe
+         * scans every offset, because the first pass can sit a pixel off the true position.
+         */
+        fun bestDrift(exact: Boolean, threshold: Double, atRest: Double, offsets: List<Int>,
+            scoreAt: (Int) -> Double): Pair<Int, Double> {
+            if (!exact && atRest >= threshold) return 0 to atRest
+            var drift = 0
+            var best = atRest
+            for (dy in offsets) {
+                val s = scoreAt(dy)
+                if (s > best) { best = s; drift = dy }
+                if (!exact && best >= threshold) break
+            }
+            return drift to best
+        }
+    }
 
     fun match(frame: Bitmap, probe: PetProfile.Probe, threshold: Double): Result {
         val r = probe.rect
@@ -23,22 +48,18 @@ class TemplateMatcher(private val context: Context) {
             val scaled = if (template.width == live.width && template.height == live.height) template
             else Bitmap.createScaledBitmap(template, live.width, live.height, true)
             try {
-                val score = similarity(live, scaled)
-                if (score >= threshold) return Result(true, score)
                 // Scene elements such as the 出门 button drift vertically between sessions
                 // (measured: the same button sat at y1354 in one session and y1332 in the next),
                 // which is layout drift, not a page change. Retry with small vertical offsets
                 // before reporting a miss; horizontal drift is not expected on these pages.
-                var best = score
-                for (dy in intArrayOf(-64,-56,-48,-40,-32,-24,-16,-8,8,16,24,32,40,48,56,64)) {
-                    val ny = r.top + dy
-                    if (ny < 0 || ny + r.height() > frame.height) continue
-                    val shifted = Bitmap.createBitmap(frame, r.left, ny, r.width(), r.height())
-                    val s = try { similarity(shifted, scaled) } finally { shifted.recycle() }
-                    if (s > best) best = s
-                    if (best >= threshold) return Result(true, best)
+                val offsets = drifts(probe.exactDrift).filter {
+                    r.top + it >= 0 && r.top + it + r.height() <= frame.height
                 }
-                Result(best >= threshold, best)
+                val (drift, best) = bestDrift(probe.exactDrift, threshold, similarity(live, scaled), offsets) { dy ->
+                    val shifted = Bitmap.createBitmap(frame, r.left, r.top + dy, r.width(), r.height())
+                    try { similarity(shifted, scaled) } finally { shifted.recycle() }
+                }
+                Result(best >= threshold, best, drift)
             } finally {
                 if (scaled !== template) scaled.recycle()
             }

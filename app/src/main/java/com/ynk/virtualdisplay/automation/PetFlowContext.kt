@@ -90,6 +90,7 @@ class PetFlowContext(val context: Context, val capture: HeadlessDisplayCapture,
     }
     fun score(frame: Bitmap, probes: List<PetProfile.Probe>) =
         probes.maxOf { matcher.match(frame,it,profile.matchThreshold).score }
+    fun healthDrift(frame: Bitmap) = matcher.match(frame,healthPanel,profile.matchThreshold).drift
     suspend fun verify(probes: List<PetProfile.Probe>, name: String, saveEvidence: Boolean = true, latest: Boolean = false): Double {
         val f = frame(latest)
         try {

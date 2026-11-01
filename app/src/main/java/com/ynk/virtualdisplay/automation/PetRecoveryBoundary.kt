@@ -19,7 +19,7 @@ class PetRecoveryBoundary(private val context: Context,private val capture: Head
     private val learningEvidence: (suspend (Bitmap)->Boolean)? = null) {
     private val facts=capture.facts
     private val matcher=TemplateMatcher(context)
-    private val healthProbe=PetProfile.Probe("health",android.graphics.Rect(169,228,250,415),"pet_health/health.png")
+    private val healthProbe=PetHealthCheck.probe
     val file=File(context.filesDir,"pet-checkpoints/${facts.events.sessionId}.json")
     val recovery=SessionRecovery(facts.events.sessionId,FileCheckpointStore(file),facts.clock::wallTimeMs,facts.clock::monotonicMs,
         {state,reason,attempt ->

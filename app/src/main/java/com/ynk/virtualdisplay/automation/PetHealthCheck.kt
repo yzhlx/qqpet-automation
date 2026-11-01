@@ -7,8 +7,20 @@ import android.graphics.Rect
 import kotlin.math.abs
 import kotlin.math.roundToInt
 
-/** Fixed measured health bars on this QQ build; no text reading or anchor detection. */
+/**
+ * Health bars measured on this QQ build, at fixed rows relative to the panel. The panel itself can
+ * sit higher between sessions (measured 2026-10-31: 21 px, between the coarse search's -16 and -24,
+ * so an open panel failed with PAGE_MISMATCH at 0.9256), so every row and the close tap move with
+ * the drift the template match reports. Recorded replay: 339 panel frames all locate at drift 0,
+ * and the 1508 other frames score at most 0.8979 at any drift, under the 0.95 gate.
+ */
 object PetHealthCheck {
+    val probe by lazy { PetProfile.Probe("health",Rect(169,228,250,415),"pet_health/health.png",exactDrift=true) }
+
+    fun digitRows(drift: Int) = listOf(228,304,380).map { it+drift }
+    fun barRows(drift: Int) = listOf(244,320,396).map { it+drift }
+    fun closeY(drift: Int) = 454f+drift
+
     class Health(private val measuredEnergy: Int, private val measuredCleanliness: Int,
         private val measuredMood: Int, private val measuredReady: Boolean,
         val observations: HealthObservations? = null) {
@@ -22,15 +34,17 @@ object PetHealthCheck {
     fun observe(context: Context, frame: Bitmap, at: Long, evidence: String): HealthObservations {
         val reader = HealthDigitReader(HealthDigitReader.parse(context.assets.open("pet_health/digits.txt")
             .bufferedReader().use { it.readText() }))
-        val anchored = frame.width == 720 && frame.height == 1600 && TemplateMatcher(context).match(frame,
-            PetProfile.Probe("health",Rect(169,228,250,415),"pet_health/health.png"),0.97).score >= 0.97
+        val located = if (frame.width == 720 && frame.height == 1600) TemplateMatcher(context).match(frame,probe,0.97) else null
+        val anchored = located?.matched == true
+        val drift = located?.drift ?: 0
         fun digits(y: Int): ObservedValue<Int> = if (!anchored) ObservedValue.Unknown("HEALTH_PANEL_UNCONFIRMED",at,evidence)
             else reader.read(52,31,{ x,j -> val p=frame.getPixel(256+x,y+j)
                 maxOf(Color.red(p),Color.green(p),Color.blue(p))<100 },at,evidence)
-        val bars = if (anchored) runCatching { read(frame) }.getOrNull() else null
+        val bars = if (anchored) runCatching { read(frame,drift) }.getOrNull() else null
         fun bar(v: Int?): ObservedValue<Int> = if(v==null) ObservedValue.Unknown("BAR_UNCONFIRMED",at,evidence)
             else ObservedValue.Known(v,at,1.0,evidence,ObservationSource.CONSERVATIVE_BAR_ESTIMATE)
-        return HealthObservations(digits(228),digits(304),digits(380),bar(bars?.energy),bar(bars?.cleanliness),
+        val (energyRow,cleanRow,moodRow) = digitRows(drift)
+        return HealthObservations(digits(energyRow),digits(cleanRow),digits(moodRow),bar(bars?.energy),bar(bars?.cleanliness),
             bar(bars?.mood),bars?.ready==true,evidence)
     }
 
@@ -39,9 +53,9 @@ object PetHealthCheck {
         return Health(v.energy,v.cleanliness,v.mood,v.ready,snapshot)
     }
 
-    fun read(frame: Bitmap): Health {
+    fun read(frame: Bitmap, drift: Int = 0): Health {
         require(frame.width == 720 && frame.height == 1600)
-        val ys = listOf(244, 320, 396)
+        val ys = barRows(drift)
         val colors = listOf(Color.rgb(0, 153, 255), Color.rgb(100, 201, 0), Color.rgb(255, 128, 0))
         // Track colour measured on FOA_AL00 2026-10-16 (memory.md "数字 OCR 真机基线"): an EMPTY
         // bar (value 0) shows only the grey track at the anchor — that is a legitimate reading,

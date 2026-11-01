@@ -292,7 +292,9 @@ class PetCareFlow(private val flow: PetFlowContext,private val navigation: PetNa
         val started = SystemClock.elapsedRealtime()
         navigation.tap(parent,PointF(516f,160f),healthPanel,"open-health")
         val f = frame(true)
+        var drift = 0
         val h = try {
+            drift = healthDrift(f)
             save(f,label)
             val snapshot=PetHealthCheck.observe(context,f,System.currentTimeMillis(),File(evidence,"round-$round-$label.png").absolutePath)
             capture.facts.health(snapshot)
@@ -306,7 +308,7 @@ class PetCareFlow(private val flow: PetFlowContext,private val navigation: PetNa
         check(h.energy in 0..100 && h.cleanliness in 0..100) { "HEALTH_VALUE_ABNORMAL" }
         latestReading=h
         emit(label,result=healthJson(h).put("read_duration_ms",SystemClock.elapsedRealtime()-started).toString())
-        navigation.tap(healthPanel,PointF(355f,454f),parent,"close-health")
+        navigation.tap(healthPanel,PointF(355f,PetHealthCheck.closeY(drift)),parent,"close-health")
         h
     }
     suspend fun recover(initial: PetCareReading, energyThreshold: Int = 90, cleanlinessThreshold: Int = 90): PetCareReading = with(flow) {
