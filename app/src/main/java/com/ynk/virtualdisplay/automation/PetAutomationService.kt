@@ -131,8 +131,14 @@ class PetAutomationService : Service() {
                                     logLine("INTERRUPTED_ATTEMPT_RECONCILED ${recovery.attemptIds}")
                                     launchOwned(intent,allowReconciliation=false,block=block)
                                 }
-                                is InterruptedAttemptRecovery.Outcome.StillRunning ->
-                                    stopSession("上一个任务被中断，游戏里可能还在进行，约 ${recovery.remainingMs/60_000+1} 分钟后再试")
+                                is InterruptedAttemptRecovery.Outcome.StillRunning -> {
+                                    val message="上一个任务被中断，游戏里可能还在进行，约 ${recovery.remainingMs/60_000+1} 分钟后再试"
+                                    // Without this the rejected tap looks like a dead button: the home screen only says 手动停止.
+                                    android.os.Handler(android.os.Looper.getMainLooper()).post {
+                                        android.widget.Toast.makeText(applicationContext,message,android.widget.Toast.LENGTH_LONG).show()
+                                    }
+                                    stopSession(message)
+                                }
                                 InterruptedAttemptRecovery.Outcome.NotApplicable -> launchLegacyCareObservation(intent,block)
                             }
                         }
