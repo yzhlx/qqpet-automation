@@ -25,6 +25,11 @@
 -keep class com.ynk.virtualdisplay.** { *; }
 -keep class com.genymobile.scrcpy.** { *; }
 -keep class android.** { *; }
+# ML Kit finds its OCR components by class name from manifest metadata; stripped, TextRecognition.getClient is null.
+-keep class com.google.mlkit.** { *; }
+-keep class com.google.android.gms.internal.mlkit_** { *; }
+-keep class com.google.android.gms.vision.** { *; }
+-keep class com.google.firebase.components.** { *; }
 -dontwarn android.**
 -dontwarn com.android.**
 -dontwarn org.lsposed.**
