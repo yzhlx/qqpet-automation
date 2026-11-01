@@ -550,7 +550,7 @@ class PetAutomationService : Service() {
         check(metrics.densityDpi == 320) { "display density must be 320dpi" }
         check(Build.MODEL == "FOA-AL00") { "Only the calibrated FOA-AL00 device is supported" }
         val qq = packageManager.getPackageInfo("com.tencent.mobileqq", 0)
-        check(qq.versionName == "9.3.70" && qq.longVersionCode == 16410L) { "QQ version differs from calibration" }
+        check(qq.versionName == "9.3.75" && qq.longVersionCode == 16580L) { "QQ version differs from calibration" }
         check(p.x == profile.displayWidth && p.y == profile.displayHeight) {
             "display must be ${profile.displayWidth}x${profile.displayHeight}, actual=${p.x}x${p.y}"
         }

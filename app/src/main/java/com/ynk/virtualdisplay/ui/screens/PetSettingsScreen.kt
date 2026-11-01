@@ -313,7 +313,7 @@ fun PetSettingsScreen(
                 trailing = { ValueText(BuildConfig.BUILD_TIME.take(16)) },
             )
             Row(Modifier.fillMaxWidth().padding(bottom = 10.dp, top = 2.dp)) {
-                PetNote("仅支持已校准的 FOA-AL00 与 QQ 9.3.70(16410)；其他设备会在服务层被拒绝启动。")
+                PetNote("仅支持已校准的 FOA-AL00 与 QQ 9.3.75(16580)；其他设备会在服务层被拒绝启动。")
             }
         }
 
