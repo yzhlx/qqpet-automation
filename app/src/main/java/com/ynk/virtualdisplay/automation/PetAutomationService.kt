@@ -123,7 +123,16 @@ class PetAutomationService : Service() {
                             v2!=null -> launchCommittedPlanFinalization(intent,v2)
                             writebackRunner.isRetainedWorkAttempt(blockingId) ->
                                 launchRetainedWorkWriteback(intent,blockingId)
-                            else -> launchLegacyCareObservation(intent,block)
+                            else -> when(val recovery=InterruptedAttemptRecovery(filesDir,
+                                PersistentBudgetStore(File(filesDir,PersistentBudgetStore.FILE_NAME))).run(System.currentTimeMillis())) {
+                                is InterruptedAttemptRecovery.Outcome.Reconciled -> {
+                                    logLine("INTERRUPTED_ATTEMPT_RECONCILED ${recovery.attemptIds}")
+                                    launchOwned(intent,allowReconciliation=false,block=block)
+                                }
+                                is InterruptedAttemptRecovery.Outcome.StillRunning ->
+                                    stopSession("上一个任务被中断，游戏里可能还在进行，约 ${recovery.remainingMs/60_000+1} 分钟后再试")
+                                InterruptedAttemptRecovery.Outcome.NotApplicable -> launchLegacyCareObservation(intent,block)
+                            }
                         }
                     } catch(t:Throwable) {
                         stopSession("PENDING_RECOVERY_REFUSED:${t.message}")

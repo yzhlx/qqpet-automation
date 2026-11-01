@@ -155,6 +155,13 @@ class PlanBudgetLedger(
         store.write(state.copy(attempts = state.attempts + (attemptId to updated)))
     }
 
+    /** Closes an interrupted attempt with its outcome unknown; minutes and day never change. */
+    fun reconcileInterrupted(attemptId: String, nowMs: Long) {
+        val previous = attempt(attemptId) ?: error("BUDGET_ATTEMPT_UNKNOWN:$attemptId")
+        mark(attemptId, ReserveStatus.RECONCILED_STOPPED, (previous.reason ?: "") +
+            "\nRECONCILED_INTERRUPTED;OUTCOME_REMAINS_UNKNOWN;at=$nowMs;no-refund;no-replay")
+    }
+
     private fun mark(attemptId: String, status: ReserveStatus, reason: String? = null) {
         synchronized(BudgetLedgerLock.monitor) {
             val state = store.read()
