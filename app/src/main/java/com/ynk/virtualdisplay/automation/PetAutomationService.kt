@@ -564,7 +564,10 @@ class PetAutomationService : Service() {
 
     private fun acquireWakeLock() {
         val pm = getSystemService(POWER_SERVICE) as PowerManager
-        wakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "$packageName:pet-mvp").apply {
+        // Keep the screen on, not just the CPU: a lock during a 10-minute shift or course ends the
+        // run with CHECKPOINT_ACTION_UNCONFIRMED, and the default screen timeout is exactly that long.
+        @Suppress("DEPRECATION")
+        wakeLock = pm.newWakeLock(PowerManager.SCREEN_DIM_WAKE_LOCK, "$packageName:pet-mvp").apply {
             setReferenceCounted(false)
             acquire(MAX_WAKELOCK_MS)
         }
