@@ -55,7 +55,7 @@ class WorkCatalog(private val entries: List<WorkCatalogEntry> = defaultEntries()
         if (page.durationMinutes != entry.durationMinutes) {
             diffs += "时长 页面${page.durationMinutes} vs 目录${entry.durationMinutes}"
         }
-        if (page.pageCoinReward != entry.coinReward) {
+        if (!coinRewardAccepted(entry.coinReward, page.pageCoinReward)) {
             diffs += "金币 页面${page.pageCoinReward} vs 目录${entry.coinReward}"
         }
         if (page.pageWorkScoreReward != entry.workScoreReward) {
@@ -71,6 +71,14 @@ class WorkCatalog(private val entries: List<WorkCatalogEntry> = defaultEntries()
     }
 
     companion object {
+        /**
+         * The catalog holds the pre-promotion pay. A job star-up raises it (measured 2026-11-01:
+         * 68 became 71 at 习武小童 1 星), so a higher reading is real; below the base, or beyond
+         * double it, is treated as a misread.
+         */
+        fun coinRewardAccepted(baseCoins: Int, pageCoins: Int): Boolean =
+            if (baseCoins == 0) pageCoins == 0 else pageCoins in baseCoins..baseCoins * 2
+
         /**
          * P5.1 measured values, 2026-10-12, on display 4.
          *

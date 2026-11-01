@@ -76,7 +76,7 @@ import java.util.UUID
 
 /** Existing parameter controls now edit an explicit selection; unselected parameters never gate save. */
 @Composable
-fun PetPlanSheetScreen(onClose: () -> Unit, onOpenConsole: () -> Unit, displayId: Int?) {
+fun PetPlanSheetScreen(onClose: () -> Unit, onStarted: () -> Unit, displayId: Int?) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var plan by remember { mutableStateOf(SessionPlan()) }
@@ -186,7 +186,7 @@ fun PetPlanSheetScreen(onClose: () -> Unit, onOpenConsole: () -> Unit, displayId
                     val intent = SessionStartRequest.forPlan(lastSavedSnapshot ?: error("方案尚未保存"),
                         target, UUID.randomUUID().toString())
                     ContextCompat.startForegroundService(context, intent)
-                    onOpenConsole()
+                    onStarted()
                 }
             } catch (cancelled: CancellationException) { throw cancelled }
             catch (error: Exception) {

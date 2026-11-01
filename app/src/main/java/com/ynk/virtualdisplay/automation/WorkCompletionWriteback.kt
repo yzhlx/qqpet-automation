@@ -86,7 +86,9 @@ object WorkCompletionWritebackPolicy {
         val award = awards.single()
         val awardCoins = award.reason!!.removePrefix("award=").substringBefore('|').toIntOrNull()
             ?: error("WORK_WRITEBACK_AWARD_NOT_AN_INTEGER:$sessionId")
-        require(awardCoins == TARGET_AWARD_COINS) { "WORK_WRITEBACK_AWARD_MISMATCH:$sessionId:$awardCoins" }
+        require(awardCoins != null && WorkCatalog.coinRewardAccepted(TARGET_AWARD_COINS, awardCoins)) {
+            "WORK_WRITEBACK_AWARD_MISMATCH:$sessionId:$awardCoins"
+        }
 
         val dismisses = rows.filter {
             it.kind == "ERROR" && it.action == "work-completion-dismiss" &&

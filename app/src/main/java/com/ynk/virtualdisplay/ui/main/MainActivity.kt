@@ -145,7 +145,7 @@ private fun PetApp(uiState: MainUiState, viewModel: MainViewModel) {
             when (uiState.overlay) {
                 OverlayScreen.PLAN_SHEET -> PetPlanSheetScreen(
                     onClose = { viewModel.closeOverlay() },
-                    onOpenConsole = { viewModel.openOverlay(OverlayScreen.CONSOLE) },
+                    onStarted = { viewModel.switchTab(ScreenTab.HOST) },
                     displayId = uiState.displays.firstOrNull {
                         it.width == com.ynk.virtualdisplay.automation.PetProfile.calibrated().displayWidth &&
                             it.height == com.ynk.virtualdisplay.automation.PetProfile.calibrated().displayHeight
