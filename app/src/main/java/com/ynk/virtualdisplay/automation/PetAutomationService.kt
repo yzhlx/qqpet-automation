@@ -118,13 +118,15 @@ class PetAutomationService : Service() {
                         val writebackRunner=WorkCompletionWritebackRunner(filesDir,checkNotNull(getExternalFilesDir(null)),
                             app.displayRepository.automationEventsDirectory,
                             PersistentBudgetStore(File(filesDir,PersistentBudgetStore.FILE_NAME)))
-                        val v2=PlanRunPendingGate.blockingRunId(File(filesDir,"plan-runs"))
+                        val runRoot=File(filesDir,"plan-runs")
+                        val v2=PlanRunPendingGate.blockingRunId(runRoot)
                         when {
-                            v2!=null -> launchCommittedPlanFinalization(intent,v2)
-                            writebackRunner.isRetainedWorkAttempt(blockingId) ->
+                            v2!=null && InterruptedRunClosure.finalizable(checkNotNull(FileRunStore(runRoot).load(v2))) ->
+                                launchCommittedPlanFinalization(intent,v2)
+                            v2==null && writebackRunner.isRetainedWorkAttempt(blockingId) ->
                                 launchRetainedWorkWriteback(intent,blockingId)
                             else -> when(val recovery=InterruptedAttemptRecovery(filesDir,
-                                PersistentBudgetStore(File(filesDir,PersistentBudgetStore.FILE_NAME))).run(System.currentTimeMillis())) {
+                                PersistentBudgetStore(File(filesDir,PersistentBudgetStore.FILE_NAME))).runAndCloseRuns(runRoot,System.currentTimeMillis())) {
                                 is InterruptedAttemptRecovery.Outcome.Reconciled -> {
                                     logLine("INTERRUPTED_ATTEMPT_RECONCILED ${recovery.attemptIds}")
                                     launchOwned(intent,allowReconciliation=false,block=block)
@@ -603,8 +605,24 @@ class PetAutomationService : Service() {
         wakeLock?.let { if (it.isHeld) it.release() }
         wakeLock = null
         job = null
+        pruneEvidence()
         stopForeground(STOP_FOREGROUND_REMOVE)
         stopSelf()
+    }
+
+    /** Off the main thread: the first pass after an update can delete thousands of old frames. */
+    private fun pruneEvidence() {
+        val sessions=getExternalFilesDir(null)?.let {File(it,"pet_mvp_session")} ?: return
+        Thread {
+            runCatching {
+                val pending=PersistentBudgetStore(File(filesDir,PersistentBudgetStore.FILE_NAME)).read().attempts.values
+                    .any(CarePendingReconciliation::unresolved) || PlanRunPendingGate.blockingRunId(File(filesDir,"plan-runs"))!=null
+                if(!pending) {
+                    EvidenceRetention.prune(sessions) {job==null}
+                    EvidenceRetention.trimLog(File(filesDir,"pet_mvp.log"))
+                }
+            }
+        }.start()
     }
 
     private fun notification(text: String): Notification {

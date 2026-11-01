@@ -99,7 +99,7 @@ object PlanRunPendingGate {
         return files.filter {it.name.endsWith(".json")}.sortedBy {it.name}.mapNotNull {file ->
             val run=store.load(file.name.removeSuffix(".json")) ?: error("RUN_STORE_RECORD_MISSING")
             if(run.state in setOf(RunState.CREATED,RunState.PREFLIGHT,RunState.RUNNING,RunState.UNCONFIRMED) ||
-                store.hasPendingInput(run.runId)) run.runId else null
+                (store.hasPendingInput(run.runId) && !InterruptedRunClosure.isClosed(run))) run.runId else null
         }
     }
 }

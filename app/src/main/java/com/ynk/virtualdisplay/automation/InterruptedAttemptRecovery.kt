@@ -2,6 +2,22 @@ package com.ynk.virtualdisplay.automation
 
 import java.io.File
 
+object InterruptedRunClosure {
+    const val PREFIX = "INTERRUPTED_OUTCOME_UNKNOWN:"
+
+    fun finalizable(run: RunSnapshot): Boolean = run.state == RunState.UNCONFIRMED &&
+        run.stopReason?.startsWith("HEALTH_STALE") == true && run.request.planSnapshot.steps.none { it is StudyStep }
+
+    fun isClosed(run: RunSnapshot): Boolean = run.state == RunState.FAILED && run.stopReason?.startsWith(PREFIX) == true
+
+    /** Keeps steps, counts and attempts as they stood: an unknown outcome is never rewritten as a result. */
+    fun close(store: RunStore, runId: String, nowMs: Long) {
+        val run = checkNotNull(store.load(runId)) { "INTERRUPTED_RUN_MISSING" }
+        val ended = run.endedAtMs ?: maxOf(nowMs, run.startedAtMs ?: 0L)
+        store.save(run.copy(state = RunState.FAILED, endedAtMs = ended, stopReason = PREFIX + run.stopReason))
+    }
+}
+
 /**
  * Releases the pending gate after an ordinary interruption (screen lock, crash, stop during a shift).
  * Without this, one interrupted attempt refuses EVERY later session forever, because the older
@@ -28,6 +44,24 @@ class InterruptedAttemptRecovery(private val filesDir: File, private val store: 
         val ledger = PlanBudgetLedger(store)
         pending.forEach { ledger.reconcileInterrupted(it.attemptId, nowMs) }
         return Outcome.Reconciled(pending.map { it.attemptId })
+    }
+
+    /**
+     * Same release for a plan run left UNCONFIRMED: once nothing can still be running, the run is closed
+     * as interrupted so later sessions are admitted. A study plan can never pass the committed-plan
+     * finalization, so without this one uncertain stop refused every later session forever
+     * (device run f41c51e3, 2026-11-01). Finalizable runs are left to that stricter path.
+     */
+    fun runAndCloseRuns(runRoot: File, nowMs: Long): Outcome {
+        val outcome = run(nowMs)
+        if (outcome is Outcome.StillRunning) return outcome
+        if (store.read().attempts.values.any(CarePendingReconciliation::unresolved)) return Outcome.NotApplicable
+        val runs = FileRunStore(runRoot)
+        val open = PlanRunPendingGate.pendingRunIds(runRoot)
+            .filterNot { InterruptedRunClosure.finalizable(checkNotNull(runs.load(it))) }
+        if (open.isEmpty()) return outcome
+        open.forEach { InterruptedRunClosure.close(runs, it, nowMs) }
+        return Outcome.Reconciled((outcome as? Outcome.Reconciled)?.attemptIds.orEmpty() + open)
     }
 
     private fun lastObservedAt(attempt: BudgetAttempt): Long? {

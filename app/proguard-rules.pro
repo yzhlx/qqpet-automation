@@ -19,3 +19,13 @@
 # If you keep the line number information, uncomment this to
 # hide the original source file name.
 #-renamesourcefileattribute SourceFile
+
+# Our classes are reached by name: Shizuku user services, AIDL stubs, scrcpy and hidden-API reflection.
+# Shrinking only the libraries is where nearly all the size is, so nothing of ours is renamed or removed.
+-keep class com.ynk.virtualdisplay.** { *; }
+-keep class com.genymobile.scrcpy.** { *; }
+-keep class android.** { *; }
+-dontwarn android.**
+-dontwarn com.android.**
+-dontwarn org.lsposed.**
+-keepattributes SourceFile,LineNumberTable,*Annotation*

@@ -24,6 +24,9 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
@@ -41,7 +44,8 @@ import com.ynk.virtualdisplay.ui.screens.PetLogScreen
 import com.ynk.virtualdisplay.ui.screens.PetPlanSheetScreen
 import com.ynk.virtualdisplay.ui.screens.PetRecordsScreen
 import com.ynk.virtualdisplay.ui.screens.PetSettingsScreen
-import com.ynk.virtualdisplay.ui.screens.ShizukuPermissionScreen
+import com.ynk.virtualdisplay.ui.screens.OnboardingFlow
+import com.ynk.virtualdisplay.ui.screens.OnboardingScreen
 import com.ynk.virtualdisplay.ui.screens.VirtualDisplayScreen
 import com.ynk.virtualdisplay.ui.theme.MyApplicationTheme
 import com.ynk.virtualdisplay.ui.theme.PetTokens
@@ -72,25 +76,25 @@ class MainActivity : ComponentActivity() {
         setContent {
             MyApplicationTheme {
                 val uiState by viewModel.uiState.collectAsState()
+                val guidePrefs = remember { getSharedPreferences("virtual_display_settings", MODE_PRIVATE) }
+                var guideCompleted by remember { mutableStateOf(guidePrefs.getBoolean("onboarding_completed", false)) }
 
                 Scaffold(
                     modifier = Modifier.fillMaxSize(),
                     containerColor = PetTokens.Bg,
                 ) { innerPadding ->
                     Box(Modifier.padding(innerPadding).fillMaxSize()) {
-                        when (val state = uiState.shizukuState) {
-                            is ShizukuState.Checking -> Box(
+                        val state = uiState.shizukuState
+                        when {
+                            // Polling from the guide passes through Checking, which must not flash a spinner.
+                            state is ShizukuState.Checking && guideCompleted -> Box(
                                 Modifier.fillMaxSize(), contentAlignment = Alignment.Center,
                             ) { CircularProgressIndicator() }
 
-                            is ShizukuState.Ready -> PetApp(
-                                uiState = uiState,
-                                viewModel = viewModel,
-                            )
-
-                            else -> ShizukuPermissionScreen(
+                            OnboardingFlow.shown(guideCompleted, state is ShizukuState.Ready) -> OnboardingScreen(
                                 state = state,
-                                onRetry = { viewModel.checkShizukuStatus(this@MainActivity) },
+                                completedBefore = guideCompleted,
+                                onCheck = { viewModel.checkShizukuStatus(this@MainActivity) },
                                 onRequestPermission = {
                                     try {
                                         Shizuku.requestPermission(ShizukuDisplayRepository.REQUEST_CODE)
@@ -98,6 +102,15 @@ class MainActivity : ComponentActivity() {
                                         Log.e("MainActivity", "Failed to request permission", e)
                                     }
                                 },
+                                onFinish = {
+                                    guidePrefs.edit().putBoolean("onboarding_completed", true).apply()
+                                    guideCompleted = true
+                                },
+                            )
+
+                            else -> PetApp(
+                                uiState = uiState,
+                                viewModel = viewModel,
                             )
                         }
 

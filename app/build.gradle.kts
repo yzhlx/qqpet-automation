@@ -58,6 +58,9 @@ android {
         buildConfigField("String", "BUILD_TIME", "\"$buildTime\"")
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+        // The OCR library is one native copy per ABI; every supported phone is 64-bit ARM.
+        ndk { abiFilters += "arm64-v8a" }
     }
 
     // Explicitly set the Java toolchain for Android tasks
@@ -97,7 +100,8 @@ android {
 
     buildTypes {
         release {
-            isMinifyEnabled = false
+            isMinifyEnabled = true
+            isShrinkResources = true
             if (signingConfigs.findByName("release") != null) {
                 signingConfig = signingConfigs.getByName("release")
             }
@@ -105,6 +109,12 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+        }
+        // The shrunken app with run-as still working, so a device test can read the logs.
+        create("verify") {
+            initWith(getByName("release"))
+            isDebuggable = true
+            matchingFallbacks += "release"
         }
     }
     
