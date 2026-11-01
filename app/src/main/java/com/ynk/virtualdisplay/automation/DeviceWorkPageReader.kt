@@ -87,8 +87,14 @@ class DeviceWorkPageReader(
     override suspend fun locateVenueLabel(venue: String): PointF? = locate { it.text.trim() == venue }
 
     override suspend fun readDetailPage(): PetWorkNavigation.TownPage {
-        val page = classify(readLines())
-        return if (page.isDetailPage) page else PetWorkNavigation.TownPage(false, false, null)
+        // One garbled ML Kit read must not block a start: identity is retried on fresh frames, and
+        // only a frame that positively proves the detail page is ever returned as one.
+        repeat(LOCATE_ATTEMPTS) { attempt ->
+            val page = classify(readLines())
+            if (page.isDetailPage) return page
+            if (attempt < LOCATE_ATTEMPTS - 1) delay(LOCATE_RETRY_DELAY_MS)
+        }
+        return PetWorkNavigation.TownPage(false, false, null)
     }
 
     override suspend fun readSelectedOptionLabel(expectedMinutes: Int?): String? =

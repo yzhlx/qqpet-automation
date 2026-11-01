@@ -553,6 +553,17 @@ class WorkPageParserTest {
     }
 
     @Test
+    fun `aMisreadFooterOnTheScrolledFrameIsStillATownDetailPage`() {
+        // Measured 2026-11-02: the same footer came back as 升呈条件 and blocked a valid start.
+        val frame = stickyHeader + listOf(
+            venueName,
+            line("去打工", 310, 1367, 410, 1399),
+            line("升呈条件:获得该阶段工分 20/280", 144, 1467, 577, 1493),
+        )
+        assertEquals(WorkPageParser.TownPageKind.DETAIL, WorkPageParser.parseTownPage(frame))
+    }
+
+    @Test
     fun `theRewardScrolledVenueFrameIsStillATownDetailPage`() {
         // Measured 2026-10-20 s17: on the scrolled frame the option cards and their 用时 lines are
         // gone, and that is exactly why the confirm step used to fail WORK_PAGE_IDENTITY_UNCONFIRMED.

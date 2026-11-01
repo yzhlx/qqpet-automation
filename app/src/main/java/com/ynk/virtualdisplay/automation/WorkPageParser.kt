@@ -400,7 +400,9 @@ object WorkPageParser {
         val text = lines.joinToString(" ") { normaliseGlyphs(it.text) }
         if (text.contains("打工中") || PAYROLL_MARKERS.any { text.contains(it) }) return TownPageKind.NONE
         val hasStart = text.contains("去打工")
-        val hasDetails = text.contains("用时") || text.contains("升星条件")
+        // The scrolled frame has no 用时, and ML Kit can misread 升星条件 on it (measured 2026-11-02:
+        // 升呈条件), which blocked a valid start. The footer's rest, 该阶段工分, is detail-only too.
+        val hasDetails = text.contains("用时") || text.contains("升星条件") || text.contains("该阶段工分")
         if (hasStart && hasDetails) return TownPageKind.DETAIL
         // The detail page's own footer survives even when the 去打工 button is DISABLED: the game
         // replaces the button with a "你的宠物清洁值不足，请回家洗澡" banner when the work's own 清洁
