@@ -230,7 +230,15 @@ fun PetHomeScreen(
                         displayReady = readyDisplay != null && readyDisplay.id in managedIds,
                         catalogReady = catalogFresh,
                         onOpenDisplay = {
-                            context.startActivity(Intent(context, DisplayActivity::class.java))
+                            viewModel.createPetDisplay { displayId ->
+                                android.widget.Toast.makeText(
+                                    context, "在这个画面里搜索「宠物」，进入宠物房间后返回 App",
+                                    android.widget.Toast.LENGTH_LONG,
+                                ).show()
+                                context.startActivity(
+                                    Intent(context, DisplayActivity::class.java).putExtra("display_id", displayId)
+                                )
+                            }
                         },
                         onOpenPlanSheet = onOpenPlanSheet,
                         modifier = Modifier.padding(bottom = 7.dp),
@@ -354,7 +362,7 @@ private fun SetupChecklistCard(
         SetupStepRow(
             index = "2", title = "720×1600 虚拟屏",
             state = if (displayReady) "已托管" else "未托管", done = displayReady,
-            actionText = "打开控制台", onAction = onOpenDisplay,
+            actionText = "一键创建", onAction = onOpenDisplay,
         )
         SetupStepRow(
             index = "3", title = "课表已读取",
@@ -364,7 +372,7 @@ private fun SetupChecklistCard(
         Spacer(Modifier.height(6.dp))
         PetNote(
             "三步全部完成前，下面的按钮保持灰色；这些步骤都不消耗游戏内金币。" +
-                "第 1 步在「设置 › 虚拟屏控制台」点『重启服务』；第 2 步创建后点该屏幕的『启动』拉起 QQ。"
+                "第 1 步在「设置 › 虚拟屏控制台」点『重启服务』；第 2 步点『一键创建』后，在打开的画面里进入 QQ 宠物房间。"
         )
     }
 }

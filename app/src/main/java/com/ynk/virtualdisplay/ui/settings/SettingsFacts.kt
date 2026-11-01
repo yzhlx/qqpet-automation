@@ -51,7 +51,7 @@ object SettingsFacts {
      * Screenshot retention: the app never deletes evidence, so the honest answer is "no limit —
      * never auto-deleted". Reporting a retention count would describe a feature that does not exist.
      */
-    const val SCREENSHOT_POLICY = "不自动清理"
+    const val SCREENSHOT_POLICY = "自动清理"
 
     /** Features the reference drew that simply do not exist yet. */
     val UNAVAILABLE_ROWS = listOf(

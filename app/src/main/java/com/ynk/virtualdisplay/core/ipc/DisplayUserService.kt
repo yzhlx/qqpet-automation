@@ -40,7 +40,12 @@ class DisplayUserService @Keep constructor(private val context: Context) : IDisp
 
     companion object {
         private const val TAG = "DisplayUserService"
+        private const val APP_PACKAGE = "com.ynk.virtualdisplay"
         private val KNOWN_MANAGED_NAME_PREFIXES = listOf("Shizuku_VD_", "vd")
+
+        /** Other pids from a `pidof` line; never this process. */
+        internal fun stalePids(pidofOutput: String, selfPid: Int): List<Int> =
+            pidofOutput.trim().split(Regex("\\s+")).mapNotNull { it.toIntOrNull() }.filter { it != selfPid }
     }
 
     private val displayManager by lazy {
@@ -55,6 +60,7 @@ class DisplayUserService @Keep constructor(private val context: Context) : IDisp
     init {
         try {
             Log.d(TAG, "DisplayUserService init in process: ${getCurrentProcessName()}")
+            killStaleServiceProcesses()
             HiddenApiBypass.addHiddenApiExemptions("")
             Workarounds.apply()
             Log.d(TAG, "Workarounds applied successfully")
@@ -62,6 +68,25 @@ class DisplayUserService @Keep constructor(private val context: Context) : IDisp
             startDiagnosticThread()
         } catch (e: Throwable) {
             Log.e(TAG, "Critical error during service initialization", e)
+        }
+    }
+
+    /**
+     * The daemon survives an app upgrade, and a new version starts a second process. Measured
+     * 2026-11-01: ten leftovers made the app's map taps and frames fail until they were killed,
+     * while adb taps on the same screen still worked.
+     */
+    private fun killStaleServiceProcesses() {
+        for (suffix in listOf("display_service", "capture_service")) {
+            runCatching {
+                val pidof = ProcessBuilder("pidof", "$APP_PACKAGE:$suffix").redirectErrorStream(true).start()
+                val output = pidof.inputStream.bufferedReader().use { it.readText() }
+                pidof.waitFor()
+                stalePids(output, android.os.Process.myPid()).forEach { pid ->
+                    Log.w(TAG, "Killing stale $suffix process $pid")
+                    android.os.Process.killProcess(pid)
+                }
+            }.onFailure { Log.w(TAG, "Stale $suffix cleanup failed", it) }
         }
     }
 

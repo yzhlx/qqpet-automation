@@ -129,6 +129,34 @@ class MainViewModel(
         }
     }
 
+    /** One tap for beginners: the calibrated screen with QQ already on it. */
+    fun createPetDisplay(onReady: (Int) -> Unit) {
+        val profile = com.ynk.virtualdisplay.automation.PetProfile.calibrated()
+        viewModelScope.launch {
+            _uiState.update { it.copy(isLoading = true, statusMessage = "正在创建虚拟屏…") }
+            repository.createDisplay(
+                name = "Shizuku_VD_${System.currentTimeMillis()}",
+                width = profile.displayWidth,
+                height = profile.displayHeight,
+                dpi = 320,
+            ).onSuccess { displayId ->
+                refreshDisplays(appContext)
+                repository.launchApp("com.tencent.mobileqq", displayId)
+                    .onSuccess {
+                        _uiState.update { it.copy(isLoading = false, statusMessage = "虚拟屏已创建") }
+                        onReady(displayId)
+                    }
+                    .onFailure { e ->
+                        Log.e("MainViewModel", "Failed to launch QQ", e)
+                        _uiState.update { it.copy(isLoading = false, statusMessage = "QQ 启动失败：${e.message}") }
+                    }
+            }.onFailure { e ->
+                Log.e("MainViewModel", "Failed to create pet display", e)
+                _uiState.update { it.copy(isLoading = false, statusMessage = "虚拟屏创建失败：${e.message}") }
+            }
+        }
+    }
+
     @Suppress("DEPRECATION")
     private fun checkAndInitDeviceMetrics(context: Context) {
         val dm = context.getSystemService(Context.DISPLAY_SERVICE) as android.hardware.display.DisplayManager

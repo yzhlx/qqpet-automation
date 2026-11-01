@@ -219,7 +219,7 @@ fun PetSettingsScreen(
                 trailing = { ValueText("$budgetUsed / ${DailyBudgetStore.HARD_STOP_MINUTES} 分钟") },
             )
             Row(Modifier.fillMaxWidth().padding(bottom = 10.dp, top = 2.dp)) {
-                PetNote("App 不会自动删除截图或日志；需要清理时请在系统「应用信息 › 存储」里操作。")
+                PetNote("运行截图只作临时核对，旧截图会自动清理。")
             }
         }
         Spacer(Modifier.height(11.dp))
