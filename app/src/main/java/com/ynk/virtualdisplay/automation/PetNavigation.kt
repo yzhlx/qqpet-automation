@@ -1252,7 +1252,17 @@ class PetNavigation(private val flow: PetFlowContext, private val workReader: Wo
             check(SystemClock.elapsedRealtime() - capturedAt <= 3_000) { "ROOM_EXIT_OBSERVATION_STALE:$action" }
             input.tap(target.x, target.y)
             delay(profile.pageSettleMs)
-            verifySettled(listOf(outdoor), "${serial++}-$action-after")
+            // A shift stopped by hand settles later: the game then opens its payroll page on the
+            // way out of the room, not before it, so initialise() cannot have cleared it (measured
+            // 2026-11-02, 1.0.83). One back tap, and only on positive OCR proof of that page.
+            try {
+                verifySettled(listOf(outdoor), "${serial++}-$action-after")
+            } catch (mismatch: IllegalStateException) {
+                if (mismatch is kotlinx.coroutines.CancellationException || workReader?.readPayrollPage() != true) throw mismatch
+                emit("$action-leave-payroll", null, "PAYROLL")
+                safety(); input.tap(PAYROLL_BACK_X, BACK_Y); delay(profile.pageSettleMs)
+                verifySettled(listOf(outdoor), "${serial++}-$action-after-payroll")
+            }
             Unit
         } finally { recognizer?.close() }
     }
