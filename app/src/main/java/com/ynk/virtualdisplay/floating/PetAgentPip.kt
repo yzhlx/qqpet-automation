@@ -101,8 +101,9 @@ fun PetAgentPipHost(modifier: Modifier = Modifier) {
             pipHeight = pipH,
             margin = with(density) { 12.dp.toPx() },
             top = with(density) { 12.dp.toPx() },
-            // Clear of the 托管 footer buttons so the preview never hides a real control.
-            bottom = with(density) { 96.dp.toPx() },
+            // Clear of the tab bar (about 59dp) plus the 托管 footer (about 71dp), so the preview
+            // never hides 停止托管. The margin below adds the visible gap.
+            bottom = with(density) { 132.dp.toPx() },
         )
         var position by remember { mutableStateOf(Offset.Zero) }
         var placed by remember { mutableStateOf(false) }
