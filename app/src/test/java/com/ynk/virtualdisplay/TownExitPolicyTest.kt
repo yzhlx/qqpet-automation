@@ -39,7 +39,7 @@ class TownExitPolicyTest {
         var reads = 0
         val failure = assertThrows(IllegalStateException::class.java) {
             runBlocking {
-                RestockConfirmation.await(3, { reads++; 0 }, { it > 0 }, {}) { "CARE_RESTOCK_NOT_CONFIRMED:COOKIE" }
+                RestockConfirmation.await<Int>(3, { reads++; 0 }, { it > 0 }, {}) { "CARE_RESTOCK_NOT_CONFIRMED:COOKIE" }
             }
         }
         assertEquals("CARE_RESTOCK_NOT_CONFIRMED:COOKIE", failure.message)
