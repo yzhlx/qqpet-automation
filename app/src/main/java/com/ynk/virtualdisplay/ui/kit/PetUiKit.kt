@@ -134,7 +134,7 @@ fun PetListRow(
                 color = if (dimmed) PetTokens.Ink3 else PetTokens.Ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
             if (sub != null) {
                 Spacer(Modifier.height(3.dp))
-                Text(sub, fontSize = 11.5.sp, color = if (dimmed) Color(0xFFB4B9C4) else PetTokens.Ink3,
+                Text(sub, fontSize = 11.5.sp, color = if (dimmed) PetTokens.Chevron else PetTokens.Ink3,
                     maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
         }
@@ -182,7 +182,7 @@ fun PetApproxValue(prefix: Boolean, value: String, modifier: Modifier = Modifier
 @Composable
 fun PetProgressBar(fraction: Float, modifier: Modifier = Modifier, color: Color = PetTokens.Blue) {
     val f = fraction.coerceIn(0f, 1f)
-    Box(modifier.fillMaxWidth().height(9.dp).background(Color(0xFFEDEFF4), pillShapes)) {
+    Box(modifier.fillMaxWidth().height(9.dp).background(PetTokens.BarTrack, pillShapes)) {
         Box(Modifier.fillMaxWidth(f).height(9.dp).background(color, pillShapes))
     }
 }
