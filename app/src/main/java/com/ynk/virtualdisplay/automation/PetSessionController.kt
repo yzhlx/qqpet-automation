@@ -76,7 +76,8 @@ class PetSessionController(context:Context,capture:HeadlessDisplayCapture,input:
                 "INITIAL_NAVIGATION","SELECT_COURSE" -> "NAVIGATION"
                 "START_COURSE","WAIT_HIGH_FIVE_WINDOW","HIGH_FIVE","WAIT_RESULT" -> "STUDY"
                 "NEXT_ROUND","DONE" -> "CONTROL"
-                else -> "OBSERVATION"},lastConfirmedAt=if(score!=null && score>=0.97) System.currentTimeMillis() else snapshot.lastConfirmedAt)
+                // Plan steps name their own flow; an unmapped observation inside one must not erase it.
+                else -> if(snapshot.currentFlow=="IDLE") "OBSERVATION" else snapshot.currentFlow},lastConfirmedAt=if(score!=null && score>=0.97) System.currentTimeMillis() else snapshot.lastConfirmedAt)
             publish()
         },onRecovery={state,reason,_ ->
             // Count a pause once per PAUSED episode, not once per transition into it.

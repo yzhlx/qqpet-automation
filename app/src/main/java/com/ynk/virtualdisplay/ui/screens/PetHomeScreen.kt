@@ -642,7 +642,8 @@ private fun flowTitle(view: ManagedRuntimeView): String {
         view.flowText.contains("OBS", true) -> "状态读取"
         else -> view.flowText
     }
-    val round = view.roundOfTotal
+    // Round 0 is the part of a plan before the first lesson; 打工 and 护理 have no 节 to count.
+    val round = view.roundOfTotal?.takeIf { it.first > 0 && base == "自动学习" }
     return if (round != null) "$base · 第 ${round.first} 节 / 共 ${round.second} 节" else base
 }
 
