@@ -225,7 +225,7 @@ object PetLogPresentation {
         val label = friendlyStep(step)
         return PetLogEntry(
             time,
-            if (template.isEmpty()) label else "$label（$template）",
+            label,
             if (passed) PetTokens.Green else PetTokens.AmberStrong,
             if (passed) null else "待确认",
             if (passed) PetTokens.GraySoft else PetTokens.AmberSoft,

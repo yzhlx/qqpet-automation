@@ -66,7 +66,9 @@ object RecordsPresentation {
     fun stopReasonText(reason: String): String = when {
         reason.contains("USER_STOP", true) || reason == "用户停止" -> "用户停止"
         reason.contains("PAGE_MISMATCH", true) -> "页面对不上"
+        reason.startsWith("WORK_NOT_STARTED", true) -> "条件不够，没有开始打工"
         reason.startsWith("WORK_", true) -> "打工未完成"
+        reason.startsWith("TOWN_EXIT", true) -> "没能回到宠物房间"
         reason.startsWith("PLAN_", true) -> "方案条件不满足"
         reason.contains("BUDGET", true) -> "达到每日上限"
         else -> "中途停止"
