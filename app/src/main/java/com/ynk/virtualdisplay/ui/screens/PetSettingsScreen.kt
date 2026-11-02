@@ -37,6 +37,7 @@ import com.ynk.virtualdisplay.automation.PetProfile
 import com.ynk.virtualdisplay.data.model.ShizukuState
 import com.ynk.virtualdisplay.floating.OverlayPermission
 import com.ynk.virtualdisplay.ui.data.PetEvidenceRepository
+import com.ynk.virtualdisplay.ui.feedback.FeedbackDialog
 import com.ynk.virtualdisplay.ui.kit.PetCard
 import com.ynk.virtualdisplay.ui.kit.PetChip
 import com.ynk.virtualdisplay.ui.kit.PetNote
@@ -80,6 +81,9 @@ fun PetSettingsScreen(
     var sessions by remember { mutableStateOf(0) }
     var budgetUsed by remember { mutableStateOf(0) }
     var notificationsEnabled by remember { mutableStateOf(true) }
+    var showFeedback by remember { mutableStateOf(false) }
+
+    if (showFeedback) FeedbackDialog(onDismiss = { showFeedback = false })
 
     LaunchedEffect(uiState.displays) {
         withContext(Dispatchers.IO) {
@@ -220,6 +224,21 @@ fun PetSettingsScreen(
             )
             Row(Modifier.fillMaxWidth().padding(bottom = 10.dp, top = 2.dp)) {
                 PetNote("运行截图只作临时核对，旧截图会自动清理。")
+            }
+        }
+        Spacer(Modifier.height(11.dp))
+
+        // ── 帮助 ──
+        PetCard(pad0 = true) {
+            GroupHeader("帮助")
+            Column(Modifier.clickable { showFeedback = true }) {
+                PetListRow(
+                    tileBg = PetTokens.AmberSoft,
+                    icon = { PetIcon(PetGlyph.Bug, 17.dp, PetTokens.AmberInk) },
+                    title = "问题反馈",
+                    sub = "把出错情况和运行日志发给开发者",
+                    showChevron = true,
+                )
             }
         }
         Spacer(Modifier.height(11.dp))

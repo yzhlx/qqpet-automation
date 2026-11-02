@@ -57,6 +57,13 @@ android {
         buildConfigField("Boolean", "GIT_DIRTY", "$isDirty")
         buildConfigField("String", "BUILD_TIME", "\"$buildTime\"")
 
+        // Blank hides that feedback channel in the app.
+        val localProperties = Properties().apply {
+            rootProject.file("local.properties").takeIf { it.exists() }?.inputStream()?.use { load(it) }
+        }
+        buildConfigField("String", "FEEDBACK_QQ_GROUP", "\"${localProperties.getProperty("feedback.qqGroup", "")}\"")
+        buildConfigField("String", "FEEDBACK_FORM_URL", "\"${localProperties.getProperty("feedback.formUrl", "")}\"")
+
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         // The OCR library is one native copy per ABI; every supported phone is 64-bit ARM.
