@@ -60,6 +60,16 @@ class FeedbackBundleTest {
     }
 
     @Test
+    fun ocrDumpsLoseThePetAndOwnerNames() {
+        val line = """{"action":"x","stopReason":"at=after|lines=狗子;主人:某昵称;金币+71","y":1}"""
+        val kept = FeedbackBundle.trimLog(listOf(line)).single()
+        assertFalse(kept.contains("某昵称"))
+        assertFalse(kept.contains("狗子"))
+        assertTrue(kept.contains("at=after"))
+        assertTrue(kept.contains(""""y":1"""))
+    }
+
+    @Test
     fun logDropsFrameLinesAndKeepsTheNewestTail() {
         val log = List(FeedbackBundle.MAX_LOG_LINES + 5) { "line-$it" } + "x:FRAME y"
         val kept = FeedbackBundle.trimLog(log)

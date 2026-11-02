@@ -59,8 +59,13 @@ object FeedbackBundle {
         }
     }
 
+    /** OCR dumps quote the game screen, which names the pet and its owner's QQ nickname. */
     fun trimLog(lines: List<String>): List<String> =
-        lines.filter { it.isNotBlank() && !it.contains(":FRAME") }.takeLast(MAX_LOG_LINES)
+        lines.filter { it.isNotBlank() && !it.contains(":FRAME") }
+            .takeLast(MAX_LOG_LINES)
+            .map { it.replace(OCR_DUMP, "lines=<已隐去>") }
+
+    private val OCR_DUMP = Regex("""lines=[^"]*""")
 
     private fun ZipOutputStream.putText(name: String, text: String) {
         putNextEntry(ZipEntry(name))
