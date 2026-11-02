@@ -99,7 +99,8 @@ object RecordsPresentation {
         val minutes = records.sumOf { it.runtimeMs } / 60_000L
         return RecordsSummary(
             rangeText = rangeText,
-            minutesText = "$minutes 分钟",
+            // Time the runs took, which is not the 今日已用 figure: that one counts game minutes.
+            minutesText = "运行 $minutes 分钟",
             courses = records.sumOf { it.completedRounds },
             careCount = records.sumOf { it.care?.total ?: 0 },
             pauseCount = records.sumOf { it.pauseCount },

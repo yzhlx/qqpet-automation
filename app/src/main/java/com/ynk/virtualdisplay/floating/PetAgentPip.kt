@@ -50,7 +50,7 @@ import kotlin.math.roundToInt
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 
-private val CollapsedWidth = 96.dp
+private val CollapsedWidth = 72.dp
 private val ExpandedWidth = 220.dp
 
 /** The calibrated automation display is 720x1600, so this window keeps the real game ratio. */

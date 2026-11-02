@@ -71,7 +71,7 @@ object HealthStatPresentation {
         is ObservedValue.Stale -> HealthStat(
             name = name,
             valueText = "≈${aged.previous.value}",
-            meta = "已过期 · ${timeFormatter(aged.previous.observedAt)}",
+            meta = "上次 ${timeFormatter(aged.previous.observedAt)}",
             status = HealthStatStatus.STALE,
             current = false,
         )

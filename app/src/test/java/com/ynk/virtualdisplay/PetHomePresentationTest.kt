@@ -90,7 +90,7 @@ class PetHomePresentationTest {
         val stats = HealthStatPresentation.stats(state, wall, true, at(old))
         assertEquals(HealthStatStatus.STALE, stats[0].status)
         assertTrue(stats[0].valueText.startsWith("≈"))
-        assertTrue(stats[0].meta.contains("已过期"))
+        assertTrue(stats[0].meta.startsWith("上次 "))
         assertFalse(stats[0].current)
     }
 
