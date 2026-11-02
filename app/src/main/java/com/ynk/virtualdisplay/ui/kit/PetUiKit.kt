@@ -28,6 +28,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -184,6 +185,48 @@ fun PetProgressBar(fraction: Float, modifier: Modifier = Modifier, color: Color 
     val f = fraction.coerceIn(0f, 1f)
     Box(modifier.fillMaxWidth().height(9.dp).background(PetTokens.BarTrack, pillShapes)) {
         Box(Modifier.fillMaxWidth(f).height(9.dp).background(color, pillShapes))
+    }
+}
+
+/** One segment per round: finished segments are full, the running one is pale with a dot. */
+@Composable
+fun PetSegmentBar(total: Int, completed: Int, running: Boolean, modifier: Modifier = Modifier) {
+    Row(modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        repeat(total.coerceAtLeast(1)) { index ->
+            val current = running && index == completed
+            Box(
+                Modifier.weight(1f).height(9.dp).background(
+                    when {
+                        index < completed -> PetTokens.Blue
+                        current -> PetTokens.BlueSoft
+                        else -> PetTokens.BarTrack
+                    },
+                    pillShapes,
+                ),
+                contentAlignment = Alignment.Center,
+            ) {
+                if (current) Box(Modifier.size(5.dp).background(PetTokens.Blue, CircleShape))
+            }
+        }
+    }
+}
+
+/** − value + control for a bounded number; the ends stop instead of wrapping. */
+@Composable
+fun PetStepper(value: Int, range: IntRange, step: Int, enabled: Boolean, onValue: (Int) -> Unit) {
+    val shape = RoundedCornerShape(PetTokens.TileRadius)
+    Row(Modifier.border(1.dp, PetTokens.Line, shape), verticalAlignment = Alignment.CenterVertically) {
+        StepperKey("−", enabled && value > range.first) { onValue((value - step).coerceIn(range)) }
+        Text("$value", Modifier.width(44.dp), fontSize = 15.sp, fontWeight = FontWeight.Bold,
+            color = PetTokens.Ink, textAlign = TextAlign.Center)
+        StepperKey("+", enabled && value < range.last) { onValue((value + step).coerceIn(range)) }
+    }
+}
+
+@Composable
+private fun StepperKey(text: String, enabled: Boolean, onClick: () -> Unit) {
+    Box(Modifier.size(38.dp).clickable(enabled = enabled, onClick = onClick), contentAlignment = Alignment.Center) {
+        Text(text, fontSize = 19.sp, color = if (enabled) PetTokens.Ink2 else PetTokens.Chevron)
     }
 }
 

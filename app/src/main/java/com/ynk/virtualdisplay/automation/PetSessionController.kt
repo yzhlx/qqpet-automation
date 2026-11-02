@@ -728,7 +728,7 @@ class PetSessionController(context:Context,capture:HeadlessDisplayCapture,input:
             ?: error("WORK_PREP_CLEANLINESS_UNREAD")
         if(WorkPreparation.isReady(have,entry.cleanlinessCost)) return
         val need=WorkPreparation.requiredCleanliness(entry.cleanlinessCost)
-        snapshot=snapshot.copy(currentFlow="WORK",nextStep="为打工备清洁，have $have / need $need")
+        snapshot=snapshot.copy(currentFlow="WORK",nextStep="为打工备清洁：现有 $have，需要 $need")
         publish()
         try {
             care.cleanTo(need,reading)

@@ -42,6 +42,7 @@ object PetTokens {
 
     // Mood dot colour from the reference S_NOW stats (not part of :root, taken from the sample row)
     val MoodDot = Color(0xFFE0567B)
+    val WaterDot = Color(0xFF4A90D9)
 
     // Extras transcribed from the fixed colours the mock-ups hard-code inline
     val Chevron = Color(0xFFCFC5B8)          // .chev stroke

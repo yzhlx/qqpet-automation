@@ -54,10 +54,8 @@ import kotlinx.coroutines.withContext
 /**
  * 设置 tab — the single settings entry for the app.
  *
- * Only real state is shown. Rows for features that do not exist are marked 暂未开放 and are NOT
- * rendered as toggles, because a switch that silently does nothing is a lie about capability. The
- * developer console, the live log and the calibration frame saver all live here so the main tabs
- * stay user-facing.
+ * Only real state is shown, and features that do not exist get no row at all. The developer console,
+ * the live log and the calibration frame saver stay folded under 高级 so the main tabs stay user-facing.
  */
 @Composable
 fun PetSettingsScreen(
@@ -73,8 +71,6 @@ fun PetSettingsScreen(
 
     val profile = remember { PetProfile.calibrated() }
     val plan = remember { com.ynk.virtualdisplay.automation.SessionPlanStore(context).load() }
-    val thresholds = remember { SettingsFacts.thresholds(plan) }
-    val batch = remember { SettingsFacts.batch(plan) }
     val repo = remember { PetEvidenceRepository(context) }
 
     var screenshots by remember { mutableStateOf(0) }
@@ -82,6 +78,7 @@ fun PetSettingsScreen(
     var budgetUsed by remember { mutableStateOf(0) }
     var notificationsEnabled by remember { mutableStateOf(true) }
     var showFeedback by remember { mutableStateOf(false) }
+    var showAdvanced by remember { mutableStateOf(false) }
 
     if (showFeedback) FeedbackDialog(onDismiss = { showFeedback = false })
 
@@ -106,14 +103,14 @@ fun PetSettingsScreen(
 
         // ── 权限与环境 ──
         PetCard(pad0 = true) {
-            GroupHeader("权限与环境")
+            GroupHeader("权限", PetGlyph.Shield)
             val overlayGranted = OverlayPermission.canDrawOverlays(context)
             Column(Modifier.clickable { context.startActivity(OverlayPermission.settingsIntent(context)) }) {
                 PetListRow(
                     tileBg = if (overlayGranted) PetTokens.GreenSoft else PetTokens.AmberSoft,
                     icon = { PetIcon(PetGlyph.TabSet, 18.dp, if (overlayGranted) PetTokens.GreenInk else PetTokens.AmberInk) },
-                    title = "悬浮窗权限",
-                    sub = if (overlayGranted) "已授权，跨应用胶囊可用" else "未授权：托管仍可运行，离开 App 后看不到胶囊",
+                    title = "悬浮窗",
+                    sub = if (overlayGranted) "离开 App 也能看到进度" else "未开启：离开 App 后看不到进度胶囊",
                     trailing = {
                         if (overlayGranted) PetChip("已授权", PetTokens.GreenSoft, PetTokens.GreenInk)
                         else PetChip("未授权", PetTokens.AmberSoft, PetTokens.AmberInk)
@@ -123,8 +120,8 @@ fun PetSettingsScreen(
             PetListRow(
                 tileBg = PetTokens.BlueSoft,
                 icon = { PetIcon(PetGlyph.Shield, 17.dp) },
-                title = "Shizuku 权限",
-                sub = if (shizukuReady) "后台截图与输入已授权" else "未授权，托管无法启动",
+                title = "Shizuku",
+                sub = if (shizukuReady) "后台画面和操作已授权" else "未授权，托管无法启动",
                 trailing = {
                     if (shizukuReady) PetChip("已授权", PetTokens.GreenSoft, PetTokens.GreenInk)
                     else PetChip("未授权", PetTokens.RedSoft, PetTokens.RedInk)
@@ -134,9 +131,8 @@ fun PetSettingsScreen(
                 PetListRow(
                     tileBg = PetTokens.GreenSoft,
                     icon = { PetIcon(PetGlyph.Display, 17.dp) },
-                    title = "虚拟屏",
-                    sub = if (petDisplay != null) "display ${petDisplay.id} · ${SettingsFacts.displayFacts(profile)}"
-                    else "未找到 ${profile.displayWidth}×${profile.displayHeight} 虚拟屏",
+                    title = "后台画面",
+                    sub = if (petDisplay != null) SettingsFacts.displayFacts(profile) else "还没有创建",
                     trailing = {
                         when {
                             petDisplayManaged -> PetChip("已就绪", PetTokens.GreenSoft, PetTokens.GreenInk)
@@ -151,7 +147,7 @@ fun PetSettingsScreen(
                 tileBg = PetTokens.AmberSoft,
                 icon = { PetIcon(PetGlyph.Bell, 17.dp) },
                 title = "通知",
-                sub = "完成、暂停与异常提醒",
+                sub = "完成和中途停止时提醒",
                 trailing = {
                     if (notificationsEnabled) PetChip("已开启", PetTokens.GreenSoft, PetTokens.GreenInk)
                     else PetChip("已关闭", PetTokens.RedSoft, PetTokens.RedInk)
@@ -159,78 +155,37 @@ fun PetSettingsScreen(
             )
             if (uiState.shizukuState !is ShizukuState.Ready) {
                 Row(Modifier.fillMaxWidth().padding(bottom = 10.dp)) {
-                    PetNote("Shizuku 未就绪时，托管按钮会被禁用——这与后端服务实际会拒绝启动的条件一致。")
+                    PetNote("Shizuku 未就绪时不能开始托管。")
                 }
             }
         }
         Spacer(Modifier.height(11.dp))
 
-        // ── 托管行为（全部为真实常量） ──
+        // ── 托管 ──
         PetCard(pad0 = true) {
-            GroupHeader("托管行为")
-            PetListRow(
-                tileBg = PetTokens.BlueSoft,
-                icon = { PetIcon(PetGlyph.Clock, 17.dp) },
-                title = "单批托管节数",
-                sub = "每节约 10 分钟，可随时停止",
-                trailing = { ValueText(batch.roundsText) },
-            )
-            PetListRow(
-                tileBg = PetTokens.AmberSoft,
-                icon = { PetIcon(PetGlyph.Shield, 17.dp) },
-                title = "每日课程上限",
-                sub = "达到后当天不再开始新课程",
-                trailing = { ValueText(batch.dailyText) },
-            )
-            PetListRow(
-                tileBg = PetTokens.VioletSoft,
-                icon = { PetIcon(PetGlyph.Grip, 17.dp) },
-                title = "开课阈值",
-                sub = "体力 / 清洁，低于时先护理",
-                trailing = { ValueText(thresholds.text) },
-            )
-            PetListRow(
-                tileBg = PetTokens.GraySoft,
-                icon = { PetIcon(PetGlyph.Cam, 17.dp) },
-                title = "运行截图",
-                sub = "仅本地保存，仅系统可写",
-                trailing = { ValueText(SettingsFacts.SCREENSHOT_POLICY) },
-            )
-            Row(Modifier.fillMaxWidth().padding(bottom = 10.dp, top = 2.dp)) {
-                PetNote(
-                    "阈值、节数与每日上限取自「托管方案」里保存的设置，在那里修改。" +
-                        "心情不参与判定，仅观察记录。"
+            GroupHeader("托管", PetGlyph.Play)
+            Column(Modifier.clickable { onOpenPlanSheet() }) {
+                PetListRow(
+                    tileBg = PetTokens.BlueSoft,
+                    icon = { PetIcon(PetGlyph.Play, 16.dp) },
+                    title = "默认运行方案",
+                    sub = "选择动作、课程、节数和目标",
+                    showChevron = true,
                 )
             }
-        }
-        Spacer(Modifier.height(11.dp))
-
-        // ── 本地数据 ──
-        PetCard(pad0 = true) {
-            GroupHeader("本地数据")
-            PetListRow(
-                tileBg = PetTokens.BlueSoft,
-                icon = { PetIcon(PetGlyph.Db, 17.dp) },
-                title = "运行记录",
-                sub = "$sessions 次会话 · $screenshots 张截图",
-                trailing = { PetChip("仅本机", PetTokens.GraySoft, PetTokens.Ink2) },
-            )
             PetListRow(
                 tileBg = PetTokens.GreenSoft,
                 icon = { PetIcon(PetGlyph.Clock, 17.dp) },
-                title = "今日已记录",
-                sub = "课程时长会计入每日上限",
-                trailing = { ValueText("$budgetUsed / ${DailyBudgetStore.HARD_STOP_MINUTES} 分钟") },
+                title = "今日已用",
+                sub = "打工和学习共用，达到上限后当天停止",
+                trailing = { ValueText("$budgetUsed / ${plan.dailyBudgetMinutes} 分钟") },
             )
-            Row(Modifier.fillMaxWidth().padding(bottom = 10.dp, top = 2.dp)) {
-                PetNote("运行截图只作临时核对，旧截图会自动清理。")
-            }
         }
         Spacer(Modifier.height(11.dp))
 
-        // ── 帮助 ──
+        // ── 关于 ──
         PetCard(pad0 = true) {
-            GroupHeader("帮助")
+            GroupHeader("关于", PetGlyph.Info)
             Column(Modifier.clickable { showFeedback = true }) {
                 PetListRow(
                     tileBg = PetTokens.AmberSoft,
@@ -240,99 +195,74 @@ fun PetSettingsScreen(
                     showChevron = true,
                 )
             }
-        }
-        Spacer(Modifier.height(11.dp))
-
-        // ── 高级与开发 ──
-        PetCard(pad0 = true) {
-            GroupHeader("高级与开发")
-            Column(Modifier.clickable { onOpenConsole() }) {
-                PetListRow(
-                    tileBg = PetTokens.GreenSoft,
-                    icon = { PetIcon(PetGlyph.Display, 17.dp) },
-                    title = "虚拟屏控制台",
-                    sub = "创建 / 释放虚拟屏，查看画面",
-                    showChevron = true,
-                )
-            }
-            Column(Modifier.clickable { onOpenLogs() }) {
-                PetListRow(
-                    tileBg = PetTokens.BlueSoft,
-                    icon = { PetIcon(PetGlyph.TabRec, 17.dp) },
-                    title = "运行日志",
-                    sub = "自动化层写入的原始事件",
-                    showChevron = true,
-                )
-            }
-            Column(Modifier.clickable { onOpenCalibration() }) {
-                PetListRow(
-                    tileBg = PetTokens.VioletSoft,
-                    icon = { PetIcon(PetGlyph.Cam, 17.dp) },
-                    title = "模板校准",
-                    sub = "保存虚拟屏调试帧，用于裁剪识别模板",
-                    showChevron = true,
-                )
-            }
-            Column(Modifier.clickable { onOpenPlanSheet() }) {
-                PetListRow(
-                    tileBg = PetTokens.GreenSoft,
-                    icon = { PetIcon(PetGlyph.Play, 17.dp) },
-                    title = "托管方案",
-                    sub = "查看已启用与暂未开放的功能",
-                    showChevron = true,
-                )
-            }
-            Column(Modifier.clickable {
-                context.startService(PetAutomationService.stopIntent(context))
-            }) {
-                PetListRow(
-                    tileBg = PetTokens.RedSoft,
-                    icon = { PetIcon(PetGlyph.Warn, 16.dp) },
-                    title = "紧急停止",
-                    sub = "立即结束当前批次，不做任何输入",
-                )
-            }
-        }
-        Spacer(Modifier.height(11.dp))
-
-        // ── 暂未开放（明确不提供假开关） ──
-        PetCard(pad0 = true) {
-            GroupHeader("暂未开放")
-            SettingsFacts.UNAVAILABLE_ROWS.forEach { (name, why) ->
-                PetListRow(
-                    tileBg = PetTokens.GraySoft,
-                    icon = { PetIcon(PetGlyph.Info, 17.dp) },
-                    title = name,
-                    sub = why,
-                    dimmed = true,
-                    trailing = { PetChip("暂未开放", PetTokens.GraySoft, PetTokens.Ink2) },
-                )
-            }
-            Row(Modifier.fillMaxWidth().padding(bottom = 10.dp, top = 2.dp)) {
-                PetNote("这些项目不显示开关：v0.1 没有对应实现，做出可点的开关会误导。")
-            }
-        }
-        Spacer(Modifier.height(11.dp))
-
-        // ── 版本信息 ──
-        PetCard(pad0 = true) {
-            GroupHeader("版本信息")
             PetListRow(
-                tileBg = PetTokens.GraySoft,
+                tileBg = PetTokens.VioletSoft,
                 icon = { PetIcon(PetGlyph.Info, 17.dp) },
-                title = "QQ 宠物托管 v0.1",
+                title = "版本",
                 sub = "设备 ${android.os.Build.MODEL} · Android ${android.os.Build.VERSION.RELEASE}",
                 trailing = { ValueText(BuildConfig.VERSION_NAME) },
             )
-            PetListRow(
-                tileBg = PetTokens.GraySoft,
-                icon = { PetIcon(PetGlyph.Bug, 17.dp) },
-                title = "构建",
-                sub = "${BuildConfig.GIT_HASH}${if (BuildConfig.GIT_DIRTY) " · 未提交改动" else ""}",
-                trailing = { ValueText(BuildConfig.BUILD_TIME.take(16)) },
-            )
             Row(Modifier.fillMaxWidth().padding(bottom = 10.dp, top = 2.dp)) {
-                PetNote("仅支持已校准的 FOA-AL00，其他设备会在服务层被拒绝启动。手机 QQ 版本不限，页面对不上时会自动停止。")
+                PetNote("目前只支持 FOA-AL00。手机 QQ 版本不限，页面对不上时会自动停止。")
+            }
+        }
+        Spacer(Modifier.height(11.dp))
+
+        // ── 高级：收起，普通用户用不到 ──
+        PetCard(pad0 = true) {
+            Row(
+                Modifier.fillMaxWidth().clickable { showAdvanced = !showAdvanced }.padding(vertical = 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                PetSection("高级")
+                Spacer(Modifier.weight(1f))
+                PetNote(if (showAdvanced) "收起" else "展开")
+            }
+            if (showAdvanced) {
+                Column(Modifier.clickable { onOpenConsole() }) {
+                    PetListRow(
+                        tileBg = PetTokens.GreenSoft,
+                        icon = { PetIcon(PetGlyph.Display, 17.dp) },
+                        title = "虚拟屏控制台",
+                        sub = "创建 / 释放虚拟屏，查看画面",
+                        showChevron = true,
+                    )
+                }
+                Column(Modifier.clickable { onOpenLogs() }) {
+                    PetListRow(
+                        tileBg = PetTokens.BlueSoft,
+                        icon = { PetIcon(PetGlyph.TabRec, 17.dp) },
+                        title = "运行日志",
+                        sub = "$sessions 次运行 · $screenshots 张截图 · 仅本机",
+                        showChevron = true,
+                    )
+                }
+                Column(Modifier.clickable { onOpenCalibration() }) {
+                    PetListRow(
+                        tileBg = PetTokens.VioletSoft,
+                        icon = { PetIcon(PetGlyph.Cam, 17.dp) },
+                        title = "模板校准",
+                        sub = "保存虚拟屏调试帧，用于裁剪识别模板",
+                        showChevron = true,
+                    )
+                }
+                Column(Modifier.clickable {
+                    context.startService(PetAutomationService.stopIntent(context))
+                }) {
+                    PetListRow(
+                        tileBg = PetTokens.RedSoft,
+                        icon = { PetIcon(PetGlyph.Warn, 16.dp) },
+                        title = "紧急停止",
+                        sub = "立即结束当前批次，不做任何输入",
+                    )
+                }
+                PetListRow(
+                    tileBg = PetTokens.GraySoft,
+                    icon = { PetIcon(PetGlyph.Bug, 17.dp) },
+                    title = "构建",
+                    sub = BuildConfig.GIT_HASH,
+                    trailing = { ValueText(BuildConfig.BUILD_TIME.take(16)) },
+                )
             }
         }
 
@@ -341,8 +271,10 @@ fun PetSettingsScreen(
 }
 
 @Composable
-private fun GroupHeader(text: String) {
+private fun GroupHeader(text: String, glyph: PetGlyph) {
     Row(Modifier.fillMaxWidth().padding(top = 2.dp, bottom = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+        PetIcon(glyph, 15.dp)
+        Spacer(Modifier.width(7.dp))
         PetSection(text)
     }
 }

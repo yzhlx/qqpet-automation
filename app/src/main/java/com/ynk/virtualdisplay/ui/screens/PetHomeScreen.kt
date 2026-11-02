@@ -9,6 +9,8 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.IntrinsicSize
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -30,25 +32,29 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
+import com.ynk.virtualdisplay.automation.CareStep
 import com.ynk.virtualdisplay.automation.CourseCatalogStore
 import com.ynk.virtualdisplay.automation.DailyBudgetStore
 import com.ynk.virtualdisplay.automation.PetAutomationService
 import com.ynk.virtualdisplay.automation.PetManagedRuntime
 import com.ynk.virtualdisplay.automation.PetProfile
 import com.ynk.virtualdisplay.automation.PetRuntime
+import com.ynk.virtualdisplay.automation.PlanV2
+import com.ynk.virtualdisplay.automation.PlanV2Store
 import com.ynk.virtualdisplay.automation.SessionMode
 import com.ynk.virtualdisplay.automation.SessionPlan
 import com.ynk.virtualdisplay.floating.OverlayPermission
 import com.ynk.virtualdisplay.automation.SessionPlanStore
+import com.ynk.virtualdisplay.automation.StudyStep
+import com.ynk.virtualdisplay.automation.WorkStep
 import com.ynk.virtualdisplay.data.model.ShizukuState
 import com.ynk.virtualdisplay.ui.data.LogEntry
 import com.ynk.virtualdisplay.ui.data.PetEvidenceRepository
@@ -65,13 +71,11 @@ import com.ynk.virtualdisplay.ui.kit.PetDot
 import com.ynk.virtualdisplay.ui.kit.PetFootButton
 import com.ynk.virtualdisplay.ui.kit.PetGlyph
 import com.ynk.virtualdisplay.ui.kit.PetIcon
-import com.ynk.virtualdisplay.ui.kit.PetListRow
 import com.ynk.virtualdisplay.ui.kit.PetNote
 import com.ynk.virtualdisplay.ui.kit.PetPill
 import com.ynk.virtualdisplay.ui.kit.PetProgressBar
-import com.ynk.virtualdisplay.ui.kit.PetRowHeader
+import com.ynk.virtualdisplay.ui.kit.PetSegmentBar
 import com.ynk.virtualdisplay.ui.kit.PetSection
-import com.ynk.virtualdisplay.ui.kit.rememberEvidenceBitmap
 import com.ynk.virtualdisplay.ui.log.PetLogEntry
 import com.ynk.virtualdisplay.ui.log.PetLogPresentation
 import com.ynk.virtualdisplay.ui.main.MainViewModel
@@ -79,10 +83,10 @@ import com.ynk.virtualdisplay.ui.theme.PetTokens
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
-import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import java.util.UUID
 
 /**
  * 托管 home. Every value on this screen comes from a real source:
@@ -91,7 +95,7 @@ import java.util.Locale
  *  - the log timeline                          : files/pet_mvp.log
  *
  * The control footer exposes ONLY what the automation layer really has: START and STOP. There is no
- * manual pause/resume API, so 暂停 explains itself and is never wired to a fake action.
+ * manual pause/resume API, so no pause button is drawn.
  */
 @Composable
 fun PetHomeScreen(
@@ -124,7 +128,7 @@ fun PetHomeScreen(
 
     val repo = remember { PetEvidenceRepository(context) }
     var latest by remember { mutableStateOf<SessionEvidence?>(null) }
-    var shots by remember { mutableStateOf<List<File>>(emptyList()) }
+    var planV2 by remember { mutableStateOf<PlanV2?>(null) }
     var logRows by remember { mutableStateOf<List<PetLogEntry>>(emptyList()) }
     var budgetUsed by remember { mutableStateOf(0) }
     // The saved plan decides the batch: course, round count, thresholds and budget. It replaces the
@@ -135,11 +139,10 @@ fun PetHomeScreen(
     LaunchedEffect(runtime.running, managed.sessionId) {
         suspend fun reload() = withContext(Dispatchers.IO) {
             latest = repo.latestSession()
-            val liveDir = repo.liveSessionDirectory(managed.sessionId)
-            shots = repo.screenshotsFor(liveDir ?: latest?.directory, null)
             logRows = PetLogPresentation.timeline(repo.logEntries(limit = 600))
             budgetUsed = DailyBudgetStore(context).usedMinutes()
             plan = SessionPlanStore(context).load()
+            planV2 = runCatching { PlanV2Store(context).load() }.getOrNull()
             val catalog = CourseCatalogStore(context).load()
             catalogFresh = catalog?.isUsable(System.currentTimeMillis()) == true &&
                 catalog.find(plan.courseId)?.let { it.unlocked && it.durationMinutes in 1..DailyBudgetStore.HARD_STOP_MINUTES } == true
@@ -169,7 +172,6 @@ fun PetHomeScreen(
     )
     val progress = RoundProgressPresentation.of(managed.totalRounds, managed.completedRounds)
     val budgetCap = minOf(plan.dailyBudgetMinutes, DailyBudgetStore.HARD_STOP_MINUTES)
-    val budgetLeft = budgetCap - budgetUsed
 
     var dialog by remember { mutableStateOf<HomeDialog?>(null) }
 
@@ -182,12 +184,23 @@ fun PetHomeScreen(
 
             // ── 状态卡：三项真实读数 + 状态胶囊 ──
             PetCard {
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    health.forEach { stat -> HealthStatCell(stat, Modifier.weight(1f)) }
+                // One confirmation line when every reading agrees; otherwise each cell keeps its own,
+                // so a stale or unknown reading is never covered by another reading's time.
+                val sharedMeta = health.map { it.meta }.distinct().singleOrNull()
+                Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min)) {
+                    health.forEachIndexed { index, stat ->
+                        if (index > 0) Box(Modifier.width(1.dp).fillMaxHeight().background(PetTokens.Line))
+                        HealthStatCell(stat, showMeta = sharedMeta == null, modifier = Modifier.weight(1f))
+                    }
                 }
-                Spacer(Modifier.height(12.dp))
+                if (sharedMeta != null) {
+                    Spacer(Modifier.height(7.dp))
+                    Text(sharedMeta, Modifier.fillMaxWidth(), fontSize = 11.5.sp, color = PetTokens.Ink3,
+                        textAlign = TextAlign.Center)
+                }
+                Spacer(Modifier.height(10.dp))
                 PetDivider()
-                Spacer(Modifier.height(11.dp))
+                Spacer(Modifier.height(10.dp))
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                     PetPill(pill.text, pillBackground(pill.tone), pillForeground(pill.tone))
                     Spacer(Modifier.width(8.dp))
@@ -197,33 +210,10 @@ fun PetHomeScreen(
 
             if (runtime.running) {
                 CurrentTaskCard(managedView, progress)
-                FilmStripCard(shots)
                 HomeLogCard(logRows, onOpenLogs)
             } else {
-                LastRunCard(latest, fmt)
-                PlanCard(plan, catalogFresh, onOpenPlanSheet)
-                ThresholdCard(plan)
-                PetNote("金币、属性、库存当前无法从游戏可靠读取，记录里不以估算值代填。")
-            }
-
-            Spacer(Modifier.height(4.dp))
-        }
-
-        // ── 底部主控：只有开始 / 停止是真实能力 ──
-        // Opaque background: the scrolled cards above end where this footer begins, so nothing may
-        // show through underneath the buttons.
-        Column(
-            Modifier.background(PetTokens.Bg)
-                .padding(horizontal = 15.dp).padding(top = 9.dp, bottom = 12.dp),
-        ) {
-            if (!runtime.running && !controls.startEnabled && controls.blockerNote != null) {
-                PetNote(controls.blockerNote, Modifier.padding(bottom = 7.dp))
-            }
-            if (!runtime.running) {
-                // Three separate entries, one per capability. v0.1 bundled 健康检查+护理+学习 into a
-                // single 开始托管, so reading the pet's current 体力/清洁 also spent coins and burned
-                // the shared daily budget. Each stage now runs on its own.
-                if (!runtime.running && (!controls.startEnabled || !catalogFresh)) {
+                if (!controls.startEnabled || !catalogFresh) {
+                    if (!controls.startEnabled && controls.blockerNote != null) PetNote(controls.blockerNote)
                     SetupChecklistCard(
                         startReady = controls.startEnabled,
                         shizukuReady = uiState.shizukuState is ShizukuState.Ready,
@@ -241,72 +231,74 @@ fun PetHomeScreen(
                             }
                         },
                         onOpenPlanSheet = onOpenPlanSheet,
-                        modifier = Modifier.padding(bottom = 7.dp),
                     )
                 }
-                val overlayHint = if (OverlayPermission.canDrawOverlays(context)) null
-                    else "未开启悬浮窗权限：托管照常运行，但离开 App 后看不到状态胶囊（设置 → 悬浮窗权限）。"
-                if (overlayHint != null) {
-                    PetNote(overlayHint, Modifier.padding(bottom = 7.dp))
-                }
+                TodayProgressCard(budgetUsed, budgetCap)
+                // Separate entries, one per capability: reading the pet must never also spend coins
+                // or the shared daily budget.
                 SessionModeRow(
                     enabled = controls.startEnabled,
                     studyEnabled = controls.startEnabled && catalogFresh,
-                    workEnabled = controls.startEnabled,
                     displayId = readyDisplay?.id,
                     rounds = plan.rounds,
                     context = context,
                 )
-                Spacer(Modifier.height(7.dp))
-                PetNote("托管：${plan.courseName} × ${plan.rounds} 节；打工/护理/学习各自独立，只做所选动作")
-                Spacer(Modifier.height(2.dp))
-                PetNote("打工：按岗位体力/清洁消耗和固定时长换金币；不查课表、不护理")
-                Spacer(Modifier.height(2.dp))
-                PetNote("学习：只花学费，不要求体力/清洁；金币不足会停止，不会自动去打工")
-                Spacer(Modifier.height(2.dp))
-                PetNote("护理：先用背包里的饼干/香皂，缺了才买；购买前核对真实金币并保留学费")
-                Spacer(Modifier.height(2.dp))
-                PetNote("今日已记 $budgetUsed / $budgetCap 分钟 · 剩余 $budgetLeft")
-            } else {
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    PetFootButton(
-                        text = "暂停",
-                        tone = PetButtonTone.GHOST,
-                        onClick = { dialog = HomeDialog.PauseUnavailable },
-                        modifier = Modifier.weight(1f),
-                    )
-                    PetFootButton(
-                        text = "停止托管",
-                        tone = PetButtonTone.DANGER,
-                        onClick = { dialog = HomeDialog.ConfirmStop },
-                        modifier = Modifier.weight(1f),
-                    )
+                PetNote("这四项各自独立，只做所选动作。")
+                if (!OverlayPermission.canDrawOverlays(context)) {
+                    PetNote("未开启悬浮窗：托管照常运行，但离开 App 后看不到状态胶囊（设置 → 悬浮窗）。")
                 }
+            }
+
+            Spacer(Modifier.height(4.dp))
+        }
+
+        // ── 底部主控：只有开始 / 停止是真实能力 ──
+        // Opaque background: the scrolled cards above end where this footer begins, so nothing may
+        // show through underneath the buttons.
+        Column(
+            Modifier.background(PetTokens.Bg)
+                .padding(horizontal = 15.dp).padding(top = 8.dp, bottom = 12.dp),
+        ) {
+            if (!runtime.running) {
+                val planReady = controls.startEnabled &&
+                    (planV2?.steps?.none { it is StudyStep } == true || catalogFresh)
+                Row(
+                    Modifier.fillMaxWidth().clickable { onOpenPlanSheet() }
+                        .padding(horizontal = 4.dp).padding(bottom = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text("托管方案", fontSize = 12.5.sp, color = PetTokens.Ink2)
+                    Spacer(Modifier.weight(1f))
+                    Text(planSummary(planV2, plan), fontSize = 12.5.sp, color = PetTokens.Ink2, maxLines = 1)
+                    PetChevron()
+                }
+                StartManagedButton(planReady) {
+                    val displayId = readyDisplay?.id ?: return@StartManagedButton
+                    val saved = planV2
+                    if (saved != null) {
+                        ContextCompat.startForegroundService(
+                            context, SessionStartRequest.forPlan(saved, displayId, UUID.randomUUID().toString()),
+                        )
+                    } else {
+                        ContextCompat.startForegroundService(context, PetAutomationService.startIntent(
+                            context, displayId,
+                            SessionStartRequest.plannedRounds(SessionMode.FULL, SessionStartRequest.sanitize(plan.rounds)),
+                            SessionMode.FULL,
+                        ))
+                    }
+                }
+            } else {
+                PetFootButton(
+                    text = "停止托管",
+                    tone = PetButtonTone.DANGER,
+                    onClick = { dialog = HomeDialog.ConfirmStop },
+                    modifier = Modifier.fillMaxWidth(),
+                )
             }
         }
     }
 
     when (dialog) {
-        HomeDialog.PauseUnavailable -> AlertDialog(
-            onDismissRequest = { dialog = null },
-            title = { Text("手动暂停暂未开放") },
-            text = {
-                Text(
-                    "v0.1 只能开始与停止。检测到锁屏、虚拟屏失效或页面无法确认时，App 会自动暂停、" +
-                        "在 120 秒内最多尝试恢复 3 次，期间不发送任何输入；恢复失败则安全停止。\n\n" +
-                        "当前：${managedView.lifecycleText}" +
-                        (managed.pauseReason?.let { " · $it" } ?: "") +
-                        "（累计自动暂停 ${managed.pauseCount} 次）"
-                )
-            },
-            confirmButton = {
-                TextButton(onClick = {
-                    dialog = null
-                    context.startService(PetAutomationService.stopIntent(context))
-                }) { Text("改为停止托管") }
-            },
-            dismissButton = { TextButton(onClick = { dialog = null }) { Text("知道了") } },
-        )
         HomeDialog.ConfirmStop -> AlertDialog(
             onDismissRequest = { dialog = null },
             title = { Text("停止托管？") },
@@ -323,7 +315,57 @@ fun PetHomeScreen(
     }
 }
 
-private enum class HomeDialog { PauseUnavailable, ConfirmStop }
+private enum class HomeDialog { ConfirmStop }
+
+private fun planSummary(saved: PlanV2?, plan: SessionPlan): String {
+    if (saved == null) return "${plan.courseName} × ${plan.rounds} 节"
+    return saved.steps.joinToString(" + ") { step ->
+        when (step) {
+            is StudyStep -> "学习 ${step.rounds} 节"
+            is CareStep -> "护理"
+            is WorkStep -> "打工"
+        }
+    }
+}
+
+/** Minutes are the real source: the daily cap is counted in minutes shared by 打工 and 学习. */
+@Composable
+private fun TodayProgressCard(used: Int, cap: Int) {
+    PetCard {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            PetIcon(PetGlyph.Study, 24.dp)
+            Spacer(Modifier.width(10.dp))
+            Column {
+                Text("今日进度", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = PetTokens.Ink)
+                Spacer(Modifier.height(2.dp))
+                Text("已用 $used / 共 $cap 分钟", fontSize = 12.sp, color = PetTokens.Ink2)
+            }
+        }
+        Spacer(Modifier.height(10.dp))
+        PetProgressBar(if (cap > 0) used.toFloat() / cap else 0f)
+    }
+}
+
+@Composable
+private fun StartManagedButton(enabled: Boolean, onClick: () -> Unit) {
+    val shape = RoundedCornerShape(PetTokens.BtnRadius)
+    Row(
+        Modifier.fillMaxWidth().height(PetTokens.BtnHeight)
+            .background(if (enabled) PetTokens.Blue else PetTokens.GraySoft, shape)
+            .clickable(enabled = enabled, onClick = onClick),
+        horizontalArrangement = Arrangement.Center,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        val fg = if (enabled) Color.White else PetTokens.Ink3
+        PetIcon(PetGlyph.Play, 17.dp, fg)
+        Spacer(Modifier.width(8.dp))
+        Text("开始托管", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = fg)
+        Spacer(Modifier.width(10.dp))
+        Box(Modifier.width(1.dp).height(14.dp).background(fg.copy(alpha = 0.4f)))
+        Spacer(Modifier.width(10.dp))
+        Text("执行托管方案", fontSize = 12.sp, color = fg)
+    }
+}
 
 /**
  * Shown instead of a dead, greyed-out footer: when the environment gate is closed the user gets the
@@ -356,11 +398,11 @@ private fun SetupChecklistCard(
         }
         Spacer(Modifier.height(8.dp))
         SetupStepRow(
-            index = "1", title = "特权服务",
+            index = "1", title = "Shizuku",
             state = if (shizukuReady) "已连接" else "未连接", done = shizukuReady,
         )
         SetupStepRow(
-            index = "2", title = "720×1600 虚拟屏",
+            index = "2", title = "后台画面",
             state = if (displayReady) "已托管" else "未托管", done = displayReady,
             actionText = "一键创建", onAction = onOpenDisplay,
         )
@@ -371,8 +413,8 @@ private fun SetupChecklistCard(
         )
         Spacer(Modifier.height(6.dp))
         PetNote(
-            "三步全部完成前，下面的按钮保持灰色；这些步骤都不消耗游戏内金币。" +
-                "第 1 步在「设置 › 虚拟屏控制台」点『重启服务』；第 2 步点『一键创建』后，在打开的画面里进入 QQ 宠物房间。"
+            "完成前下面的按钮保持灰色，这些步骤都不花游戏金币。" +
+                "点「一键创建」后，在打开的画面里进入 QQ 宠物房间。"
         )
     }
 }
@@ -409,8 +451,8 @@ private fun SetupStepRow(
 }
 
 @Composable
-private fun HealthStatCell(stat: HealthStat, modifier: Modifier = Modifier) {
-    Column(modifier) {
+private fun HealthStatCell(stat: HealthStat, showMeta: Boolean, modifier: Modifier = Modifier) {
+    Column(modifier, horizontalAlignment = Alignment.CenterHorizontally) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             PetDot(dotColorFor(stat.name))
             Spacer(Modifier.width(5.dp))
@@ -423,17 +465,19 @@ private fun HealthStatCell(stat: HealthStat, modifier: Modifier = Modifier) {
             }
             Text(
                 stat.valueText.removePrefix("≈"),
-                fontSize = 23.sp, fontWeight = FontWeight.Bold,
+                fontSize = 26.sp, fontWeight = FontWeight.Bold,
                 color = if (stat.status == HealthStatStatus.KNOWN && stat.current) PetTokens.Ink else PetTokens.Ink3,
-                fontFamily = FontFamily.Monospace, lineHeight = 24.sp,
+                lineHeight = 28.sp,
             )
         }
-        Spacer(Modifier.height(5.dp))
-        Text(
-            stat.meta, fontSize = 10.sp,
-            color = if (stat.status == HealthStatStatus.STALE) PetTokens.AmberInk else PetTokens.Ink3,
-            maxLines = 1,
-        )
+        if (showMeta) {
+            Spacer(Modifier.height(5.dp))
+            Text(
+                stat.meta, fontSize = 10.sp,
+                color = if (stat.status == HealthStatStatus.STALE) PetTokens.AmberInk else PetTokens.Ink3,
+                maxLines = 1,
+            )
+        }
     }
 }
 
@@ -458,14 +502,21 @@ private fun CurrentTaskCard(view: ManagedRuntimeView, progress: RoundProgress) {
         Spacer(Modifier.height(5.dp))
         Text(stepHeroText(view), fontSize = 24.sp, fontWeight = FontWeight.Bold, color = PetTokens.Ink,
             letterSpacing = (-0.3).sp)
-        Spacer(Modifier.height(13.dp))
-        PetProgressBar(progress.fraction)
-        Spacer(Modifier.height(7.dp))
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            Text("第 ${progress.completed} / 共 ${progress.total} 节", fontSize = 12.5.sp,
-                color = PetTokens.Ink2, fontFamily = FontFamily.Monospace)
-            Text(progress.percentText, fontSize = 14.sp, fontWeight = FontWeight.Bold,
-                color = PetTokens.Ink, fontFamily = FontFamily.Monospace)
+        val studying = view.flowText.contains("STUDY", true) || view.flowText.contains("学习", true)
+        if (progress.total > 0 && studying) {
+            Spacer(Modifier.height(12.dp))
+            PetSegmentBar(progress.total, progress.completed, view.lifecycle == ManagedLifecycle.RUNNING)
+            Spacer(Modifier.height(7.dp))
+            Text("已完成 ${progress.completed} / 共 ${progress.total} 节", fontSize = 12.5.sp, color = PetTokens.Ink2)
+        }
+        val stage = StudyStepTrack.indexOf(view.stepText)
+        if (studying && stage != null) {
+            Spacer(Modifier.height(11.dp))
+            Row(Modifier.fillMaxWidth()) {
+                StudyStepTrack.LABELS.forEachIndexed { index, label ->
+                    StageCell(label, index, stage, Modifier.weight(1f))
+                }
+            }
         }
         Spacer(Modifier.height(9.dp))
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -473,8 +524,8 @@ private fun CurrentTaskCard(view: ManagedRuntimeView, progress: RoundProgress) {
                 if (view.sessionIsCurrent) PetTokens.Green else PetTokens.Ink3)
             Spacer(Modifier.width(5.dp))
             Text(
-                if (view.sessionIsCurrent) "体力和清洁是本会话最新读数 · 已运行 ${view.durationValue}"
-                else "显示的不是本会话读数 · 已运行 ${view.durationValue}",
+                if (view.sessionIsCurrent) "已运行 ${view.durationValue}"
+                else "显示的不是本次读数 · 已运行 ${view.durationValue}",
                 fontSize = 11.5.sp, color = PetTokens.Ink2, maxLines = 1,
             )
         }
@@ -482,16 +533,42 @@ private fun CurrentTaskCard(view: ManagedRuntimeView, progress: RoundProgress) {
             Spacer(Modifier.height(10.dp))
             PausedBanner(view)
         }
-        Spacer(Modifier.height(10.dp))
-        Row(
-            Modifier.fillMaxWidth().background(PetTokens.GraySoft, RoundedCornerShape(PetTokens.NextRadius))
-                .padding(horizontal = 12.dp, vertical = 10.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text("下一步", fontSize = 11.5.sp, color = PetTokens.Ink3)
-            Spacer(Modifier.width(10.dp))
-            Text(view.nextStepText, fontSize = 13.5.sp, fontWeight = FontWeight.Bold, color = PetTokens.Ink)
+        if (!studying || stage == null) {
+            Spacer(Modifier.height(10.dp))
+            Row(
+                Modifier.fillMaxWidth().background(PetTokens.GraySoft, RoundedCornerShape(PetTokens.NextRadius))
+                    .padding(horizontal = 12.dp, vertical = 10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text("下一步", fontSize = 11.5.sp, color = PetTokens.Ink3)
+                Spacer(Modifier.width(10.dp))
+                Text(view.nextStepText, fontSize = 13.5.sp, fontWeight = FontWeight.Bold, color = PetTokens.Ink)
+            }
         }
+    }
+}
+
+@Composable
+private fun StageCell(label: String, index: Int, stage: Int, modifier: Modifier = Modifier) {
+    val current = index == stage
+    Column(
+        modifier.background(if (current) PetTokens.BlueSoft else Color.Transparent, RoundedCornerShape(PetTokens.TileRadius))
+            .padding(vertical = 7.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        PetIcon(
+            when {
+                index < stage -> PetGlyph.Check
+                current -> PetGlyph.Clock
+                else -> PetGlyph.Info
+            },
+            17.dp,
+            if (index > stage) PetTokens.Chevron else PetTokens.Blue,
+        )
+        Spacer(Modifier.height(4.dp))
+        Text(label, fontSize = 10.sp, maxLines = 1,
+            color = if (current) PetTokens.BlueInk else PetTokens.Ink3,
+            fontWeight = if (current) FontWeight(650) else FontWeight.Normal)
     }
 }
 
@@ -513,47 +590,6 @@ private fun PausedBanner(view: ManagedRuntimeView) {
                 fontSize = 11.5.sp, color = PetTokens.AmberInk, lineHeight = 16.sp,
             )
         }
-    }
-}
-
-@Composable
-private fun FilmStripCard(shots: List<File>) {
-    PetCard {
-        PetRowHeader(
-            "运行截图",
-            if (shots.isEmpty()) "本次暂无" else "共 ${shots.size} 张 · 仅本地",
-        )
-        Spacer(Modifier.height(10.dp))
-        if (shots.isEmpty()) {
-            PetNote("本会话尚未写入截图。截图由自动化层落盘，UI 只读取，不会伪造。")
-        } else {
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(9.dp)) {
-                shots.takeLast(4).forEach { file -> FilmFrame(file, Modifier.weight(1f)) }
-            }
-        }
-    }
-}
-
-@Composable
-private fun FilmFrame(file: File, modifier: Modifier = Modifier) {
-    val bmp = rememberEvidenceBitmap(file.absolutePath, 260)
-    Column(modifier) {
-        Box(
-            Modifier.fillMaxWidth().height(96.dp).clip(RoundedCornerShape(9.dp))
-                .background(PetTokens.FilmTop),
-            contentAlignment = Alignment.Center,
-        ) {
-            if (bmp != null) {
-                androidx.compose.foundation.Image(
-                    bitmap = bmp, contentDescription = file.name,
-                    modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop,
-                )
-            } else {
-                PetIcon(PetGlyph.Cam, 20.dp, alpha = 0.5f)
-            }
-        }
-        Spacer(Modifier.height(5.dp))
-        Text(frameCaption(file.name), fontSize = 10.sp, color = PetTokens.Ink3, maxLines = 1)
     }
 }
 
@@ -596,142 +632,13 @@ private fun LogRow(row: PetLogEntry) {
     }
 }
 
-@Composable
-private fun LastRunCard(latest: SessionEvidence?, fmt: (Long) -> String) {
-    val record = latest?.record
-    PetCard {
-        PetRowHeader("上次运行", lastRunNote(record))
-        Spacer(Modifier.height(10.dp))
-        if (record == null) {
-            PetNote("尚无运行记录。完成一次托管后，这里会显示真实统计。")
-        } else {
-            Row(Modifier.fillMaxWidth()) {
-                StripCell(record.completedRounds, "已完成 节", Modifier.weight(1f))
-                Spacer(Modifier.width(7.dp))
-                StripCell(record.care?.total ?: 0, "护理 次", Modifier.weight(1f))
-                Spacer(Modifier.width(7.dp))
-                StripCell((record.runtimeMs / 60000).toInt(), "分钟", Modifier.weight(1f))
-            }
-            Spacer(Modifier.height(11.dp))
-            PetDivider()
-            Spacer(Modifier.height(11.dp))
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                PetNote(
-                    if (record.startedAtMs != null) "开始于 ${fmt(record.startedAtMs)}" else "开始时间未记录"
-                )
-                PetNote("已保留 ${latest.screenshots.size} 张运行截图")
-            }
-        }
-    }
-}
-
-@Composable
-private fun StripCell(value: Int, label: String, modifier: Modifier = Modifier) {
-    // Reference draws these as tinted tiles rather than bare numbers, which keeps the three
-    // statistics from reading as loose text.
-    Column(
-        modifier
-            .background(PetTokens.BarTrack, RoundedCornerShape(PetTokens.TileRadius))
-            .padding(vertical = 9.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        Text("$value", fontSize = 21.sp, fontWeight = FontWeight.Bold, color = PetTokens.Ink,
-            fontFamily = FontFamily.Monospace)
-        Spacer(Modifier.height(2.dp))
-        Text(label, fontSize = 10.5.sp, color = PetTokens.Ink3)
-    }
-}
-
-@Composable
-private fun PlanCard(plan: SessionPlan, catalogFresh: Boolean, onOpenPlanSheet: () -> Unit) {
-    PetCard(pad0 = true) {
-        Row(Modifier.fillMaxWidth().padding(top = 2.dp, bottom = 4.dp),
-            verticalAlignment = Alignment.CenterVertically) {
-            PetSection("本次方案")
-            Spacer(Modifier.weight(1f))
-            PetNote("${plan.courseName} × ${plan.rounds} 节")
-        }
-        Box(Modifier.clickable { onOpenPlanSheet() }) {
-            PetListRow(
-                tileBg = PetTokens.GreenSoft,
-                icon = { PetIcon(PetGlyph.Care, 18.dp) },
-                title = "日常维持",
-                sub = "健康检查 · 自动护理 · 自动学习",
-                trailing = { PetChip("已启用", PetTokens.GreenSoft, PetTokens.GreenInk) },
-                showChevron = true,
-            )
-        }
-        PetListRow(
-            tileBg = PetTokens.AmberSoft,
-            icon = { PetIcon(PetGlyph.Coin, 18.dp) },
-            title = "打工赚学费",
-            sub = if (plan.workBeforeStudy) "金币不足时先打一轮工" else "未开启",
-            dimmed = !plan.workBeforeStudy,
-            trailing = {
-                PetChip(
-                    if (plan.workBeforeStudy) "已开启" else "未开启",
-                    if (plan.workBeforeStudy) PetTokens.GreenSoft else PetTokens.GraySoft,
-                    if (plan.workBeforeStudy) PetTokens.GreenInk else PetTokens.Ink2,
-                )
-            },
-        )
-        PetListRow(
-            tileBg = PetTokens.VioletSoft,
-            icon = { PetIcon(PetGlyph.Friend, 18.dp) },
-            title = "社交互动",
-            sub = "串门 · 踩踩 · 好友护理",
-            dimmed = true,
-            trailing = { PetChip("暂未开放", PetTokens.GraySoft, PetTokens.Ink2) },
-        )
-    }
-}
-
-@Composable
-private fun ThresholdCard(plan: SessionPlan) {
-    PetCard(pad0 = true) {
-        Row(Modifier.fillMaxWidth().padding(top = 2.dp, bottom = 2.dp),
-            verticalAlignment = Alignment.CenterVertically) {
-            PetSection("开课阈值")
-            Spacer(Modifier.weight(1f))
-            PetNote("低于时先护理")
-        }
-        Spacer(Modifier.height(6.dp))
-        Row(Modifier.fillMaxWidth().padding(bottom = 13.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            listOf("体力", "清洁", "心情").forEach { name ->
-                val gate = when (name) {
-                    "体力" -> "≥ ${plan.energyThreshold}"
-                    "清洁" -> "≥ ${plan.cleanlinessThreshold}"
-                    else -> "不参与"
-                }
-                Column(Modifier.weight(1f)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        PetDot(dotColorFor(name))
-                        Spacer(Modifier.width(5.dp))
-                        Text(name, fontSize = 11.5.sp, color = PetTokens.Ink2)
-                    }
-                    Spacer(Modifier.height(3.dp))
-                    Text(
-                        gate,
-                        fontSize = 17.sp, fontWeight = FontWeight.Bold, color = PetTokens.Ink,
-                        fontFamily = FontFamily.Monospace,
-                    )
-                    Spacer(Modifier.height(2.dp))
-                    Text(
-                        if (name == "心情") "仅观察记录" else "低于时先护理",
-                        fontSize = 9.5.sp, color = PetTokens.Ink3, maxLines = 1,
-                    )
-                }
-            }
-        }
-    }
-}
-
 // ─────────────────────────── helpers ───────────────────────────
 
 private fun flowTitle(view: ManagedRuntimeView): String {
     val base = when {
         view.flowText.contains("STUDY", true) || view.flowText.contains("学习", true) -> "自动学习"
         view.flowText.contains("CARE", true) || view.flowText.contains("护理", true) -> "日常护理"
+        view.flowText.contains("WORK", true) -> "打工"
         view.flowText.contains("NAV", true) -> "页面导航"
         view.flowText.contains("OBS", true) -> "状态读取"
         else -> view.flowText
@@ -763,7 +670,11 @@ private fun stepHeroText(view: ManagedRuntimeView): String = when (view.stepText
     "NEXT_ROUND" -> "准备下一节"
     "DONE", "SESSION" -> "正在收尾"
     "STOPPED" -> "已停止"
-    else -> "正在执行本步骤"
+    else -> when {
+        view.flowText.contains("WORK", true) -> "正在打工"
+        view.flowText.contains("CARE", true) -> "正在护理宠物"
+        else -> "正在执行本步骤"
+    }
 }
 
 private fun subtitleFor(
@@ -776,25 +687,21 @@ private fun subtitleFor(
         "${view.pauseText} · 自动恢复中"
     running -> "已运行 ${view.durationValue} · 完成 ${view.completedValue}"
     record?.startedAtMs != null ->
-        "上次 ${fmt(record.startedAtMs)} · 完成 ${record.completedRounds}/${record.rounds} 节"
-    else -> "尚未运行"
+        "上次 ${fmt(record.startedAtMs)} · ${lastRunNote(record)}"
+    else -> "尚未进行托管"
 }
 
 private fun lastRunNote(record: SessionRunRecord?): String = when (record?.terminalState) {
     null -> "无记录"
     "COMPLETED" -> "正常结束"
     "STOPPED" -> "手动停止"
-    "FAILED" -> "异常结束"
+    "FAILED" -> "已自动停止"
     else -> record.terminalState
 }
 
-// One caption implementation for both 托管 and 记录, so the same file never gets two labels.
-private fun frameCaption(fileName: String): String =
-    com.ynk.virtualdisplay.ui.records.RecordsPresentation.frameCaption(fileName)
-
 private fun dotColorFor(name: String): Color = when (name) {
     "体力" -> PetTokens.Green
-    "清洁" -> PetTokens.Blue
+    "清洁" -> PetTokens.WaterDot
     else -> PetTokens.MoodDot
 }
 
@@ -818,97 +725,50 @@ private fun hhmmFormatter(): (Long) -> String {
 }
 
 /**
- * 1 / 3 / 10 节. Restores the choice that the worktree had dropped, in the original visual style.
- *
- * Disabled (and dimmed) whenever the environment cannot start, so the selector never looks like it
- * will do something while 开始 is blocked for a real reason.
- */
-@Composable
-private fun RoundSelectorRow(selected: Int, enabled: Boolean, onSelect: (Int) -> Unit) {
-    Row(
-        Modifier.fillMaxWidth().padding(bottom = 8.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        SessionStartRequest.ROUND_OPTIONS.forEach { n ->
-            val isSelected = n == selected
-            Box(
-                Modifier.weight(1f).height(36.dp)
-                    .background(
-                        if (isSelected) PetTokens.BlueSoft else PetTokens.GraySoft,
-                        RoundedCornerShape(PetTokens.NextRadius),
-                    )
-                    .clickable(enabled = enabled) { onSelect(n) },
-                contentAlignment = Alignment.Center,
-            ) {
-                Text(
-                    "$n 节", fontSize = 13.sp,
-                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                    color = if (isSelected) PetTokens.BlueInk else PetTokens.Ink2,
-                )
-            }
-        }
-    }
-}
-
-/**
- * The three stage entries, one row each, so every capability can be started on its own.
- *
- * Ordering is by cost, cheapest first: 健康检查 spends nothing, 护理 spends coins on
- * cookies/soap, 托管 adds a lesson on top and consumes the shared daily budget. Each button
- * names what it does in its own label, so the cost of a tap is never a surprise.
+ * The four single-action entries, cheapest first: 健康检查 spends nothing, the others spend what their
+ * own label says. Disabled tiles stay in place so the row never reflows while the setup is incomplete.
  */
 @Composable
 private fun SessionModeRow(
     enabled: Boolean,
     studyEnabled: Boolean,
-    workEnabled: Boolean,
     displayId: Int?,
     rounds: Int,
     context: android.content.Context,
 ) {
     fun start(mode: SessionMode) {
-        if (!enabled || displayId == null) return
-        // 托管/学习 carry the selected batch; 健康检查/护理/打工 are always a single pass.
+        if (displayId == null) return
+        // 学习 carries the selected batch; 健康检查/护理/打工 are always a single pass.
         val requested = SessionStartRequest.plannedRounds(mode, SessionStartRequest.sanitize(rounds))
         ContextCompat.startForegroundService(
             context,
             PetAutomationService.startIntent(context, displayId, requested, mode),
         )
     }
-    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            PetFootButton(
-                text = "健康检查",
-                tone = if (enabled) PetButtonTone.PRIMARY else PetButtonTone.DISABLED,
-                onClick = { start(SessionMode.HEALTH_CHECK) },
-                modifier = Modifier.weight(1f),
-            )
-            PetFootButton(
-                text = "打工",
-                tone = if (workEnabled) PetButtonTone.PRIMARY else PetButtonTone.DISABLED,
-                onClick = { if (workEnabled) start(SessionMode.WORK) },
-                modifier = Modifier.weight(1f),
-            )
-        }
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            PetFootButton(
-                text = "护理",
-                tone = if (enabled) PetButtonTone.PRIMARY else PetButtonTone.DISABLED,
-                onClick = { start(SessionMode.CARE) },
-                modifier = Modifier.weight(1f),
-            )
-            PetFootButton(
-                text = "学习",
-                tone = if (studyEnabled) PetButtonTone.PRIMARY else PetButtonTone.DISABLED,
-                onClick = { if (studyEnabled) start(SessionMode.STUDY) },
-                modifier = Modifier.weight(1f),
-            )
-        }
-        PetFootButton(
-            text = "托管（护理+上课）",
-            tone = if (studyEnabled) PetButtonTone.PRIMARY else PetButtonTone.DISABLED,
-            onClick = { if (studyEnabled) start(SessionMode.FULL) },
-            modifier = Modifier.fillMaxWidth(),
-        )
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        ActionTile("健康检查", PetGlyph.Care, enabled, Modifier.weight(1f)) { start(SessionMode.HEALTH_CHECK) }
+        ActionTile("打工", PetGlyph.Coin, enabled, Modifier.weight(1f)) { start(SessionMode.WORK) }
+        ActionTile("护理", PetGlyph.Brush, enabled, Modifier.weight(1f)) { start(SessionMode.CARE) }
+        ActionTile("学习", PetGlyph.Study, studyEnabled, Modifier.weight(1f)) { start(SessionMode.STUDY) }
+    }
+}
+
+@Composable
+private fun ActionTile(
+    label: String,
+    glyph: PetGlyph,
+    enabled: Boolean,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit,
+) {
+    Column(
+        modifier.background(PetTokens.Surface, RoundedCornerShape(PetTokens.CardRadius))
+            .clickable(enabled = enabled, onClick = onClick).padding(vertical = 13.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        PetIcon(glyph, 24.dp, alpha = if (enabled) 1f else 0.35f)
+        Spacer(Modifier.height(7.dp))
+        Text(label, fontSize = 12.5.sp, fontWeight = FontWeight(650),
+            color = if (enabled) PetTokens.Ink else PetTokens.Ink3, maxLines = 1)
     }
 }

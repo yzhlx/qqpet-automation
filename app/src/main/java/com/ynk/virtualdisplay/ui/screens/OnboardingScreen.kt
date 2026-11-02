@@ -198,7 +198,7 @@ fun OnboardingScreen(
             if (page.steps.isNotEmpty()) {
                 Spacer(Modifier.height(20.dp))
                 Column(
-                    Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(PetTokens.Surface).padding(16.dp),
+                    Modifier.fillMaxWidth().clip(RoundedCornerShape(PetTokens.CardRadius)).background(PetTokens.Surface).padding(16.dp),
                     verticalArrangement = Arrangement.spacedBy(14.dp),
                 ) { page.steps.forEachIndexed { i, text -> NumberedLine(i + 1, text) } }
             }
@@ -250,7 +250,8 @@ private fun NumberedLine(number: Int, text: String) {
 @Composable
 private fun GuideButton(label: String, onClick: () -> Unit) {
     Box(
-        Modifier.fillMaxWidth().height(50.dp).clip(RoundedCornerShape(14.dp)).background(PetTokens.Blue).clickable(onClick = onClick),
+        Modifier.fillMaxWidth().height(PetTokens.BtnHeight).clip(RoundedCornerShape(PetTokens.BtnRadius))
+            .background(PetTokens.Blue).clickable(onClick = onClick),
         contentAlignment = Alignment.Center,
     ) { Text(label, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, color = PetTokens.Surface) }
 }

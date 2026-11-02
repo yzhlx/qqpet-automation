@@ -17,6 +17,7 @@ import com.ynk.virtualdisplay.ui.screens.ManagedRuntimePresentation
 import com.ynk.virtualdisplay.ui.screens.RoundProgressPresentation
 import com.ynk.virtualdisplay.ui.screens.StatusPillPresentation
 import com.ynk.virtualdisplay.ui.screens.StatusPillTone
+import com.ynk.virtualdisplay.ui.screens.StudyStepTrack
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -35,6 +36,18 @@ class PetHomePresentationTest {
 
     private fun known(value: Int, observedAt: Long = wall) =
         ObservedValue.Known(value, observedAt, 1.0, "frame.png", ObservationSource.DIGIT_RECOGNITION)
+
+    // --- study stage track -----------------------------------------------------------------------
+
+    @Test
+    fun `study steps map onto the four stages and anything else stays unmapped`() {
+        assertEquals(4, StudyStepTrack.LABELS.size)
+        assertEquals(0, StudyStepTrack.indexOf("CHECK_STATE"))
+        assertEquals(1, StudyStepTrack.indexOf("start_course"))
+        assertEquals(2, StudyStepTrack.indexOf("WAIT_RESULT"))
+        assertEquals(3, StudyStepTrack.indexOf("READ_POST_STATE"))
+        assertNull(StudyStepTrack.indexOf("WORK_SHIFT"))
+    }
 
     // --- health stats --------------------------------------------------------------------------
 

@@ -200,6 +200,19 @@ object RoundProgressPresentation {
     }
 }
 
+/** The four stages of one lesson. Steps outside a lesson have no stage, so no track is drawn for them. */
+object StudyStepTrack {
+    val LABELS = listOf("检查状态", "开始上课", "等成绩", "读取课后状态")
+
+    fun indexOf(step: String): Int? = when (step.uppercase()) {
+        "INITIAL_NAVIGATION", "CHECK_STATE", "VERIFY_READY", "RECOVER_IF_NEEDED" -> 0
+        "SELECT_COURSE", "CLEAR_PREVIOUS_RESULT", "START_COURSE" -> 1
+        "HIGH_FIVE", "WAIT_HIGH_FIVE_WINDOW", "WAIT_RESULT" -> 2
+        "READ_POST_STATE", "NEXT_ROUND" -> 3
+        else -> null
+    }
+}
+
 /**
  * One-row summary of the most recent finished batch, for the idle home card. It is built ONLY from a
  * persisted run record (see [com.ynk.virtualdisplay.ui.data.SessionRunRecord]); when there is no

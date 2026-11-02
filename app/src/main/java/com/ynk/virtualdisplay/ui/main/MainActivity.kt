@@ -33,6 +33,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ynk.virtualdisplay.MyApplication
+import com.ynk.virtualdisplay.automation.PetRuntime
 import com.ynk.virtualdisplay.data.model.ShizukuState
 import com.ynk.virtualdisplay.data.repository.ShizukuDisplayRepository
 import com.ynk.virtualdisplay.ui.kit.PetGlyph
@@ -166,7 +167,9 @@ private fun PetApp(uiState: MainUiState, viewModel: MainViewModel) {
 
                 OverlayScreen.NONE -> when (uiState.currentTab) {
                     ScreenTab.HOST -> Column(Modifier.fillMaxSize()) {
-                        PetTitleBar("宠物托管")
+                        val running by PetRuntime.state.collectAsState()
+                        if (running.running) PetTitleBar("宠物托管")
+                        else PetTitleBar("养宠自动化", subtitle = "一只厚礼蟹 · 宠物托管助手")
                         PetHomeScreen(
                             viewModel = viewModel,
                             onOpenPlanSheet = { viewModel.openOverlay(OverlayScreen.PLAN_SHEET) },
@@ -203,9 +206,9 @@ private fun PetApp(uiState: MainUiState, viewModel: MainViewModel) {
 
 /** Reference `.ab` title bar: 19px/700, left-aligned, on the app background. */
 @Composable
-fun PetTitleBar(title: String, onBack: (() -> Unit)? = null) {
+fun PetTitleBar(title: String, onBack: (() -> Unit)? = null, subtitle: String? = null) {
     Row(
-        Modifier.fillMaxWidth().padding(horizontal = 15.dp, vertical = 10.dp),
+        Modifier.fillMaxWidth().padding(horizontal = 17.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         if (onBack != null) {
@@ -213,7 +216,10 @@ fun PetTitleBar(title: String, onBack: (() -> Unit)? = null) {
                 PetIcon(PetGlyph.ArrowBack, 20.dp, PetTokens.Ink)
             }
         }
-        Text(title, fontSize = 19.sp, fontWeight = FontWeight.Bold, color = PetTokens.Ink)
+        Column {
+            Text(title, fontSize = 24.sp, fontWeight = FontWeight.Bold, color = PetTokens.Ink)
+            if (subtitle != null) Text(subtitle, fontSize = 12.5.sp, color = PetTokens.Ink2)
+        }
     }
 }
 
