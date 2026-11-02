@@ -214,12 +214,14 @@ class DisplayUserService @Keep constructor(private val context: Context) : IDisp
                 Log.e(TAG, "releaseVirtualDisplay failed for active handle: displayId=$displayId", e)
                 knownDisplays[displayId]?.isOrphan = true
                 knownDisplays[displayId]?.lastSeenAtMs = System.currentTimeMillis()
+                // Report the failure: a silent return made the app say "已释放" while the screen stayed.
+                throw IllegalStateException("RELEASE_FAILED:$displayId", e)
             }
         } else {
             val known = knownDisplays[displayId]
             if (known == null) {
                 Log.w(TAG, "releaseVirtualDisplay: Display $displayId not found in registry")
-                return
+                throw IllegalStateException("NOT_OWNED:$displayId")
             }
             val released = bestEffortReleaseOrphan(displayId)
             if (released) {
@@ -229,6 +231,7 @@ class DisplayUserService @Keep constructor(private val context: Context) : IDisp
                 known.isOrphan = true
                 known.lastSeenAtMs = System.currentTimeMillis()
                 Log.w(TAG, "releaseVirtualDisplay: orphan display $displayId cannot be released without recoverable handle")
+                throw IllegalStateException("ORPHAN_NOT_RELEASABLE:$displayId")
             }
         }
     }

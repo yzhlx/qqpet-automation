@@ -221,7 +221,7 @@ fun PetHomeScreen(
                         onOpenDisplay = {
                             viewModel.createPetDisplay { displayId ->
                                 android.widget.Toast.makeText(
-                                    context, "在这个画面里搜索「宠物」，进入宠物房间后返回 App",
+                                    context, "虚拟屏已创建，打开宠物界面即可",
                                     android.widget.Toast.LENGTH_LONG,
                                 ).show()
                                 context.startActivity(
@@ -418,7 +418,7 @@ private fun SetupChecklistCard(
         Spacer(Modifier.height(6.dp))
         PetNote(
             "完成前下面的按钮保持灰色，这些步骤都不花游戏金币。" +
-                "点「一键创建」后，在打开的画面里进入 QQ 宠物房间。"
+                "点「一键创建」会自动建好后台画面并打开宠物界面，不用手动搜索。"
         )
     }
 }

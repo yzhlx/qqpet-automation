@@ -62,6 +62,12 @@ class FeedbackChannels(private val context: Context) {
         context.startActivity(Intent.createChooser(send, "发送反馈包").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
     }
 
+    /** Saves the zip to Downloads only, for exporting logs without sending them. Returns the file name. */
+    fun exportToDownloads(zip: File): String {
+        saveToDownloads(zip)
+        return zip.name
+    }
+
     /** Puts the zip in Downloads, then opens the form. Returns the name shown in the file picker. */
     fun openWebForm(zip: File): String {
         saveToDownloads(zip)

@@ -4,6 +4,7 @@ import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import android.os.Build
 import android.os.PowerManager
 import android.provider.Settings
 import androidx.compose.foundation.background
@@ -34,6 +35,7 @@ private const val SHIZUKU_RELEASES = "https://github.com/RikkaApps/Shizuku/relea
 
 private fun readFacts(context: Context, state: ShizukuState): OnboardingFacts {
     val power = context.getSystemService(Context.POWER_SERVICE) as PowerManager
+    val resolver = context.contentResolver
     return OnboardingFacts(
         shizukuInstalled = runCatching { context.packageManager.getPackageInfo(SHIZUKU_PACKAGE, 0) }.isSuccess,
         shizukuRunning = state is ShizukuState.Ready || state is ShizukuState.PermissionDenied,
@@ -41,7 +43,40 @@ private fun readFacts(context: Context, state: ShizukuState): OnboardingFacts {
         overlayGranted = OverlayPermission.canDrawOverlays(context),
         notificationGranted = NotificationManagerCompat.from(context).areNotificationsEnabled(),
         batteryExempt = power.isIgnoringBatteryOptimizations(context.packageName),
+        developerEnabled = runCatching {
+            Settings.Global.getInt(resolver, Settings.Global.DEVELOPMENT_SETTINGS_ENABLED, 0) == 1
+        }.getOrDefault(false),
+        wirelessDebugEnabled = runCatching {
+            Settings.Global.getInt(resolver, "adb_wifi_enabled", 0) == 1
+        }.getOrDefault(false),
     )
+}
+
+/**
+ * Where the developer options live differs by brand. Shown for this phone's brand first, with the
+ * other common brands listed underneath, so the user is never guessing from a generic path.
+ */
+private data class DevPath(val brand: String, val about: String, val dev: String)
+
+private val DEV_PATHS = listOf(
+    DevPath("华为 / 荣耀", "设置 → 关于手机，连续点「版本号」7 次", "设置 → 系统和更新 → 开发人员选项（旧版在「设置 → 更多设置」）"),
+    DevPath("小米 / Redmi", "设置 → 我的设备 → 全部参数，连续点「MIUI / OS 版本」7 次", "设置 → 更多设置 → 开发者选项"),
+    DevPath("OPPO / realme / 一加", "设置 → 关于本机 → 版本信息，连续点「版本号」7 次", "设置 → 其他设置 → 开发者选项"),
+    DevPath("vivo / iQOO", "设置 → 关于手机，连续点「软件版本号」7 次", "设置 → 更多设置 → 开发人员选项"),
+    DevPath("三星", "设置 → 关于手机 → 软件信息，连续点「版本号」7 次", "设置 → 开发人员选项"),
+    DevPath("原生安卓 / 其他", "设置 → 关于手机，连续点「版本号」7 次", "设置 → 系统 → 开发者选项"),
+)
+
+private fun devPathFor(manufacturer: String): DevPath {
+    val m = manufacturer.lowercase()
+    return when {
+        m.contains("huawei") || m.contains("honor") -> DEV_PATHS[0]
+        m.contains("xiaomi") || m.contains("redmi") -> DEV_PATHS[1]
+        m.contains("oppo") || m.contains("realme") || m.contains("oneplus") -> DEV_PATHS[2]
+        m.contains("vivo") || m.contains("iqoo") -> DEV_PATHS[3]
+        m.contains("samsung") -> DEV_PATHS[4]
+        else -> DEV_PATHS[5]
+    }
 }
 
 /** System screens differ by brand, so a missing one falls back to the Settings home. */
@@ -65,7 +100,59 @@ private data class GuidePage(
     val waiting: String? = null,
 )
 
-private fun pageFor(step: OnboardingStep, state: ShizukuState, completedBefore: Boolean) = when (step) {
+/** Start-Shizuku guide: the phone's current state decides which sub-step is shown, never a counter. */
+private fun startShizukuPage(facts: OnboardingFacts, completedBefore: Boolean): GuidePage {
+    if (completedBefore) return GuidePage(
+        title = "Shizuku 需要重新启动",
+        intro = "手机重启后 Shizuku 会自动停止，这是系统的限制。打开 Shizuku 再点一次「启动」就好，不用重新配对。",
+        steps = listOf("打开手机的「无线调试」", "打开 Shizuku，点「启动」", "回到这里"),
+        note = "不同手机的菜单名字可能略有差别，意思一样即可。",
+        action = "打开 Shizuku",
+        secondary = "打开开发者选项",
+        waiting = "正在等待 Shizuku 启动…",
+    )
+    val path = devPathFor(Build.MANUFACTURER)
+    if (!facts.developerEnabled) return GuidePage(
+        title = "先开启开发者选项",
+        intro = "手机默认隐藏了「开发者选项」。打开它不会改变你平时的使用方式，只是多出一个菜单。",
+        steps = listOf(
+            "点下面的「打开关于手机」",
+            "${path.about}，直到提示「已进入开发者模式」",
+            "回到这里，页面会自动继续",
+        ),
+        note = "${path.brand} 手机通常是这样走。找不到时，在设置顶部搜索「版本号」。下面列出了其他品牌的路径。",
+        action = "打开关于手机",
+        secondary = "直接打开开发者选项",
+        waiting = "正在等待开发者选项开启…",
+    )
+    if (!facts.wirelessDebugEnabled) return GuidePage(
+        title = "打开无线调试",
+        intro = "开发者选项已经开启。接下来打开「无线调试」，Shizuku 才能完成配对。请先连上 Wi-Fi。",
+        steps = listOf(
+            "点下面的「打开开发者选项」",
+            "找到「无线调试」，打开开关（部分手机要先点进去再打开）",
+            "回到这里，页面会自动继续",
+        ),
+        note = "${path.brand} 的入口：${path.dev}。找不到时，在开发者选项顶部搜索「无线调试」。",
+        action = "打开开发者选项",
+        waiting = "正在等待无线调试开启…",
+    )
+    return GuidePage(
+        title = "启动 Shizuku",
+        intro = "第一次需要配对。无线调试已经打开，请保持 Wi-Fi 连接。",
+        steps = listOf(
+            "点下面的「打开 Shizuku」",
+            "在「通过无线调试启动」里点「配对」，按提示在通知栏输入配对码",
+            "配对成功后，回到 Shizuku 点「启动」",
+            "回到这里",
+        ),
+        note = "配对码只显示一次。输错或超时，就重新点「配对」。",
+        action = "打开 Shizuku",
+        waiting = "正在等待 Shizuku 启动…",
+    )
+}
+
+private fun pageFor(step: OnboardingStep, state: ShizukuState, completedBefore: Boolean, facts: OnboardingFacts) = when (step) {
     OnboardingStep.WELCOME -> GuidePage(
         title = "欢迎使用宠物托管",
         intro = "它会替你照看 QQ 宠物：打工、上课、喂食。开始前需要在手机上打开几个开关，全程约 5 分钟，不用连电脑，也不需要 root。",
@@ -81,22 +168,7 @@ private fun pageFor(step: OnboardingStep, state: ShizukuState, completedBefore: 
         action = "打开下载页",
         waiting = "正在等待 Shizuku 安装完成…",
     )
-    OnboardingStep.START_SHIZUKU -> GuidePage(
-        title = if (completedBefore) "Shizuku 需要重新启动" else "启动 Shizuku",
-        intro = if (completedBefore) "手机重启后 Shizuku 会自动停止，这是系统的限制。打开 Shizuku 再点一次「启动」就好，不用重新配对。"
-        else "第一次需要配对，以后手机重启时只要再点一次「启动」。请先连上 Wi-Fi。",
-        steps = if (completedBefore) listOf("打开手机的「无线调试」", "打开 Shizuku，点「启动」", "回到这里") else listOf(
-            "打开手机「设置 → 关于手机」，连续点「版本号」7 次，直到提示已进入开发者模式",
-            "点下面的「打开开发者选项」，找到并打开「无线调试」。找不到时，在设置顶部搜索“无线调试”",
-            "打开 Shizuku，在“通过无线调试启动”里点「配对」，按提示在通知栏输入配对码",
-            "配对成功后，回到 Shizuku 点「启动」",
-            "回到这里",
-        ),
-        note = "不同手机的菜单名字可能略有差别，意思一样即可。",
-        action = "打开 Shizuku",
-        secondary = "打开开发者选项",
-        waiting = "正在等待 Shizuku 启动…",
-    )
+    OnboardingStep.START_SHIZUKU -> startShizukuPage(facts, completedBefore)
     OnboardingStep.GRANT_SHIZUKU -> GuidePage(
         title = "允许本应用使用 Shizuku",
         intro = "Shizuku 已经在运行了。点下面的按钮，在弹出的窗口里选择「始终允许」。",
@@ -160,14 +232,22 @@ fun OnboardingScreen(
     }
     LaunchedEffect(state) { facts = readFacts(context, state) }
 
-    val step = OnboardingFlow.current(facts, welcomed, setAside)
-    LaunchedEffect(step) { if (step == OnboardingStep.FINISH && completedBefore) onFinish() }
-    val page = pageFor(step, state, completedBefore)
+    // 「上一步」只改看的页面；进度仍由手机状态决定，点「回到当前进度」即回到原位。
+    var backTo by remember { mutableStateOf<OnboardingStep?>(null) }
+    val current = OnboardingFlow.current(facts, welcomed, setAside)
+    val step = backTo ?: current
+    LaunchedEffect(current) { if (current == OnboardingStep.FINISH && completedBefore) onFinish() }
+    val page = pageFor(step, state, completedBefore, facts)
 
     val primary: () -> Unit = when (step) {
-        OnboardingStep.WELCOME -> ({ welcomed = true })
+        OnboardingStep.WELCOME -> ({ welcomed = true; backTo = null })
         OnboardingStep.INSTALL_SHIZUKU -> ({ context.open(Intent(Intent.ACTION_VIEW, Uri.parse(SHIZUKU_RELEASES))) })
-        OnboardingStep.START_SHIZUKU -> ({ context.openShizuku() })
+        OnboardingStep.START_SHIZUKU -> when {
+            completedBefore -> ({ context.openShizuku() })
+            !facts.developerEnabled -> ({ context.open(Intent(Settings.ACTION_DEVICE_INFO_SETTINGS)) })
+            !facts.wirelessDebugEnabled -> ({ context.open(Intent(Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS)) })
+            else -> ({ context.openShizuku() })
+        }
         OnboardingStep.GRANT_SHIZUKU -> onRequestPermission
         OnboardingStep.OVERLAY -> ({ context.open(OverlayPermission.settingsIntent(context)) })
         OnboardingStep.NOTIFICATION -> ({
@@ -206,6 +286,7 @@ fun OnboardingScreen(
                 Spacer(Modifier.height(14.dp))
                 Text(it, fontSize = 13.sp, lineHeight = 19.sp, color = PetTokens.Ink2)
             }
+            if (step == OnboardingStep.START_SHIZUKU && !completedBefore && !facts.developerEnabled) OtherBrands()
             Spacer(Modifier.height(16.dp))
         }
         page.waiting?.let {
@@ -214,6 +295,8 @@ fun OnboardingScreen(
         }
         page.action?.let { GuideButton(it, primary) }
         page.secondary?.let { TextAction(it, secondary) }
+        OnboardingFlow.previous(step)?.let { previous -> TextAction("上一步") { backTo = previous } }
+        if (backTo != null) TextAction("回到当前进度") { backTo = null }
         if (step in OnboardingFlow.OPTIONAL) TextAction("暂时跳过") { setAside = setAside + step }
         Spacer(Modifier.height(16.dp))
     }
@@ -254,6 +337,21 @@ private fun GuideButton(label: String, onClick: () -> Unit) {
             .background(PetTokens.Blue).clickable(onClick = onClick),
         contentAlignment = Alignment.Center,
     ) { Text(label, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, color = PetTokens.Surface) }
+}
+
+@Composable
+private fun OtherBrands() {
+    Spacer(Modifier.height(18.dp))
+    Text("各品牌的开发者选项位置", fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = PetTokens.Ink)
+    Spacer(Modifier.height(8.dp))
+    Column(
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(PetTokens.CardRadius)).background(PetTokens.Surface).padding(14.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        DEV_PATHS.forEach { p ->
+            Text("${p.brand}：${p.about}。开发者选项：${p.dev}", fontSize = 13.sp, lineHeight = 19.sp, color = PetTokens.Ink2)
+        }
+    }
 }
 
 @Composable

@@ -1,7 +1,10 @@
 package com.ynk.virtualdisplay.ui.screens
 
 import android.app.NotificationManager
+import android.content.ActivityNotFoundException
 import android.content.Context
+import android.content.Intent
+import android.provider.Settings
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -16,8 +19,11 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.launch
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -25,6 +31,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -37,6 +44,7 @@ import com.ynk.virtualdisplay.automation.PetProfile
 import com.ynk.virtualdisplay.data.model.ShizukuState
 import com.ynk.virtualdisplay.floating.OverlayPermission
 import com.ynk.virtualdisplay.ui.data.PetEvidenceRepository
+import com.ynk.virtualdisplay.ui.feedback.FeedbackChannels
 import com.ynk.virtualdisplay.ui.feedback.FeedbackDialog
 import com.ynk.virtualdisplay.ui.kit.PetCard
 import com.ynk.virtualdisplay.ui.kit.PetChip
@@ -48,6 +56,8 @@ import com.ynk.virtualdisplay.ui.kit.PetSection
 import com.ynk.virtualdisplay.ui.main.MainViewModel
 import com.ynk.virtualdisplay.ui.settings.SettingsFacts
 import com.ynk.virtualdisplay.ui.theme.PetTokens
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -66,6 +76,7 @@ fun PetSettingsScreen(
     onOpenCalibration: () -> Unit,
 ) {
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
     val uiState by viewModel.uiState.collectAsState()
     val managedIds by viewModel.repository.managedDisplayIds.collectAsState()
 
@@ -82,6 +93,10 @@ fun PetSettingsScreen(
 
     if (showFeedback) FeedbackDialog(onDismiss = { showFeedback = false })
 
+    // The display list is only filled by the console, so the page must ask for it itself; otherwise a
+    // screen created elsewhere still reads as 未创建.
+    LaunchedEffect(Unit) { viewModel.refreshDisplays(context) }
+
     LaunchedEffect(uiState.displays) {
         withContext(Dispatchers.IO) {
             val dirs = repo.sessionDirectories(limit = 100).map { repo.read(it) }
@@ -89,7 +104,19 @@ fun PetSettingsScreen(
             sessions = dirs.count { it.record != null }
         }
         budgetUsed = DailyBudgetStore(context).usedMinutes()
-        notificationsEnabled = NotificationManagerCompat.from(context).areNotificationsEnabled()
+    }
+
+    // Permissions change in system screens; re-read them whenever this page comes back to the front.
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                notificationsEnabled = NotificationManagerCompat.from(context).areNotificationsEnabled()
+                viewModel.refreshDisplays(context)
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
     val shizukuReady = uiState.shizukuState is ShizukuState.Ready
@@ -143,16 +170,19 @@ fun PetSettingsScreen(
                     showChevron = true,
                 )
             }
-            PetListRow(
-                tileBg = PetTokens.AmberSoft,
-                icon = { PetIcon(PetGlyph.Bell, 17.dp) },
-                title = "通知",
-                sub = "完成和中途停止时提醒",
-                trailing = {
-                    if (notificationsEnabled) PetChip("已开启", PetTokens.GreenSoft, PetTokens.GreenInk)
-                    else PetChip("已关闭", PetTokens.RedSoft, PetTokens.RedInk)
-                },
-            )
+            Column(Modifier.clickable { openNotificationSettings(context) }) {
+                PetListRow(
+                    tileBg = PetTokens.AmberSoft,
+                    icon = { PetIcon(PetGlyph.Bell, 17.dp) },
+                    title = "通知",
+                    sub = if (notificationsEnabled) "完成和中途停止时提醒" else "未开启：点这里去打开，完成和停止时才会提醒",
+                    trailing = {
+                        if (notificationsEnabled) PetChip("已开启", PetTokens.GreenSoft, PetTokens.GreenInk)
+                        else PetChip("去开启", PetTokens.RedSoft, PetTokens.RedInk)
+                    },
+                    showChevron = !notificationsEnabled,
+                )
+            }
             if (uiState.shizukuState !is ShizukuState.Ready) {
                 Row(Modifier.fillMaxWidth().padding(bottom = 10.dp)) {
                     PetNote("Shizuku 未就绪时不能开始托管。")
@@ -195,6 +225,23 @@ fun PetSettingsScreen(
                     showChevron = true,
                 )
             }
+            Column(Modifier.clickable {
+                scope.launch {
+                    val channels = FeedbackChannels(context)
+                    val name = withContext(Dispatchers.IO) {
+                        channels.exportToDownloads(channels.buildZip("手动导出运行日志", includeScreenshots = false))
+                    }
+                    android.widget.Toast.makeText(context, "已保存到「下载」：$name", android.widget.Toast.LENGTH_LONG).show()
+                }
+            }) {
+                PetListRow(
+                    tileBg = PetTokens.BlueSoft,
+                    icon = { PetIcon(PetGlyph.TabRec, 17.dp) },
+                    title = "导出运行日志",
+                    sub = "存到手机「下载」，出问题时可直接发给开发者",
+                    showChevron = true,
+                )
+            }
             PetListRow(
                 tileBg = PetTokens.VioletSoft,
                 icon = { PetIcon(PetGlyph.Info, 17.dp) },
@@ -203,7 +250,7 @@ fun PetSettingsScreen(
                 trailing = { ValueText(BuildConfig.VERSION_NAME) },
             )
             Row(Modifier.fillMaxWidth().padding(bottom = 10.dp, top = 2.dp)) {
-                PetNote("目前只支持 FOA-AL00。手机 QQ 版本不限，页面对不上时会自动停止。")
+                PetNote("托管画面固定为 720×1600，与手机型号无关。坐标在 FOA-AL00 上校准过，其他机型未实测，页面对不上时会自动停止。")
             }
         }
         Spacer(Modifier.height(11.dp))
@@ -267,6 +314,16 @@ fun PetSettingsScreen(
         }
 
         Spacer(Modifier.height(16.dp))
+    }
+}
+
+private fun openNotificationSettings(context: Context) {
+    val intent = Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
+        .putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
+    try {
+        context.startActivity(intent)
+    } catch (_: ActivityNotFoundException) {
+        context.startActivity(Intent(Settings.ACTION_SETTINGS))
     }
 }
 

@@ -398,7 +398,20 @@ class PetAutomationService : Service() {
             throw ce
         } catch (t: Throwable) {
             Log.e(TAG, "course scan failed", t)
-            stopSession("读取课程失败：${t.javaClass.simpleName}: ${t.message}")
+            stopSession(courseScanFailureText(t))
+        }
+    }
+
+    /** The reason a user can act on; the raw exception name is kept only for unknown failures. */
+    private fun courseScanFailureText(t: Throwable): String {
+        val m = t.message.orEmpty()
+        return when {
+            m.contains("PHONE_LOCKED") -> "读取课程失败：手机处于锁屏状态。解锁后重新读取，并把自动锁屏时间调长"
+            m.contains("not managed") || m.contains("disappeared") ->
+                "读取课程失败：后台画面不可用，请到「设置 → 后台画面」重新创建"
+            t is TimeoutCancellationException -> "读取课程失败：等待后台画面超时，请确认 Shizuku 已启动"
+            m.contains("COURSE_SCAN_INCOMPLETE") -> "读取课程不完整（$m），请重新读取"
+            else -> "读取课程失败：${t.javaClass.simpleName}: $m"
         }
     }
 
@@ -565,7 +578,6 @@ class PetAutomationService : Service() {
         val p = Point(); d.getRealSize(p)
         val metrics = android.util.DisplayMetrics(); d.getRealMetrics(metrics)
         check(metrics.densityDpi == 320) { "display density must be 320dpi" }
-        check(Build.MODEL == "FOA-AL00") { "Only the calibrated FOA-AL00 device is supported" }
         check(p.x == profile.displayWidth && p.y == profile.displayHeight) {
             "display must be ${profile.displayWidth}x${profile.displayHeight}, actual=${p.x}x${p.y}"
         }
