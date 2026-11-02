@@ -20,6 +20,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CheckboxDefaults
 import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -208,7 +209,7 @@ fun PetPlanSheetScreen(onClose: () -> Unit, onStarted: () -> Unit, displayId: In
                         }
                         changed()
                     }
-                    ActionChoice("护理", PetGlyph.Care, selectedCare, !busy, Modifier.weight(1f)) { selectedCare = it; changed() }
+                    ActionChoice("护理", PetGlyph.Brush, selectedCare, !busy, Modifier.weight(1f)) { selectedCare = it; changed() }
                     ActionChoice("学习", PetGlyph.Study, selectedStudy, !busy, Modifier.weight(1f)) { selectedStudy = it; changed() }
                 }
                 Spacer(Modifier.height(8.dp))
@@ -232,7 +233,13 @@ fun PetPlanSheetScreen(onClose: () -> Unit, onStarted: () -> Unit, displayId: In
                             PetNote("最多一班")
                         }
                         Switch(checked = plan.workBeforeStudy, enabled = !busy,
-                            onCheckedChange = { plan = plan.copy(workBeforeStudy = it); changed() })
+                            onCheckedChange = { plan = plan.copy(workBeforeStudy = it); changed() },
+                            colors = SwitchDefaults.colors(
+                                checkedTrackColor = PetTokens.Blue,
+                                uncheckedTrackColor = PetTokens.GraySoft,
+                                uncheckedThumbColor = PetTokens.Chevron,
+                                uncheckedBorderColor = PetTokens.Chevron,
+                            ))
                     }
                 }
             }

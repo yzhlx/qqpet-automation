@@ -320,7 +320,8 @@ class PetHomePresentationTest {
         assertEquals(VerdictTone.CONFIRMED, rows[0].outcomeTone)
         assertEquals(2, rows[0].screenshots)
         assertEquals("失败", rows[1].outcomeText)
-        assertTrue(rows[1].detail.contains("PAGE_MISMATCH"))
+        assertTrue(rows[1].detail.contains("页面对不上"))
+        assertFalse(rows[1].detail.contains("PAGE_MISMATCH"))
     }
 
     @Test

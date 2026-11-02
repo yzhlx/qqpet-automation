@@ -213,7 +213,6 @@ fun PetHomeScreen(
                 HomeLogCard(logRows, onOpenLogs)
             } else {
                 if (!controls.startEnabled || !catalogFresh) {
-                    if (!controls.startEnabled && controls.blockerNote != null) PetNote(controls.blockerNote)
                     SetupChecklistCard(
                         startReady = controls.startEnabled,
                         shizukuReady = uiState.shizukuState is ShizukuState.Ready,

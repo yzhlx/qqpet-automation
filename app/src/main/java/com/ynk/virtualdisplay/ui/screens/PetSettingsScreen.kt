@@ -177,7 +177,7 @@ fun PetSettingsScreen(
                 tileBg = PetTokens.GreenSoft,
                 icon = { PetIcon(PetGlyph.Clock, 17.dp) },
                 title = "今日已用",
-                sub = "打工和学习共用，达到上限后当天停止",
+                sub = "打工和学习共用",
                 trailing = { ValueText("$budgetUsed / ${plan.dailyBudgetMinutes} 分钟") },
             )
         }

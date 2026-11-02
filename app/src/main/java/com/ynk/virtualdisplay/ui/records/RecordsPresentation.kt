@@ -62,6 +62,17 @@ data class SessionHistoryRow(
 
 object RecordsPresentation {
 
+    /** The raw code stays in the run's log; 记录 only says what happened in words. */
+    fun stopReasonText(reason: String): String = when {
+        reason.contains("USER_STOP", true) || reason == "用户停止" -> "用户停止"
+        reason.contains("PAGE_MISMATCH", true) -> "页面对不上"
+        reason.startsWith("WORK_", true) -> "打工未完成"
+        reason.startsWith("PLAN_", true) -> "方案条件不满足"
+        reason.contains("BUDGET", true) -> "达到每日上限"
+        else -> "中途停止"
+    }
+
+
     /**
      * Aggregates today's sessions. Only sessions that actually produced a run record are counted, so
      * the summary can never be larger than what really ran.
@@ -218,7 +229,7 @@ object RecordsPresentation {
             outcomeTone = tone,
             detail = "完成 ${record.completedRounds}/${record.rounds} 节 · " +
                 "${record.runtimeMs / 60_000L} 分钟 · 护理 ${record.care?.total ?: 0} 次" +
-                (record.stopReason?.let { " · ${it.take(40)}" } ?: ""),
+                (record.stopReason?.let { " · ${stopReasonText(it)}" } ?: ""),
             screenshots = ev.screenshots.size,
         )
     }
