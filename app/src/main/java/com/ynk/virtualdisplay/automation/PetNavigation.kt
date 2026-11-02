@@ -615,6 +615,8 @@ class PetNavigation(private val flow: PetFlowContext, private val workReader: Wo
         private const val BACK_Y=160f
         /** The venue detail page is two levels below the outdoor map, so two back taps at most. */
         private const val TOWN_EXIT_MAX_HOPS=2
+        private const val TOWN_EXIT_SETTLE_MS=3000L
+        private const val TOWN_EXIT_POLL_MS=300L
         private const val TOWN_READ_ATTEMPTS=3
         private const val TOWN_READ_RETRY_MS=900L
 
@@ -1602,23 +1604,46 @@ class PetNavigation(private val flow: PetFlowContext, private val workReader: Wo
         check(readTownPage(reader)?.isDetailPage==start.isDetailPage) {"INITIAL_TOWN_PAGE_MOVED"}
         emit("initial-leave-town",null,if(start.isDetailPage) "DETAIL" else "LIST")
         var hops=0
-        while(!isOutdoorMap() && hops<TOWN_EXIT_MAX_HOPS) {
-            safety();input.tap(BACK_X,BACK_Y);delay(profile.pageSettleMs);hops++
-            emit("initial-leave-town-back",null,"hop=$hops")
+        var page=townExitPage()
+        while(true) {
+            when(TownExitPolicy.next(page,hops,TOWN_EXIT_MAX_HOPS)) {
+                TownExitPolicy.Step.DONE -> return@with
+                TownExitPolicy.Step.LEAVE_MAP -> return@with returnHomeFromMap("initial-leave-town")
+                TownExitPolicy.Step.BACK -> {
+                    safety();input.tap(BACK_X,BACK_Y);delay(profile.pageSettleMs);hops++
+                    emit("initial-leave-town-back",null,"hop=$hops")
+                    page=awaitTownExitPage()
+                }
+                TownExitPolicy.Step.STOP -> error("TOWN_EXIT_UNCONFIRMED_AFTER_${hops}_BACKS")
+            }
         }
-        check(isOutdoorMap()) {"TOWN_EXIT_UNCONFIRMED_AFTER_${hops}_BACKS"}
-        returnHomeFromMap("initial-leave-town")
     }
     /**
-     * True when the CURRENT frame is the outdoor map, by the same template probe every page of
-     * this flow is recognised with. One frame, no settle: this only decides whether another back
-     * tap is needed, and the decision that counts is the outdoor probe's own settle check inside
-     * [tap].
+     * Walks a shift the game refused back to the room, so the next run does not begin on the town.
+     * Measured 2026-11-02: a pet with 体力 2 stayed on the shift's card and the next 护理 failed.
      */
-    private suspend fun isOutdoorMap(): Boolean {
-        val current=flow.frame()
+    suspend fun leaveTownAfterRefusedWork() {
+        val reader=workReader ?: error("TOWN_PAGE_READER_UNAVAILABLE")
+        leaveTownAndReturnHome(readTownPage(reader) ?: error("TOWN_PAGE_UNREADABLE"))
+    }
+    /** The page a back tap is heading for, given the time its transition takes to paint. */
+    private suspend fun awaitTownExitPage(): TownExitPolicy.Page {
+        val deadline=SystemClock.elapsedRealtime()+TOWN_EXIT_SETTLE_MS
+        while(true) {
+            val page=townExitPage()
+            if(page!=TownExitPolicy.Page.TOWN || SystemClock.elapsedRealtime()>=deadline) return page
+            delay(TOWN_EXIT_POLL_MS)
+        }
+    }
+    /** Read from the latest frame: a cached one still shows the page the last tap already left. */
+    private suspend fun townExitPage(): TownExitPolicy.Page {
+        val current=flow.frame(latest=true)
         return try {
-            flow.score(current,listOf(flow.outdoor))>=flow.profile.matchThreshold
+            when {
+                flow.score(current,listOf(flow.room))>=flow.profile.matchThreshold -> TownExitPolicy.Page.ROOM
+                flow.score(current,listOf(flow.outdoor))>=flow.profile.matchThreshold -> TownExitPolicy.Page.OUTDOOR
+                else -> TownExitPolicy.Page.TOWN
+            }
         } finally {current.recycle()}
     }
     /** Retry OCR on fresh frames; a failed read never authorises a back tap. */

@@ -241,11 +241,13 @@ class PetCareFlow(private val flow: PetFlowContext,private val navigation: PetNa
         if(CareResourceGate.stockAction(current,System.currentTimeMillis())==CareResourceGate.StockAction.CONSUME_OWNED)
             return current
         exchange.buy(item,1,"$label-numeric-zero",ownedCount=current)
-        val restocked=observedStock(item,"$label-restocked")
-        check(CareResourceGate.stockAction(restocked,System.currentTimeMillis())==CareResourceGate.StockAction.CONSUME_OWNED) {
-            "CARE_RESTOCK_NOT_CONFIRMED:$item"
-        }
-        return restocked
+        // The sheet closes before the scene repaints its stock. Measured 2026-11-02 (session
+        // 1793626770215): the paid cookie was on screen moments after this read saw the empty scene.
+        // Only reads repeat here, so a late repaint can never cause a second purchase.
+        return RestockConfirmation.await(RESTOCK_READ_ATTEMPTS,
+            read = { observedStock(item,"$label-restocked") },
+            owned = { CareResourceGate.stockAction(it,System.currentTimeMillis())==CareResourceGate.StockAction.CONSUME_OWNED },
+            wait = { delay(RESTOCK_READ_RETRY_MS) }) { "CARE_RESTOCK_NOT_CONFIRMED:$item" }
     }
     var careStatistics=JSONObject();private set
     /** The most recent panel reading, so a later stage can reuse it without reopening the panel. */
@@ -427,6 +429,8 @@ class PetCareFlow(private val flow: PetFlowContext,private val navigation: PetNa
      */
     private companion object {
         const val GAME_FULL = 100
+        const val RESTOCK_READ_ATTEMPTS = 6
+        const val RESTOCK_READ_RETRY_MS = 700L
     }
 
     /**

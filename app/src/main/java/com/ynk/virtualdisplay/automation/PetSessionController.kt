@@ -266,6 +266,7 @@ class PetSessionController(context:Context,capture:HeadlessDisplayCapture,input:
             maxCoinsSpent=0,maxEnergySpent=entry.energyCost,grantedBy="work-shortcut",
             nowMs=System.currentTimeMillis()))
         val started=work.run(target)
+        leaveTownIfWorkRefused(started)
         check(started is WorkOutcome.Started) {"WORK_NOT_STARTED:${started::class.simpleName}"}
         onWorkStarted(started.durationMinutes)
         val done=work.waitAndVerify(target)
@@ -396,6 +397,7 @@ class PetSessionController(context:Context,capture:HeadlessDisplayCapture,input:
             maxCoinsSpent=0,maxEnergySpent=entry.energyCost,grantedBy="plan",
             nowMs=System.currentTimeMillis()))
         val started=work.run(target)
+        leaveTownIfWorkRefused(started)
         check(started is WorkOutcome.Started) {"WORK_NOT_STARTED:${started::class.simpleName}"}
         checkNotNull(activePlanContext).startConfirmed(1)
         val done=work.waitAndVerify(target)
@@ -709,6 +711,7 @@ class PetSessionController(context:Context,capture:HeadlessDisplayCapture,input:
         work.authorise(WorkStartAuthorisation.grant(entry.venue,entry.id,maxStarts=1,
             maxCoinsSpent=0,maxEnergySpent=entry.energyCost,grantedBy="session-plan",nowMs=System.currentTimeMillis()))
         val started=work.run(target)
+        leaveTownIfWorkRefused(started)
         check(started is WorkOutcome.Started) {"WORK_NOT_STARTED:${started::class.simpleName}"}
         onWorkStarted(started.durationMinutes)
         val done=work.waitAndVerify(target)
@@ -720,6 +723,16 @@ class PetSessionController(context:Context,capture:HeadlessDisplayCapture,input:
         flow.verifySettled(listOf(flow.outdoor),"work-completion-outdoor")
         navigation.returnHomeFromMap("work")
         return true
+    }
+    /** Tidying only: the refusal stays the session's stop reason even if the way home fails. */
+    private suspend fun leaveTownIfWorkRefused(outcome:WorkOutcome) {
+        if(outcome !is WorkOutcome.Blocked) return
+        try {
+            navigation.leaveTownAfterRefusedWork()
+        } catch(t: Throwable) {
+            if(t is kotlinx.coroutines.CancellationException) throw t
+            flow.emit("work-refused-return-best-effort",result="SKIP",reason="LEFT_ON_TOWN:${t.message}")
+        }
     }
     /** Satisfies only the game's shift cost; plan care thresholds belong to lessons. */
     private suspend fun preparePetForWork(entry:WorkCatalog.WorkCatalogEntry,balanceCoins:Int) {
