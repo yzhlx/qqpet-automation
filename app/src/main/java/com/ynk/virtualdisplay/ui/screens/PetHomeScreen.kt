@@ -300,15 +300,20 @@ fun PetHomeScreen(
     when (dialog) {
         HomeDialog.ConfirmStop -> AlertDialog(
             onDismissRequest = { dialog = null },
+            containerColor = PetTokens.Surface,
+            titleContentColor = PetTokens.Ink,
+            textContentColor = PetTokens.Ink2,
             title = { Text("停止托管？") },
             text = { Text("将结束当前批次。已完成的节会写入运行记录，未完成的不会被标记为已完成。") },
             confirmButton = {
                 TextButton(onClick = {
                     dialog = null
                     context.startService(PetAutomationService.stopIntent(context))
-                }) { Text("停止") }
+                }) { Text("停止", color = PetTokens.Red) }
             },
-            dismissButton = { TextButton(onClick = { dialog = null }) { Text("取消") } },
+            dismissButton = {
+                TextButton(onClick = { dialog = null }) { Text("取消", color = PetTokens.Ink2) }
+            },
         )
         null -> Unit
     }

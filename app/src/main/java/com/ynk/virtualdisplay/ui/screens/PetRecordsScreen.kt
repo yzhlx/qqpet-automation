@@ -103,7 +103,7 @@ fun PetRecordsScreen() {
             TodayCard(summary)
             Spacer(Modifier.height(11.dp))
             if (changes.any { it.beforeText != "—" || it.afterText != "—" }) ChangesCard(changes)
-            else PetNote("这次运行没有读到状态数值。")
+            else PetNote("这次运行没有成对的前后读数，所以不显示变化。")
         }
 
         if (history.isNotEmpty()) {
