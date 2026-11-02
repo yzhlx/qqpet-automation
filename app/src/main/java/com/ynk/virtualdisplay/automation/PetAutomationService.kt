@@ -566,11 +566,6 @@ class PetAutomationService : Service() {
         val metrics = android.util.DisplayMetrics(); d.getRealMetrics(metrics)
         check(metrics.densityDpi == 320) { "display density must be 320dpi" }
         check(Build.MODEL == "FOA-AL00") { "Only the calibrated FOA-AL00 device is supported" }
-        val qq = packageManager.getPackageInfo("com.tencent.mobileqq", 0)
-        check(qq.versionName == "9.3.75" && qq.longVersionCode == 16580L) {
-            "QQ 已变为 ${qq.versionName}(${qq.longVersionCode})，本版只校准了 9.3.75(16580)，已停止运行。" +
-                "请关闭 QQ 自动更新；QQ 更新后还需重新把宠物页打开到虚拟屏。"
-        }
         check(p.x == profile.displayWidth && p.y == profile.displayHeight) {
             "display must be ${profile.displayWidth}x${profile.displayHeight}, actual=${p.x}x${p.y}"
         }
