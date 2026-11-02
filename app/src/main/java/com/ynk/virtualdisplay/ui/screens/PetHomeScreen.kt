@@ -78,7 +78,9 @@ import com.ynk.virtualdisplay.ui.kit.PetSegmentBar
 import com.ynk.virtualdisplay.ui.kit.PetSection
 import com.ynk.virtualdisplay.ui.log.PetLogEntry
 import com.ynk.virtualdisplay.ui.log.PetLogPresentation
+import com.ynk.virtualdisplay.R
 import com.ynk.virtualdisplay.ui.main.MainViewModel
+import com.ynk.virtualdisplay.ui.main.PetTitleBar
 import com.ynk.virtualdisplay.ui.theme.PetTokens
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -176,6 +178,19 @@ fun PetHomeScreen(
     var dialog by remember { mutableStateOf<HomeDialog?>(null) }
 
     Column(Modifier.fillMaxSize()) {
+        if (runtime.running) {
+            PetTitleBar("宠物托管", crab = R.drawable.crab_peek)
+        } else {
+            PetTitleBar(
+                "养宠自动化",
+                subtitle = "一只厚礼蟹 · 宠物托管助手",
+                crab = when {
+                    !controls.startEnabled -> R.drawable.crab_clipboard
+                    pill.tone == StatusPillTone.SUCCESS -> R.drawable.crab_gift
+                    else -> R.drawable.crab_reading
+                },
+            )
+        }
         Column(
             Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(horizontal = 15.dp),
             verticalArrangement = Arrangement.spacedBy(11.dp),

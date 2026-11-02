@@ -191,7 +191,7 @@ fun PetPlanSheetScreen(onClose: () -> Unit, onStarted: () -> Unit, displayId: In
     }
 
     Column(Modifier.fillMaxSize()) {
-        PetTitleBar("运行方案", onBack = onClose)
+        PetTitleBar("运行方案", onBack = onClose, crab = com.ynk.virtualdisplay.R.drawable.crab_peek)
         Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(horizontal = 15.dp),
             verticalArrangement = Arrangement.spacedBy(11.dp)) {
             PetCard {
