@@ -2,7 +2,7 @@ package com.ynk.virtualdisplay.automation
 
 import java.util.Collections
 
-enum class PlanStepType { WORK, CARE, STUDY }
+enum class PlanStepType { WORK, CARE, STUDY, ADVENTURE }
 enum class WorkTrigger { ALWAYS, IF_FUNDS_SHORT }
 enum class ExecutionProfile { SELECTED_ACTIONS, LEGACY_MANAGED }
 
@@ -52,6 +52,19 @@ data class StudyStep(
     }
 }
 
+data class AdventureStep(
+    override val stepId: String,
+    val mode: AdventureMode = AdventureMode.NEARBY_WALK,
+    val rounds: Int = 1,
+) : PlanStep {
+    override val type: PlanStepType get() = PlanStepType.ADVENTURE
+    init {
+        require(stepId.isNotBlank()) { "PLAN_STEP_ID_BLANK" }
+        require(rounds in 1..10) { "PLAN_ADVENTURE_ROUNDS_OUT_OF_RANGE:$rounds" }
+    }
+}
+
+
 /** Pure configuration. The list is detached and unmodifiable even if a caller supplied a MutableList. */
 class PlanV2(
     val schemaVersion: Int = 2,
@@ -69,7 +82,7 @@ class PlanV2(
         require(planId.isNotBlank()) { "PLAN_ID_BLANK" }
         require(name.isNotBlank() && name.length in 1..80) { "PLAN_NAME_INVALID" }
         require(dailyBudgetMinutes in 1..480) { "PLAN_BUDGET_OUT_OF_RANGE:$dailyBudgetMinutes" }
-        require(this.steps.size in 1..3) { "PLAN_STEPS_COUNT_INVALID:${this.steps.size}" }
+        require(this.steps.size in 1..4) { "PLAN_STEPS_COUNT_INVALID:${this.steps.size}" }
         require(this.steps.map { it.stepId }.distinct().size == this.steps.size) { "PLAN_STEP_ID_DUPLICATE" }
         require(this.steps.map { it.type }.distinct().size == this.steps.size) { "PLAN_STEP_TYPE_DUPLICATE" }
         require(this.steps.zipWithNext().all { (left, right) -> left.type.ordinal < right.type.ordinal }) {

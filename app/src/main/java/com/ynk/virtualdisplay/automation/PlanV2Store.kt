@@ -27,6 +27,7 @@ object PlanV2JsonCodec {
                         put("energyThreshold", step.energyThreshold); put("cleanlinessThreshold", step.cleanlinessThreshold)
                     }
                     is StudyStep -> { put("courseId", step.courseId); put("rounds", step.rounds); if (step.targetAttribute != null) put("targetAttribute", step.targetAttribute) }
+                    is AdventureStep -> { put("mode", step.mode.name); put("rounds", step.rounds) }
                 }
             }
         }
@@ -54,6 +55,11 @@ object PlanV2JsonCodec {
                 PlanStepType.STUDY -> {
                     step.only("stepId", "type", "courseId", "rounds", "targetAttribute")
                     StudyStep(id, step.string("courseId"), step.int("rounds"), step.optionalString("targetAttribute"))
+                }
+                PlanStepType.ADVENTURE -> {
+                    step.only("stepId", "type", "mode", "rounds")
+                    val mode = if (step.containsKey("mode")) enumValueOf<AdventureMode>(step.string("mode")) else AdventureMode.NEARBY_WALK
+                    AdventureStep(id, mode, step.int("rounds"))
                 }
             }
         }

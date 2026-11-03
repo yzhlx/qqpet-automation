@@ -26,6 +26,7 @@ class PlanV2StoreTest {
                 PlanStepType.WORK -> WorkStep("w", "work:竹影武馆/帮武馆跑腿")
                 PlanStepType.CARE -> CareStep("c", 70, 80)
                 PlanStepType.STUDY -> StudyStep("s", "study:田径运动课", 4)
+                PlanStepType.ADVENTURE -> AdventureStep("a", AdventureMode.NEARBY_WALK, 1)
             } }
             val expected = plan(steps)
             PlanV2Store(file).save(expected)

@@ -44,6 +44,8 @@ interface RunStore {
             .sumOf { step -> (perKind[step.stepId] ?: 0).coerceAtMost(step.rounds) }
         val care = plan.steps.filterIsInstance<CareStep>()
             .count { step -> (perKind[step.stepId] ?: 0) > 0 }
-        return RunCounts(workShiftsCompleted = work, careCompleted = care, studyRoundsCompleted = study)
+        val adventure = plan.steps.filterIsInstance<AdventureStep>()
+            .sumOf { step -> (perKind[step.stepId] ?: 0).coerceAtMost(step.rounds) }
+        return RunCounts(workShiftsCompleted = work, careCompleted = care, studyRoundsCompleted = study, adventureCompleted = adventure)
     }
 }

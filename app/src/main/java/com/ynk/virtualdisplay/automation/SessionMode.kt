@@ -27,6 +27,9 @@ enum class SessionMode {
     /** 学习 the plan's course for the selected rounds. No work, no care. */
     STUDY,
 
+    /** 冒险 1 轮（附近走走 / 诗和远方）。 */
+    ADVENTURE,
+
     /** 护理 + 学习, plus the plan's optional first-round work shift. The historical 托管 behaviour. */
     FULL,
 
@@ -48,6 +51,9 @@ enum class SessionMode {
     /** True when this mode runs a work shift as its own action rather than as a funding step. */
     val runsWork: Boolean get() = this == WORK
 
+    /** True when this mode runs an adventure exploration. */
+    val runsAdventure: Boolean get() = this == ADVENTURE
+
     /** Stable wire name, used in intents and event payloads. */
     val wire: String get() = name.lowercase()
 
@@ -58,6 +64,7 @@ enum class SessionMode {
             "care" -> CARE
             "work" -> WORK
             "study" -> STUDY
+            "adventure" -> ADVENTURE
             "plan" -> PLAN
             "full", null -> FULL
             else -> error("UNKNOWN_SESSION_MODE:$value")

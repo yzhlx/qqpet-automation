@@ -2,7 +2,7 @@ package com.ynk.virtualdisplay.automation
 
 import java.util.Collections
 
-enum class RunOrigin { WORK_SHORTCUT, CARE_SHORTCUT, STUDY_SHORTCUT, PLAN, LEGACY }
+enum class RunOrigin { WORK_SHORTCUT, CARE_SHORTCUT, STUDY_SHORTCUT, ADVENTURE_SHORTCUT, PLAN, LEGACY }
 enum class RunState { CREATED, PREFLIGHT, RUNNING, COMPLETED, STOPPED, FAILED, UNCONFIRMED }
 enum class StepState { PENDING, RUNNING, COMPLETED, SKIPPED, BLOCKED, FAILED, UNCONFIRMED, CANCELLED }
 enum class AttemptState { PREPARED, BUDGET_RESERVED, INPUT_PENDING, START_CONFIRMED, COMPLETED, UNCONFIRMED }
@@ -35,6 +35,7 @@ data class RunRequest(
             RunOrigin.WORK_SHORTCUT -> PlanStepType.WORK
             RunOrigin.CARE_SHORTCUT -> PlanStepType.CARE
             RunOrigin.STUDY_SHORTCUT -> PlanStepType.STUDY
+            RunOrigin.ADVENTURE_SHORTCUT -> PlanStepType.ADVENTURE
             else -> null
         }
         require(expected == null || (planSnapshot.steps.size == 1 && planSnapshot.steps.single().type == expected)) {
@@ -50,9 +51,10 @@ data class RunCounts(
     val workShiftsCompleted: Int = 0,
     val careCompleted: Int = 0,
     val studyRoundsCompleted: Int = 0,
+    val adventureCompleted: Int = 0,
 ) {
     init {
-        require(workShiftsCompleted >= 0 && careCompleted >= 0 && studyRoundsCompleted >= 0) { "RUN_COUNT_NEGATIVE" }
+        require(workShiftsCompleted >= 0 && careCompleted >= 0 && studyRoundsCompleted >= 0 && adventureCompleted >= 0) { "RUN_COUNT_NEGATIVE" }
     }
 }
 
@@ -149,6 +151,7 @@ class RunSnapshot(
         require(counts.workShiftsCompleted <= selected.filterIsInstance<WorkStep>().sumOf { it.shifts }) { "RUN_WORK_COUNT_EXCEEDED" }
         require(counts.careCompleted <= selected.filterIsInstance<CareStep>().size || request.planSnapshot.executionProfile == ExecutionProfile.LEGACY_MANAGED) { "RUN_CARE_COUNT_EXCEEDED" }
         require(counts.studyRoundsCompleted <= selected.filterIsInstance<StudyStep>().sumOf { it.rounds }) { "RUN_STUDY_COUNT_EXCEEDED" }
+        require(counts.adventureCompleted <= selected.filterIsInstance<AdventureStep>().sumOf { it.rounds }) { "RUN_ADVENTURE_COUNT_EXCEEDED" }
     }
 
     fun copy(

@@ -192,8 +192,15 @@ class PetSessionController(context:Context,capture:HeadlessDisplayCapture,input:
     suspend fun run():String=coroutineScope {
         // One boundary before each plan step, and before each lesson of a study step or a round.
         val boundaries=when {
-            mode==SessionMode.HEALTH_CHECK || mode==SessionMode.WORK -> 0
-            planV2!=null -> planV2.steps.sumOf {if(it is StudyStep) it.rounds else 1}
+            mode==SessionMode.HEALTH_CHECK || mode==SessionMode.WORK || mode==SessionMode.ADVENTURE -> 0
+            planV2!=null -> planV2.steps.sumOf {
+                when (it) {
+                    is StudyStep -> it.rounds
+                    is AdventureStep -> it.rounds
+                    is WorkStep -> it.shifts
+                    else -> 1
+                }
+            }
             else -> totalRounds
         }
         snapshot=snapshot.copy(runState=SessionRunState.RUNNING,startedAt=System.currentTimeMillis(),
@@ -226,6 +233,7 @@ class PetSessionController(context:Context,capture:HeadlessDisplayCapture,input:
                 flow.state="DONE"
                 "HEALTH_CHECK_PASS"
             } else if(mode==SessionMode.WORK) runWorkOnly()
+            else if(mode==SessionMode.ADVENTURE) runAdventureOnly()
             else if(planV2!=null) runPlanSteps()
             else runRounds()
         } catch(t:Throwable) {
@@ -390,7 +398,9 @@ class PetSessionController(context:Context,capture:HeadlessDisplayCapture,input:
                     .single {it.id==workStep.workOptionId}.durationMinutes
                 val studyMinutes=if(studyStep==null) 0 else Math.multiplyExact(studyStep.rounds,
                     CourseTiming.resolve(plan,catalog,System.currentTimeMillis()).durationMinutes)
-                if(!checkNotNull(planAttemptBudget).canAfford(Math.addExact(workMinutes,studyMinutes),selected.dailyBudgetMinutes)) {
+                val adventureStep=selected.steps.filterIsInstance<AdventureStep>().singleOrNull()
+                val adventureMinutes=if(adventureStep==null) 0 else Math.multiplyExact(adventureStep.rounds, adventureStep.mode.durationMinutes)
+                if(!checkNotNull(planAttemptBudget).canAfford(Math.addExact(workMinutes,Math.addExact(studyMinutes,adventureMinutes)),selected.dailyBudgetMinutes)) {
                     return@ResourcePreflightPort ResourcePreflight.Insufficient("DAILY_BUDGET_LIMIT")
                 }
                 ResourcePreflight.Ready("device-preflight-${System.currentTimeMillis()}",planSkipWork,false)
@@ -398,11 +408,13 @@ class PetSessionController(context:Context,capture:HeadlessDisplayCapture,input:
         val execution=PlanDeviceExecution(store,checkNotNull(planAttemptBudget),preflight,
             work={step,ctx -> pausePoint("打工");activePlanContext=ctx;runPlanWork(step)},
             care={step,ctx -> pausePoint("护理");activePlanContext=ctx;runPlanCare(step)},
-            study={step,ctx -> activePlanContext=ctx;runPlanStudy(step)},checkAuthority=authority)
+            study={step,ctx -> activePlanContext=ctx;runPlanStudy(step)},
+            adventure={step,ctx -> pausePoint("冒险: " + step.mode.label);activePlanContext=ctx;runPlanAdventure(step)},
+            checkAuthority=authority)
         try {
             val result=execution.run(request,flow.capture.facts.events.sessionId)
             planRunSnapshot=result
-            completed=result.counts.studyRoundsCompleted
+            completed=result.counts.studyRoundsCompleted + result.counts.adventureCompleted
             stopReason=result.stopReason
             snapshot=snapshot.copy(completedRounds=completed,nextStep=if(result.state==RunState.COMPLETED) "方案完成" else "方案停止")
             File(evidence,"plan-run.json").writeText(PlanRunJsonCodec.encode(StoredRun(result,
@@ -411,7 +423,8 @@ class PetSessionController(context:Context,capture:HeadlessDisplayCapture,input:
         } finally {
             activePlanContext=null
             planRunSnapshot=store.load(flow.capture.facts.events.sessionId)
-            completed=planRunSnapshot?.counts?.studyRoundsCompleted ?: completed
+            val c = planRunSnapshot?.counts
+            completed = if (c != null) c.studyRoundsCompleted + c.adventureCompleted else completed
         }
     }
 
@@ -584,6 +597,103 @@ class PetSessionController(context:Context,capture:HeadlessDisplayCapture,input:
      * never calls beforeCourse()/study, so it never touches the shared daily budget and never
      * requires the threshold precondition that only a lesson needs.
      */
+
+    private suspend fun runPlanAdventure(step: AdventureStep): StepOutcome {
+        val adventureFlow = PetAdventureFlow(
+            flow = flow,
+            navigation = navigation,
+            lineReader = {
+                val f = flow.frame(latest = true)
+                try {
+                    reader.read(f)
+                } finally {
+                    f.recycle()
+                }
+            },
+            tap = { point, settleMs ->
+                flow.safety()
+                flow.input.tap(point.x, point.y)
+                kotlinx.coroutines.delay(settleMs)
+            }
+        )
+        repeat(step.rounds) { index ->
+            pausePoint("第 " + (index + 1) + "/" + step.rounds + " 轮冒险: " + step.mode.label)
+            flow.round = index + 1
+            flow.state = "ADVENTURE"
+            snapshot = snapshot.copy(currentFlow = "ADVENTURE", nextStep = "第 " + (index + 1) + "/" + step.rounds + " 轮冒险: " + step.mode.label)
+            val ctx = checkNotNull(activePlanContext)
+            val durationMinutes = step.mode.durationMinutes
+            ctx.beforeConsumingInput(index + 1, durationMinutes)
+            val outcome = adventureFlow.run(mode = step.mode)
+            when (outcome) {
+                is AdventureOutcome.Completed -> {
+                    ctx.completed(index + 1, durationMinutes)
+                    flow.emit("ADVENTURE_COMPLETE", result = "round=" + (index + 1) + " coins=" + outcome.coinAward)
+                }
+                is AdventureOutcome.Blocked -> {
+                    ctx.unconfirmed(index + 1, outcome.reason)
+                    flow.emit("ADVENTURE_BLOCKED", result = outcome.reason)
+                    return StepOutcome.Blocked(outcome.reason)
+                }
+                is AdventureOutcome.Failed -> {
+                    ctx.unconfirmed(index + 1, outcome.reason)
+                    flow.emit("ADVENTURE_FAILED", result = outcome.reason)
+                    return StepOutcome.Failed(outcome.reason)
+                }
+                is AdventureOutcome.Interrupted -> {
+                    ctx.unconfirmed(index + 1, "INTERRUPTED")
+                    return StepOutcome.Blocked("ADVENTURE_INTERRUPTED")
+                }
+                else -> {
+                    ctx.unconfirmed(index + 1, "UNCONFIRMED")
+                    return StepOutcome.Unconfirmed("ADVENTURE_UNCONFIRMED")
+                }
+            }
+        }
+        return StepOutcome.Completed()
+    }
+
+    private suspend fun runAdventureOnly(): String {
+        flow.round = 1
+        flow.state = "ADVENTURE"
+        snapshot = snapshot.copy(round = 1, currentFlow = "ADVENTURE", nextStep = "冒险: 附近走走")
+        val adventureFlow = PetAdventureFlow(
+            flow = flow,
+            navigation = navigation,
+            lineReader = {
+                val f = flow.frame(latest = true)
+                try {
+                    reader.read(f)
+                } finally {
+                    f.recycle()
+                }
+            },
+            tap = { point, settleMs ->
+                flow.safety()
+                flow.input.tap(point.x, point.y)
+                kotlinx.coroutines.delay(settleMs)
+            }
+        )
+        val outcome = adventureFlow.run(mode = AdventureMode.NEARBY_WALK)
+        return when (outcome) {
+            is AdventureOutcome.Completed -> {
+                completed = 1
+                snapshot = snapshot.copy(completedRounds = 1, nextStep = "冒险完成")
+                flow.emit("ADVENTURE_COMPLETE", result = "coins=" + outcome.coinAward)
+                "ADVENTURE_PASS"
+            }
+            is AdventureOutcome.Blocked -> {
+                stopReason = outcome.reason
+                "STOPPED"
+            }
+            is AdventureOutcome.Failed -> {
+                stopReason = outcome.reason
+                "FAILED"
+            }
+            else -> "STOPPED"
+        }
+    }
+
     private suspend fun runRounds():String=coroutineScope {
             repeat(totalRounds) {index ->
                 pausePoint("第 ${index+1}/$totalRounds 节")

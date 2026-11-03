@@ -47,6 +47,10 @@ class PlanRunnerCompositionTest {
             log.hit(PlanStepType.STUDY); c.beforeConsumingInput(1, 30); c.startConfirmed(1); c.completed(1, 30)
             StepOutcome.Completed()
         },
+        PlanStepType.ADVENTURE to StepExecutor { _, c ->
+            log.hit(PlanStepType.ADVENTURE); c.beforeConsumingInput(1, 5); c.startConfirmed(1); c.completed(1, 5)
+            StepOutcome.Completed()
+        },
     )
 
     @Test fun unselectedStepTypesAreNeverExecutedForAnySubset() = runBlocking {

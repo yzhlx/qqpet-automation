@@ -51,6 +51,7 @@ import com.ynk.virtualdisplay.automation.PetAutomationService
 import com.ynk.virtualdisplay.automation.PetRuntime
 import com.ynk.virtualdisplay.automation.PlanStep
 import com.ynk.virtualdisplay.automation.PlanStepType
+import com.ynk.virtualdisplay.automation.AdventureStep
 import com.ynk.virtualdisplay.automation.PlanV2
 import com.ynk.virtualdisplay.automation.PlanV2Store
 import com.ynk.virtualdisplay.automation.PlanValidator
@@ -93,6 +94,9 @@ fun PetPlanSheetScreen(onClose: () -> Unit, onStarted: () -> Unit, displayId: In
     var selectedWork by remember { mutableStateOf(false) }
     var selectedCare by remember { mutableStateOf(false) }
     var selectedStudy by remember { mutableStateOf(false) }
+    var selectedAdventure by remember { mutableStateOf(false) }
+    var adventureMode by remember { mutableStateOf(com.ynk.virtualdisplay.automation.AdventureMode.NEARBY_WALK) }
+    var adventureRounds by remember { mutableStateOf(1) }
     var stepIds by remember { mutableStateOf(emptyMap<PlanStepType, String>()) }
     var legacySource by remember { mutableStateOf<String?>(null) }
     var showCompatibilityNote by remember { mutableStateOf(false) }
@@ -121,7 +125,12 @@ fun PetPlanSheetScreen(onClose: () -> Unit, onStarted: () -> Unit, displayId: In
             name = stored.name
             stepIds = stored.steps.associate { it.type to it.stepId }
             legacySource = stored.legacySource
-            selectedWork = work != null; selectedCare = care != null; selectedStudy = study != null
+            val adventure = stored.steps.filterIsInstance<AdventureStep>().singleOrNull()
+            selectedWork = work != null; selectedCare = care != null; selectedStudy = study != null; selectedAdventure = adventure != null
+            if (adventure != null) {
+                adventureMode = adventure.mode
+                adventureRounds = adventure.rounds
+            }
             plan = plan.copy(courseId = study?.courseId ?: plan.courseId, rounds = study?.rounds ?: plan.rounds,
                 targetAttribute = study?.targetAttribute ?: plan.targetAttribute,
                 energyThreshold = care?.energyThreshold ?: plan.energyThreshold,
@@ -150,7 +159,7 @@ fun PetPlanSheetScreen(onClose: () -> Unit, onStarted: () -> Unit, displayId: In
     val selectedCourse = unlocked.firstOrNull { it.id == plan.courseId }
     val validationMessage = when {
         loading -> "正在读取方案…"
-        !selectedWork && !selectedCare && !selectedStudy -> "请选择至少一个动作。"
+        !selectedWork && !selectedCare && !selectedStudy && !selectedAdventure -> "请选择至少一个动作。"
         selectedWork && verified.none { it.id == plan.workOptionId } -> "请选择打工岗位。"
         selectedStudy && !fresh && plan.targetAttribute == null && catalog == null -> "请先读取我的课程或选择上方目标属性。"
         selectedStudy && plan.targetAttribute == null && selectedCourse?.durationMinutes == null -> "请选择一门时长已读出的课程。"
@@ -171,6 +180,7 @@ fun PetPlanSheetScreen(onClose: () -> Unit, onStarted: () -> Unit, displayId: In
                     if (selectedCare) add(CareStep(stepIds[PlanStepType.CARE] ?: "$planId:care",
                         plan.energyThreshold, plan.cleanlinessThreshold))
                     if (selectedStudy) add(StudyStep(stepIds[PlanStepType.STUDY] ?: "$planId:study", plan.courseId, plan.rounds, plan.targetAttribute))
+                    if (selectedAdventure) add(AdventureStep(stepIds[PlanStepType.ADVENTURE] ?: "$planId:adventure", adventureMode, adventureRounds))
                 }
                 val snapshot = PlanV2(planId = planId, name = name, dailyBudgetMinutes = plan.dailyBudgetMinutes,
                     steps = steps, executionProfile = ExecutionProfile.SELECTED_ACTIONS, legacySource = legacySource)
@@ -236,9 +246,10 @@ fun PetPlanSheetScreen(onClose: () -> Unit, onStarted: () -> Unit, displayId: In
                     }
                     ActionChoice("护理", PetGlyph.Brush, selectedCare, !busy, Modifier.weight(1f)) { selectedCare = it; changed() }
                     ActionChoice("学习", PetGlyph.Study, selectedStudy, !busy, Modifier.weight(1f)) { selectedStudy = it; changed() }
+                    ActionChoice("冒险", PetGlyph.Locate, selectedAdventure, !busy, Modifier.weight(1f)) { selectedAdventure = it; changed() }
                 }
                 Spacer(Modifier.height(8.dp))
-                PetNote("按打工 → 护理 → 学习的顺序执行，只做勾选的动作。")
+                PetNote("按打工 → 护理 → 学习 → 冒险的顺序执行，只做勾选的动作。")
                 loadNote?.let { PetNote(it) }
                 if (showCompatibilityNote) PetNote("保存为新版方案后，护理执行一次；打工前需已满足岗位条件。")
             }
@@ -327,6 +338,39 @@ fun PetPlanSheetScreen(onClose: () -> Unit, onStarted: () -> Unit, displayId: In
                 Spacer(Modifier.height(4.dp))
                 if (selectedStudy) ParamRow("节数", PetGlyph.Study, plan.rounds, SessionPlan.MIN_ROUNDS..SessionPlan.MAX_ROUNDS, 1, !busy) {
                     plan = plan.copy(rounds = it); changed()
+                }
+                if (selectedAdventure) {
+                    Spacer(Modifier.height(8.dp))
+                    PetCard {
+                        PetSection("冒险模式 (CORE-11)")
+                        Spacer(Modifier.height(8.dp))
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            for (mode in com.ynk.virtualdisplay.automation.AdventureMode.entries) {
+                                val isSelected = adventureMode == mode
+                                Box(
+                                    Modifier
+                                        .weight(1f)
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .background(if (isSelected) PetTokens.BlueSoft else PetTokens.Bg)
+                                        .clickable(!busy) { adventureMode = mode; changed() }
+                                        .padding(vertical = 8.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        mode.label,
+                                        fontSize = 12.sp,
+                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                        color = if (isSelected) PetTokens.BlueInk else PetTokens.Ink2
+                                    )
+                                }
+                            }
+                        }
+                        Spacer(Modifier.height(6.dp))
+                        PetNote(if (adventureMode == com.ynk.virtualdisplay.automation.AdventureMode.NEARBY_WALK) "附近走走：5 分钟短途探索，快速累积奇遇" else "诗和远方：30 分钟深度旅行，奖励丰富但耗时较长")
+                    }
+                    ParamRow("冒险轮次", PetGlyph.Locate, adventureRounds, 1..10, 1, !busy) {
+                        adventureRounds = it; changed()
+                    }
                 }
                 if (selectedCare) {
                     ParamRow("体力目标", PetGlyph.Care, plan.energyThreshold, SessionPlan.MIN_THRESHOLD..SessionPlan.MAX_THRESHOLD, 5, !busy) {

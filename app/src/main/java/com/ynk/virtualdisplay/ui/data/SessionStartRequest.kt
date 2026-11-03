@@ -37,6 +37,7 @@ object SessionStartRequest {
             PlanStepType.WORK -> SessionMode.WORK
             PlanStepType.CARE -> SessionMode.CARE
             PlanStepType.STUDY -> SessionMode.STUDY
+            PlanStepType.ADVENTURE -> SessionMode.ADVENTURE
         } else SessionMode.FULL
         return Intent(ACTION_START)
             .setClassName("com.ynk.virtualdisplay", "com.ynk.virtualdisplay.automation.PetAutomationService")

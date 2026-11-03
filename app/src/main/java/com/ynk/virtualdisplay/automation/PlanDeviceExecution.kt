@@ -60,6 +60,7 @@ class PlanDeviceExecution(
     private val work: suspend (WorkStep, StepExecutionContext) -> StepOutcome,
     private val care: suspend (CareStep, StepExecutionContext) -> StepOutcome,
     private val study: suspend (StudyStep, StepExecutionContext) -> StepOutcome,
+    private val adventure: suspend (AdventureStep, StepExecutionContext) -> StepOutcome = { _, _ -> StepOutcome.Completed() },
     private val checkAuthority: () -> Unit,
 ) {
     suspend fun run(request: RunRequest, runId: String): RunSnapshot {
@@ -72,6 +73,7 @@ class PlanDeviceExecution(
                     PlanStepType.WORK -> work(step as WorkStep, guarded)
                     PlanStepType.CARE -> care(step as CareStep, guarded)
                     PlanStepType.STUDY -> study(step as StudyStep, guarded)
+                    PlanStepType.ADVENTURE -> adventure(step as AdventureStep, guarded)
                 }
             } finally {
                 guarded.retainPending("STEP_ENDED_WITHOUT_COMPLETION_PROOF")

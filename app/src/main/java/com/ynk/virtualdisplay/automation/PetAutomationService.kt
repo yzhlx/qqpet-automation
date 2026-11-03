@@ -741,6 +741,7 @@ class PetAutomationService : Service() {
             SessionMode.CARE -> "护理"
             SessionMode.WORK -> "打工"
             SessionMode.STUDY -> "学习"
+            SessionMode.ADVENTURE -> "冒险"
             SessionMode.FULL -> "托管"
             SessionMode.PLAN -> "方案"
         }

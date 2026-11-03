@@ -51,6 +51,7 @@ import com.ynk.virtualdisplay.automation.PetManagedRuntime
 import com.ynk.virtualdisplay.automation.PetProfile
 import com.ynk.virtualdisplay.automation.PetRuntime
 import com.ynk.virtualdisplay.automation.PlanV2
+import com.ynk.virtualdisplay.automation.AdventureStep
 import com.ynk.virtualdisplay.automation.PlanV2Store
 import com.ynk.virtualdisplay.automation.SessionMode
 import com.ynk.virtualdisplay.automation.SessionPlan
@@ -370,6 +371,7 @@ private fun planSummary(saved: PlanV2?, plan: SessionPlan): String {
             is StudyStep -> "学习 ${step.rounds} 节"
             is CareStep -> "护理"
             is WorkStep -> "打工"
+            is AdventureStep -> "冒险 " + step.rounds + " 轮"
         }
     }
 }

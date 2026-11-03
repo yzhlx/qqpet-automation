@@ -62,6 +62,13 @@ fun PetLogScreen(onClose: () -> Unit) {
     var raw by remember { mutableStateOf(false) }
     var rows by remember { mutableStateOf<List<PetLogEntry>>(emptyList()) }
     var totalRaw by remember { mutableStateOf(0) }
+    var copiedNote by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(copiedNote) {
+        if (copiedNote != null) {
+            delay(2000L)
+            copiedNote = null
+        }
+    }
 
     LaunchedEffect(runtime.running, managed.sessionId, raw) {
         suspend fun reload() = withContext(Dispatchers.IO) {
@@ -87,6 +94,16 @@ fun PetLogScreen(onClose: () -> Unit) {
         ) {
             ModeChip("简洁", !raw) { raw = false }
             ModeChip("原始", raw) { raw = true }
+            ModeChip(copiedNote ?: "复制脱敏日志", copiedNote != null) {
+                val rawText = rows.joinToString("\n") { "[" + it.time + "] " + it.text + (if (it.chip != null) " [" + it.chip + "]" else "") }
+                val sanitized = rawText
+                    .replace(Regex("\\b[1-9]\\d{4,10}\\b"), "***")
+                    .replace(Regex("[A-Za-z]:\\\\?[^ \t\r\n]+"), "[LOCAL_PATH]")
+                    .replace(Regex("/data/user/\\d+/[^ \t\r\n]+"), "[APP_DIR]")
+                val clipboard = context.getSystemService(android.content.ClipboardManager::class.java)
+                clipboard?.setPrimaryClip(android.content.ClipData.newPlainText("蟹啦脱敏日志", sanitized))
+                copiedNote = "已复制"
+            }
             Spacer(Modifier.weight(1f))
             PetNote("读取 $totalRaw 行 · 显示 ${rows.size}")
         }

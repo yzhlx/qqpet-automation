@@ -6,8 +6,9 @@ package com.ynk.virtualdisplay.automation
  * - POETRY_AND_DISTANT: 诗和远方（旅行、明信片与风景收藏）
  */
 enum class AdventureMode(val label: String, val defaultDurationMinutes: Int) {
-    NEARBY_WALK("附近走走", 5),
+        NEARBY_WALK("附近走走", 5),
     POETRY_AND_DISTANT("诗和远方", 30);
+    val durationMinutes: Int get() = defaultDurationMinutes
 
     companion object {
         fun fromLabel(text: String?): AdventureMode? =

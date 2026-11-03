@@ -63,14 +63,23 @@ data class SessionHistoryRow(
 object RecordsPresentation {
 
     /** The raw code stays in the run's log; 记录 only says what happened in words. */
-    fun stopReasonText(reason: String): String = when {
+        fun stopReasonText(reason: String): String = when {
         reason == com.ynk.virtualdisplay.automation.ManualPause.REASON -> "你手动暂停"
         reason.contains("USER_STOP", true) || reason == "用户停止" -> "用户停止"
-        reason.contains("PAGE_MISMATCH", true) -> "页面对不上"
+        reason.contains("PERMISSION_DENIED", true) || reason.contains("SHIZUKU", true) || reason.contains("DISPLAY_PERMISSION", true) -> "系统权限不足，请在排故页检查 Shizuku 与显示授权"
+        reason.contains("PLAN_DISPLAY_NOT_READY", true) -> "虚拟显示未就绪，请在主页选择或创建虚拟屏"
+        reason.contains("PAGE_MISMATCH", true) || reason.contains("OCR_TIMEOUT", true) || reason.contains("BUTTON_NOT_FOUND", true) -> "界面未识别目标按钮或入口，请确认 QQ 处于宠物页面"
+        reason.contains("WORK_ALL_CANDIDATES_REFUSED", true) -> "候选打工岗位均未达到开工条件"
         reason.startsWith("WORK_NOT_STARTED", true) -> "条件不够，没有开始打工"
+        reason.contains("ENERGY_INSUFFICIENT", true) -> "宠物当前体力不足，请先喂食护理"
+        reason.contains("COINS_INSUFFICIENT", true) -> "金币余额不足以支付学费或开销"
+        reason.contains("COOKIE_OUT_OF_STOCK", true) || reason.contains("SOAP_OUT_OF_STOCK", true) -> "背包护理道具不足"
+        reason.contains("ADVENTURE_LIMIT", true) || reason.contains("ADVENTURE_ENTRY_NOT_FOUND", true) -> "冒险入口未找到或已达今日次数上限"
+        reason.startsWith("ADVENTURE_", true) -> "冒险未完成或未到结算"
         reason.startsWith("WORK_", true) -> "打工未完成"
         reason.startsWith("TOWN_EXIT", true) -> "没能回到宠物房间"
         reason.startsWith("PLAN_", true) -> "方案条件不满足"
+        reason.contains("QQ_NOT_READY", true) || reason.contains("ROOM_UNCONFIRMED", true) -> "QQ 宠物未处于房间状态，请先在后台拉起 QQ"
         reason.contains("BUDGET", true) -> "今天蟹累了，明天再来"
         else -> "中途停止"
     }

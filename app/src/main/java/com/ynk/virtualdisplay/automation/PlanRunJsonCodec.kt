@@ -15,6 +15,7 @@ internal object PlanRunJsonCodec {
                 is WorkStep -> fields.putAll(obj("workOptionId" to s.workOptionId, "trigger" to s.trigger.name, "shifts" to s.shifts))
                 is CareStep -> fields.putAll(obj("energyThreshold" to s.energyThreshold, "cleanlinessThreshold" to s.cleanlinessThreshold))
                 is StudyStep -> fields.putAll(obj("courseId" to s.courseId, "rounds" to s.rounds))
+                is AdventureStep -> fields.putAll(obj("mode" to s.mode.name, "rounds" to s.rounds))
             }
             fields
         })
@@ -26,7 +27,8 @@ internal object PlanRunJsonCodec {
         return Json.write(obj("schemaVersion" to 2, "snapshot" to obj(
             "runId" to s.runId, "request" to request(s.request), "state" to s.state.name,
             "counts" to obj("workShiftsCompleted" to s.counts.workShiftsCompleted,
-                "careCompleted" to s.counts.careCompleted, "studyRoundsCompleted" to s.counts.studyRoundsCompleted),
+                "careCompleted" to s.counts.careCompleted, "studyRoundsCompleted" to s.counts.studyRoundsCompleted,
+                "adventureCompleted" to s.counts.adventureCompleted),
             "startedAtMs" to s.startedAtMs, "endedAtMs" to s.endedAtMs, "stopReason" to s.stopReason,
             "steps" to s.steps.map { e -> obj("runId" to e.runId, "stepId" to e.stepId, "index" to e.index,
                 "type" to e.type.name, "state" to e.state.name, "reason" to e.reason,
@@ -52,6 +54,7 @@ internal object PlanRunJsonCodec {
                     PlanStepType.WORK -> WorkStep(id, step.string("workOptionId"), enumValueOf(step.string("trigger")), step.int("shifts"))
                     PlanStepType.CARE -> CareStep(id, step.int("energyThreshold"), step.int("cleanlinessThreshold"))
                     PlanStepType.STUDY -> StudyStep(id, step.string("courseId"), step.int("rounds"))
+                    PlanStepType.ADVENTURE -> AdventureStep(id, if (step.containsKey("mode")) enumValueOf<AdventureMode>(step.string("mode")) else AdventureMode.NEARBY_WALK, step.int("rounds"))
                 }
             }, enumValueOf(p.string("executionProfile")), p.nullString("legacySource"))
         val request = RunRequest(r.string("requestId"), plan, r.string("deviceSerial"), r.int("displayId"),
@@ -62,7 +65,7 @@ internal object PlanRunJsonCodec {
             StepExecution(e.string("runId"), e.string("stepId"), e.int("index"), enumValueOf(e.string("type")),
                 enumValueOf(e.string("state")), e.nullString("reason"), e.nullLong("startedAtMs"), e.nullLong("endedAtMs"),
                 e.list("evidenceIds").map { id -> id as? String ?: error("RUN_JSON_STRING_REQUIRED") })
-        }, RunCounts(counts.int("workShiftsCompleted"), counts.int("careCompleted"), counts.int("studyRoundsCompleted")),
+        }, RunCounts(counts.int("workShiftsCompleted"), counts.int("careCompleted"), counts.int("studyRoundsCompleted"), if (counts.containsKey("adventureCompleted")) counts.int("adventureCompleted") else 0),
             s.nullLong("startedAtMs"), s.nullLong("endedAtMs"), s.nullString("stopReason"))
         val reasons = linkedMapOf<String, String>()
         val attempts = root.list("attempts").map {
