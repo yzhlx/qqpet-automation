@@ -18,6 +18,18 @@ object ManualPause {
     private val mutable = MutableStateFlow(ManualPauseState.NONE)
     val state: StateFlow<ManualPauseState> = mutable.asStateFlow()
 
+    fun actionLabel(running: Boolean, boundariesLeft: Int, pause: ManualPauseState): String? = when {
+        !running -> null
+        pause == ManualPauseState.HELD -> "继续"
+        pause == ManualPauseState.REQUESTED -> "取消暂停"
+        boundariesLeft > 0 -> "暂停"
+        else -> null
+    }
+
+    fun toggle() {
+        if (mutable.value == ManualPauseState.NONE) request() else release()
+    }
+
     fun request() { mutable.compareAndSet(ManualPauseState.NONE, ManualPauseState.REQUESTED) }
 
     /** Continues a held session, or withdraws a request that has not reached a boundary yet. */

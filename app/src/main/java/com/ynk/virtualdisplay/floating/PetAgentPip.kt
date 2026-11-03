@@ -68,8 +68,10 @@ private val PipAspect = 1600f / 720f
 fun PetAgentPipHost(modifier: Modifier = Modifier) {
     val runtime by PetRuntime.state.collectAsState()
     val managed by PetManagedRuntime.state.collectAsState()
+    val manualPause by com.ynk.virtualdisplay.automation.ManualPause.state.collectAsState()
     val active = runtime.running || ManagedRuntimePresentation.isActive(managed.runState)
     if (!active) return
+    if (manualPause != com.ynk.virtualdisplay.automation.ManualPauseState.NONE) return
 
     // Releasing the token stops preview scaling work entirely: no viewer, no processing.
     DisposableEffect(Unit) {

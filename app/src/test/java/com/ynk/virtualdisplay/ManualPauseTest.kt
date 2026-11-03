@@ -14,6 +14,15 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ManualPauseTest {
+    @Test
+    fun `controls disappear after the last boundary but keep a pending pause cancellable`() {
+        assertEquals("暂停", ManualPause.actionLabel(true, 1, ManualPauseState.NONE))
+        assertEquals(null, ManualPause.actionLabel(true, 0, ManualPauseState.NONE))
+        assertEquals("取消暂停", ManualPause.actionLabel(true, 0, ManualPauseState.REQUESTED))
+        assertEquals("继续", ManualPause.actionLabel(true, 0, ManualPauseState.HELD))
+        assertEquals(null, ManualPause.actionLabel(false, 1, ManualPauseState.HELD))
+    }
+
     @After
     fun reset() = ManualPause.release()
 

@@ -77,6 +77,11 @@ fun CapsuleExpandedCard(
     }
     val frame by DisplayPreviewHub.frame.collectAsState()
     var previewExpanded by remember { mutableStateOf(false) }
+    val manualPause by com.ynk.virtualdisplay.automation.ManualPause.state.collectAsState()
+    val runtime by com.ynk.virtualdisplay.automation.PetRuntime.state.collectAsState()
+    val managed by com.ynk.virtualdisplay.automation.PetManagedRuntime.state.collectAsState()
+    val pauseLabel = com.ynk.virtualdisplay.automation.ManualPause.actionLabel(
+        runtime.running, managed.pauseBoundariesLeft, manualPause)
     val accent = accentOf(model.visual)
 
     Column(
@@ -162,6 +167,12 @@ fun CapsuleExpandedCard(
 
         Spacer(Modifier.height(12.dp))
 
+        if (pauseLabel != null) {
+            CapsuleActionButton(pauseLabel, PetTokens.BlueSoft, PetTokens.BlueInk, Modifier.fillMaxWidth()) {
+                com.ynk.virtualdisplay.automation.ManualPause.toggle()
+            }
+            Spacer(Modifier.height(8.dp))
+        }
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             CapsuleActionButton("回到蟹啦", PetTokens.BlueSoft, PetTokens.BlueInk, Modifier.weight(1f), onOpenApp)
             if (model.canStop) {

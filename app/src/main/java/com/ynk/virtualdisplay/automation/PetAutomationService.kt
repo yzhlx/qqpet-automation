@@ -20,6 +20,8 @@ import com.ynk.virtualdisplay.R
 import com.ynk.virtualdisplay.data.repository.ConnectionStatus
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -54,11 +56,24 @@ class PetAutomationService : Service() {
         app = application as MyApplication
         app.acquireDisplayRepository("PetAutomationService")
         ensureChannel()
+        scope.launch {
+            combine(PetRuntime.state, PetManagedRuntime.state, ManualPause.state) { runtime, managed, pause ->
+                Triple(runtime.running, runtime.status, ManualPause.actionLabel(runtime.running, managed.pauseBoundariesLeft, pause))
+            }.distinctUntilChanged().collect { (running, status, _) ->
+                if (running) updateNotification(status)
+            }
+        }
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         when (intent?.action) {
             ACTION_STOP -> stopSession("用户停止")
+            ACTION_PAUSE -> {
+                if (ManualPause.actionLabel(PetRuntime.state.value.running,
+                        PetManagedRuntime.state.value.pauseBoundariesLeft, ManualPause.state.value) != null) {
+                    ManualPause.toggle()
+                } else if (job == null) stopSelf()
+            }
             ACTION_SCAN_COURSES -> {
                 val displayId = intent.getIntExtra(EXTRA_DISPLAY_ID, -1)
                 startForeground(NOTIFICATION_ID, notification("读取课程中…"))
@@ -651,6 +666,15 @@ class PetAutomationService : Service() {
             .setContentTitle("蟹啦")
             .setContentText(text)
             .setOngoing(true)
+            .apply {
+                ManualPause.actionLabel(PetRuntime.state.value.running,
+                    PetManagedRuntime.state.value.pauseBoundariesLeft, ManualPause.state.value)?.let { label ->
+                    val pause = PendingIntent.getService(this@PetAutomationService, 3,
+                        Intent(this@PetAutomationService, PetAutomationService::class.java).setAction(ACTION_PAUSE),
+                        PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+                    addAction(0, label, pause)
+                }
+            }
             .addAction(0, "停止", stop)
             .build()
     }
@@ -707,6 +731,7 @@ class PetAutomationService : Service() {
         private const val EXTRA_PLAN_JSON = "plan_json"
         private const val ACTION_START = "com.ynk.virtualdisplay.pet.START"
         private const val ACTION_STOP = "com.ynk.virtualdisplay.pet.STOP"
+        private const val ACTION_PAUSE = "com.ynk.virtualdisplay.pet.PAUSE"
         private const val ACTION_SCAN_COURSES = "com.ynk.virtualdisplay.pet.SCAN_COURSES"
         private const val MAX_WAKELOCK_MS = 8L * 60L * 60L * 1000L
 
