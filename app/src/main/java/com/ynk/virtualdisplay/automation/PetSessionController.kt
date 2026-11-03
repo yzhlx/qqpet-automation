@@ -147,6 +147,8 @@ class PetSessionController(context:Context,capture:HeadlessDisplayCapture,input:
     var completed=0;private set
     var stopReason:String?=null;private set
     private var cancelled=false
+    private var sessionRoomCoinsBefore: Int? = null
+    private var sessionRoomCoinsAfter: Int? = null
     init {require(totalRounds in 1..10)}
 
     /** Production gate receives the wallet read from this payment's verified dialog frame. */
@@ -215,6 +217,10 @@ class PetSessionController(context:Context,capture:HeadlessDisplayCapture,input:
         try {
             flow.state="INITIAL_NAVIGATION"
             navigation.initialise()
+            val initialCoins = readRoomCoins("session-initial-coins")
+            if (initialCoins is ObservedValue.Known && sessionRoomCoinsBefore == null) {
+                sessionRoomCoinsBefore = initialCoins.value
+            }
             // A HEALTH_CHECK session is deliberately not a loop over rounds: it reads the panel
             // once, records it and stops. It never reaches care, study, beforeCourse or the
             // readiness precondition, so it cannot spend a coin or a budget minute.
@@ -446,6 +452,9 @@ class PetSessionController(context:Context,capture:HeadlessDisplayCapture,input:
         // The work pages never show the balance; the room's top bar does. Read it here and again
         // after the shift so the payout is a real balance delta, not only the payroll's own award.
         val roomCoinsBefore=readRoomCoins("work-room-coins-before")
+        if (roomCoinsBefore is ObservedValue.Known && sessionRoomCoinsBefore == null) {
+            sessionRoomCoinsBefore = roomCoinsBefore.value
+        }
         workResources.setCoursePageBalance(roomCoinsBefore as? ObservedValue.Known)
         flow.state="WORK"
         navigation.enterOutdoor("plan-work-outdoor")
@@ -481,6 +490,9 @@ class PetSessionController(context:Context,capture:HeadlessDisplayCapture,input:
         flow.verifySettled(listOf(flow.outdoor),"work-completion-outdoor")
         navigation.returnHomeFromMap("work")
         val roomCoinsAfter=readRoomCoins("work-room-coins-after")
+        if (roomCoinsAfter is ObservedValue.Known) {
+            sessionRoomCoinsAfter = roomCoinsAfter.value
+        }
         if(roomCoinsBefore is ObservedValue.Known && roomCoinsAfter is ObservedValue.Known) {
             val delta=roomCoinsAfter.value-roomCoinsBefore.value
             flow.emit("work-room-balance-delta",result=if(delta>0) "PASS" else "OBSERVED",
@@ -1009,7 +1021,11 @@ class PetSessionController(context:Context,capture:HeadlessDisplayCapture,input:
                 "clean_duration_ms" to care.careStatistics.optLong("clean_duration_ms")),
             "encouragementSent" to ledger.encouragementTotal,
             "courseStarts" to ledger.startedCount,
-            "requestedRounds" to ledger.attemptCount)
+            "requestedRounds" to ledger.attemptCount,
+            "workCompleted" to (planRunSnapshot?.counts?.workShiftsCompleted ?: if (mode == SessionMode.WORK && terminal == SessionRunState.COMPLETED) 1 else 0),
+            "adventureCompleted" to (planRunSnapshot?.counts?.adventureCompleted ?: if (mode == SessionMode.ADVENTURE && terminal == SessionRunState.COMPLETED) 1 else 0),
+            "roomCoinsBefore" to sessionRoomCoinsBefore,
+            "roomCoinsAfter" to sessionRoomCoinsAfter)
         File(evidence,"run-record.json").writeText(EventJson.encode(record))
     }
 }

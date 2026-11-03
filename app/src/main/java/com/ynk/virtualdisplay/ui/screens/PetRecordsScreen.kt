@@ -86,7 +86,7 @@ fun PetRecordsScreen() {
 
     val summary = RecordsPresentation.summary(today, timeFormatter, dateFormatter)
     val focus = today.firstOrNull()
-    val changes = focus?.let { RecordsPresentation.changes(it.rounds) }.orEmpty()
+    val changes = focus?.let { RecordsPresentation.changes(it.rounds, it.record) }.orEmpty()
 
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 15.dp)) {
         Spacer(Modifier.height(2.dp))
@@ -133,8 +133,9 @@ private fun TodayCard(summary: RecordsSummary) {
         Spacer(Modifier.height(11.dp))
         Row(Modifier.fillMaxWidth()) {
             StripCell(summary.courses, "学习 节", Modifier.weight(1f))
+            StripCell(summary.workCount, "打工 班", Modifier.weight(1f))
+            StripCell(summary.adventureCount, "冒险 轮", Modifier.weight(1f))
             StripCell(summary.careCount, "护理 次", Modifier.weight(1f))
-            StripCell(summary.pauseCount, "自动暂停 次", Modifier.weight(1f))
         }
     }
 }

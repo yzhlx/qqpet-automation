@@ -138,4 +138,93 @@ class PlanOrchestrationTest {
         assertEquals("你手动暂停", RecordsPresentation.stopReasonText(ManualPause.REASON))
         assertEquals("今天蟹累了，明天再来", RecordsPresentation.stopReasonText("DAILY_BUDGET_LIMIT"))
     }
+
+    @Test
+    fun sessionRunRecordHoldsMultiTaskCountsAndCoinBalances() {
+        val record = com.ynk.virtualdisplay.ui.data.SessionRunRecord(
+            sessionId = "s-101",
+            terminalState = "COMPLETED",
+            runner = "PetSessionController",
+            rounds = 4,
+            completedRounds = 2,
+            pauseCount = 0,
+            startedAtMs = 1730600000000L,
+            runtimeMs = 1800000L,
+            stopReason = null,
+            moodPolicy = null,
+            energy = null,
+            cleanliness = null,
+            mood = null,
+            care = null,
+            encouragementSent = null,
+            courseStarts = null,
+            requestedRounds = null,
+            workCompleted = 1,
+            adventureCompleted = 1,
+            roomCoinsBefore = 500,
+            roomCoinsAfter = 571
+        )
+        assertEquals(1, record.workCompleted)
+        assertEquals(1, record.adventureCompleted)
+        assertEquals(500, record.roomCoinsBefore)
+        assertEquals(571, record.roomCoinsAfter)
+    }
+
+    @Test
+    fun recordsPresentationAggregatesAndFormatsHonestMultiTaskData() {
+        val record = com.ynk.virtualdisplay.ui.data.SessionRunRecord(
+            sessionId = "s-1",
+            terminalState = "COMPLETED",
+            runner = "test",
+            rounds = 2,
+            completedRounds = 2,
+            pauseCount = 1,
+            startedAtMs = 1730600000000L,
+            runtimeMs = 120000L,
+            stopReason = null,
+            moodPolicy = null,
+            energy = null,
+            cleanliness = null,
+            mood = null,
+            care = null,
+            encouragementSent = null,
+            courseStarts = null,
+            requestedRounds = null,
+            workCompleted = 1,
+            adventureCompleted = 1,
+            roomCoinsBefore = 600,
+            roomCoinsAfter = 671
+        )
+        val evidence = com.ynk.virtualdisplay.ui.data.SessionEvidence(
+            directory = java.io.File("/tmp/dummy-session"),
+            record = record,
+            rounds = emptyList(),
+            screenshots = emptyList(),
+            runtimeStateJson = null
+        )
+
+        val summary = RecordsPresentation.summary(listOf(evidence), { "10:00" }, { "2026-11-03" })
+        assertEquals(2, summary.courses)
+        assertEquals(1, summary.workCount)
+        assertEquals(1, summary.adventureCount)
+
+        val changes = RecordsPresentation.changes(emptyList(), record)
+        val coinMetric = changes.singleOrNull { it.label == "金币" }
+        assertNotNull(coinMetric)
+        assertEquals("+71", coinMetric?.deltaText)
+        assertEquals("600", coinMetric?.beforeText)
+        assertEquals("671", coinMetric?.afterText)
+        assertTrue(coinMetric?.confirmed == true)
+
+        val actions = RecordsPresentation.actions(emptyList(), record)
+        val coinAction = actions.singleOrNull { it.label == "金币变动" }
+        assertNotNull(coinAction)
+        assertEquals("+71", coinAction?.verdict)
+
+        val history = RecordsPresentation.history(listOf(evidence), { "10:00" }, { "2026-11-03" })
+        val row = history.single()
+        assertTrue(row.detail.contains("学习 2/2 节"))
+        assertTrue(row.detail.contains("打工 1 班"))
+        assertTrue(row.detail.contains("冒险 1 轮"))
+    }
 }

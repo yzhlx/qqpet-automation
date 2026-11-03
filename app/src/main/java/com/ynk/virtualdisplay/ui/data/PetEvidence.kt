@@ -131,6 +131,10 @@ data class SessionRunRecord(
     val encouragementSent: Int?,
     val courseStarts: Int?,
     val requestedRounds: Int?,
+    val workCompleted: Int? = null,
+    val adventureCompleted: Int? = null,
+    val roomCoinsBefore: Int? = null,
+    val roomCoinsAfter: Int? = null,
 ) {
     val succeeded get() = terminalState == "COMPLETED"
 
@@ -157,6 +161,10 @@ data class SessionRunRecord(
                 encouragementSent = o.intOrNull("encouragementSent"),
                 courseStarts = o.intOrNull("courseStarts"),
                 requestedRounds = o.intOrNull("requestedRounds"),
+                workCompleted = o.intOrNull("workCompleted"),
+                adventureCompleted = o.intOrNull("adventureCompleted"),
+                roomCoinsBefore = o.intOrNull("roomCoinsBefore"),
+                roomCoinsAfter = o.intOrNull("roomCoinsAfter"),
             )
         }.getOrNull()
     }

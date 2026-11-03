@@ -49,6 +49,8 @@ data class RecordsSummary(
     val courses: Int,
     val careCount: Int,
     val pauseCount: Int,
+    val workCount: Int = 0,
+    val adventureCount: Int = 0,
 )
 
 data class SessionHistoryRow(
@@ -96,7 +98,7 @@ object RecordsPresentation {
     ): RecordsSummary {
         val records = today.mapNotNull { it.record }
         if (records.isEmpty()) {
-            return RecordsSummary(null, null, 0, 0, 0)
+            return RecordsSummary(null, null, 0, 0, 0, 0, 0)
         }
         val starts = records.mapNotNull { it.startedAtMs }
         val rangeText = if (starts.isEmpty()) {
@@ -107,6 +109,8 @@ object RecordsPresentation {
             "今天 ${timeFormatter(start)} – ${timeFormatter(end)}"
         }
         val minutes = records.sumOf { it.runtimeMs } / 60_000L
+        val workCount = records.sumOf { it.workCompleted ?: 0 }
+        val adventureCount = records.sumOf { it.adventureCompleted ?: 0 }
         return RecordsSummary(
             rangeText = rangeText,
             // Time the runs took, which is not the 今日已用 figure: that one counts game minutes.
@@ -114,6 +118,8 @@ object RecordsPresentation {
             courses = records.sumOf { it.completedRounds },
             careCount = records.sumOf { it.care?.total ?: 0 },
             pauseCount = records.sumOf { it.pauseCount },
+            workCount = workCount,
+            adventureCount = adventureCount,
         )
     }
 
@@ -121,22 +127,30 @@ object RecordsPresentation {
      * Health changes across the rounds of one session, deduced from the before → after readings the
      * controller itself recorded. A round whose readings are missing contributes nothing.
      */
-    fun changes(rounds: List<RoundRecord>): List<MetricChange> {
+    fun changes(rounds: List<RoundRecord>, record: SessionRunRecord? = null): List<MetricChange> {
         val usable = rounds.filter { it.before != null && it.after != null }
-        if (usable.isEmpty()) {
-            return listOf(
+        val baseChanges = if (usable.isEmpty()) {
+            listOf(
                 MetricChange("体力", "—", "—", null, "—", "本会话没有成对的读数", false),
                 MetricChange("清洁", "—", "—", null, "—", "本会话没有成对的读数", false),
                 MetricChange("心情", "—", "—", null, "—", "本会话没有成对的读数", false),
             )
+        } else {
+            val first = usable.first().before!!
+            val last = usable.last().after!!
+            listOf(
+                change("体力", first.stamina, last.stamina),
+                change("清洁", first.cleanliness, last.cleanliness),
+                change("心情", first.mood, last.mood),
+            )
         }
-        val first = usable.first().before!!
-        val last = usable.last().after!!
-        return listOf(
-            change("体力", first.stamina, last.stamina),
-            change("清洁", first.cleanliness, last.cleanliness),
-            change("心情", first.mood, last.mood),
-        )
+        val coinBefore = record?.roomCoinsBefore
+        val coinAfter = record?.roomCoinsAfter
+        return if (coinBefore != null && coinAfter != null) {
+            baseChanges + change("金币", coinBefore, coinAfter)
+        } else {
+            baseChanges
+        }
     }
 
     private fun change(label: String, before: Int?, after: Int?): MetricChange {
@@ -204,18 +218,31 @@ object RecordsPresentation {
                 verdictTone = VerdictTone.PENDING,
             )
         }
-        out += ActionOutcome(
-            label = "剩余库存",
-            meta = "游戏未提供可稳定识别的位置",
-            verdict = "未知",
-            verdictTone = VerdictTone.UNKNOWN,
-        )
-        out += ActionOutcome(
-            label = "金币 / 属性 / 库存",
-            meta = "本版本未接入读取器（NO_READER_IN_SLICE1）",
-            verdict = "不支持读取",
-            verdictTone = VerdictTone.UNKNOWN,
-        )
+        val coinBefore = record?.roomCoinsBefore
+        val coinAfter = record?.roomCoinsAfter
+        if (coinBefore != null && coinAfter != null) {
+            val delta = coinAfter - coinBefore
+            val deltaStr = if (delta >= 0) "+$delta" else "$delta"
+            out += ActionOutcome(
+                label = "金币变动",
+                meta = "房间顶栏实际读数 $coinBefore → $coinAfter",
+                verdict = deltaStr,
+                verdictTone = if (delta >= 0) VerdictTone.CONFIRMED else VerdictTone.PENDING,
+            )
+        } else {
+            out += ActionOutcome(
+                label = "剩余库存",
+                meta = "游戏未提供可稳定识别的位置",
+                verdict = "未知",
+                verdictTone = VerdictTone.UNKNOWN,
+            )
+            out += ActionOutcome(
+                label = "金币 / 属性 / 库存",
+                meta = "本版本未接入读取器（NO_READER_IN_SLICE1）",
+                verdict = "不支持读取",
+                verdictTone = VerdictTone.UNKNOWN,
+            )
+        }
         return out
     }
 
@@ -235,12 +262,23 @@ object RecordsPresentation {
         val whenText = record.startedAtMs?.let { ms ->
             "${dateFormatter(ms)} ${timeFormatter(ms)}"
         } ?: "时间未记录"
+        val taskParts = mutableListOf<String>()
+        if (record.completedRounds > 0 || record.rounds > 0) {
+            taskParts += "学习 ${record.completedRounds}/${record.rounds} 节"
+        }
+        if ((record.workCompleted ?: 0) > 0) {
+            taskParts += "打工 ${record.workCompleted} 班"
+        }
+        if ((record.adventureCompleted ?: 0) > 0) {
+            taskParts += "冒险 ${record.adventureCompleted} 轮"
+        }
+        val taskDesc = if (taskParts.isEmpty()) "完成 ${record.completedRounds}/${record.rounds} 节" else taskParts.joinToString(" · ")
         SessionHistoryRow(
             id = ev.id,
             whenText = whenText,
             outcomeText = text,
             outcomeTone = tone,
-            detail = "完成 ${record.completedRounds}/${record.rounds} 节 · " +
+            detail = "$taskDesc · " +
                 "${record.runtimeMs / 60_000L} 分钟 · 护理 ${record.care?.total ?: 0} 次" +
                 (record.stopReason?.let { " · ${stopReasonText(it)}" } ?: ""),
             screenshots = ev.screenshots.size,
