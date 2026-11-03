@@ -649,6 +649,8 @@ class PetNavigation(private val flow: PetFlowContext, private val workReader: Wo
          */
         const val labelOffsetSweepPx=4
 
+        /** Map hold plus the slide itself, with room for a slow frame. */
+        const val ACADEMY_SETTLE_MS=8000L
         /** The shipped label pill; exposed so the device test builds the identical template. */
         const val ACADEMY_LABEL_ASSET="pet_mvp/academy_primary_label.png"
 
@@ -1302,9 +1304,7 @@ class PetNavigation(private val flow: PetFlowContext, private val workReader: Wo
         val upgraded=try {score(next,listOf(upgrade))>=profile.matchThreshold} finally {next.recycle()}
         if(upgraded) dismissUpgradeIfPresent(action)
         else verifySettled(listOf(academy,profile.courseListProbe),"$action-continue-after")
-        val current=frame()
-        val panelOpen=try {score(current,listOf(profile.courseListProbe))>=profile.matchThreshold} finally {current.recycle()}
-        if(panelOpen) tap(profile.courseListProbe,PointF(80f,160f),academy,"$action-close-course")
+        if(awaitAcademySettled("$action-academy-settled")) tap(profile.courseListProbe,PointF(80f,160f),academy,"$action-close-course")
         tap(academy,PointF(80f,160f),outdoor,"$action-leave-academy")
         returnHomeFromMap(action)
     }
@@ -1388,6 +1388,31 @@ class PetNavigation(private val flow: PetFlowContext, private val workReader: Wo
             }
         }
     }
+    /**
+     * Waits until the academy map settles (see [AcademyPanelSettle]) and returns true when the
+     * course panel is open. Sends no input; a page that never settles stops the flow.
+     */
+    private suspend fun awaitAcademySettled(name: String): Boolean = with(flow) {
+        val settle=AcademyPanelSettle(profile.matchThreshold)
+        val deadline=SystemClock.elapsedRealtime()+ACADEMY_SETTLE_MS
+        var mapScore=0.0
+        while(SystemClock.elapsedRealtime()<deadline) {
+            val current=frame(latest=true)
+            try {
+                mapScore=score(current,listOf(academy))
+                val panelScore=score(current,listOf(profile.courseListProbe))
+                val page=settle.observe(SystemClock.elapsedRealtime(),mapScore,panelScore)
+                emit(name,maxOf(mapScore,panelScore),capture.telemetry().put("mapScore",mapScore)
+                    .put("panelScore",panelScore).put("result",page?.name ?: "SETTLING").toString())
+                if(page!=null) {
+                    save(current,name)
+                    return@with page==AcademyPanelSettle.Page.PANEL
+                }
+            } finally {current.recycle()}
+            delay(300)
+        }
+        error("ACADEMY_PAGE_UNCONFIRMED:$mapScore")
+    }
     private suspend fun coursePanelOpen(): Boolean = with(flow) {
         val current=frame()
         try {score(current,listOf(profile.courseListProbe))>=profile.matchThreshold} finally {current.recycle()}
@@ -1400,22 +1425,9 @@ class PetNavigation(private val flow: PetFlowContext, private val workReader: Wo
         delay(profile.pageSettleMs)
         verifySettled(listOf(academy),"academy-map")
         // Real run 1791201870302 showed the panel was already open before this click;
-        // tapping its school label again toggled it closed. Use the existing panel probe.
-        val current=frame(latest=true)
-        try {
-            val panelScore=score(current,listOf(profile.courseListProbe))
-            if(panelScore>=profile.matchThreshold) {
-                save(current,"academy-course-panel-already-open")
-                emit("academy-course-panel-already-open",panelScore,capture.telemetry()
-                    .put("templateName",profile.courseListProbe.name).put("result","PASS").toString())
-                return@with
-            }
-            val mapScore=score(current,listOf(academy))
-            check(mapScore>=profile.matchThreshold) { "ACADEMY_PAGE_UNCONFIRMED:$mapScore" }
-            save(current,"enter-primary-academy-before")
-            emit("enter-primary-academy-before",mapScore,capture.telemetry()
-                .put("templateName",academy.name).put("result","PASS").toString())
-        } finally {current.recycle()}
+        // tapping its school label again toggled it closed. The panel also slides up on its own
+        // after the map appears, so the page must settle before either is believed.
+        if(awaitAcademySettled("academy-course-panel-settled")) return@with
         // The entry is the localized 初级学园 label, never a fixed point. A tap is only allowed
         // after two consecutive fresh frames each matched it at the unchanged threshold with a
         // stable centre, and a second tap only after the panel is positively absent. Everything
@@ -1562,7 +1574,10 @@ class PetNavigation(private val flow: PetFlowContext, private val workReader: Wo
             "course_list" -> {tap(profile.courseListProbe,PointF(80f,160f),academy,"initial-close-panel")
                 tap(academy,PointF(80f,160f),outdoor,"initial-leave-academy")
                 returnHomeFromMap("initial")}
-            "academy" -> {tap(academy,PointF(80f,160f),outdoor,"initial-leave-academy")
+            "academy" -> {
+                if(awaitAcademySettled("initial-academy-settled"))
+                    tap(profile.courseListProbe,PointF(80f,160f),academy,"initial-close-panel")
+                tap(academy,PointF(80f,160f),outdoor,"initial-leave-academy")
                 returnHomeFromMap("initial")}
             "outdoor" -> returnHomeFromMap("initial")
             "LEARNING" -> error("ACTIVE_COURSE_WITHOUT_OWNED_CHECKPOINT")
