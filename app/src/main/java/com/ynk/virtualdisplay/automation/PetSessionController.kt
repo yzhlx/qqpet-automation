@@ -390,6 +390,10 @@ class PetSessionController(context:Context,capture:HeadlessDisplayCapture,input:
             return StepOutcome.Skipped(SkipReason.FUNDS_SUFFICIENT)
         }
         care.readHealth("work-before")
+        // The work pages never show the balance; the room's top bar does. Read it here and again
+        // after the shift so the payout is a real balance delta, not only the payroll's own award.
+        val roomCoinsBefore=readRoomCoins("work-room-coins-before")
+        workResources.setCoursePageBalance(roomCoinsBefore as? ObservedValue.Known)
         flow.state="WORK"
         navigation.enterOutdoor("plan-work-outdoor")
         val target=WorkTarget(entry.venue,entry.optionLabel,entry.id)
@@ -408,7 +412,34 @@ class PetSessionController(context:Context,capture:HeadlessDisplayCapture,input:
         check(workPageReader.dismissCompletion()) {"WORK_COMPLETION_DISMISS_UNCONFIRMED"}
         flow.verifySettled(listOf(flow.outdoor),"work-completion-outdoor")
         navigation.returnHomeFromMap("work")
+        val roomCoinsAfter=readRoomCoins("work-room-coins-after")
+        if(roomCoinsBefore is ObservedValue.Known && roomCoinsAfter is ObservedValue.Known) {
+            val delta=roomCoinsAfter.value-roomCoinsBefore.value
+            flow.emit("work-room-balance-delta",result=if(delta>0) "PASS" else "OBSERVED",
+                reason="before=${roomCoinsBefore.value}|after=${roomCoinsAfter.value}|delta=$delta")
+        }
         return StepOutcome.Completed()
+    }
+
+    /**
+     * Coins off the room's top bar, or Unknown (never 0). Evidence only: a failed read never stops the
+     * plan, it only leaves the payout proved by the payroll award alone.
+     */
+    private suspend fun readRoomCoins(tag:String):ObservedValue<Int> {
+        val now=System.currentTimeMillis()
+        val value=try {
+            val f=flow.frame(latest=true)
+            try {
+                if(flow.score(f,listOf(flow.room))<flow.profile.matchThreshold) ObservedValue.Unknown("ROOM_UNCONFIRMED",now,tag)
+                else DeviceWalletReader(reader).read(f,now,"room-top-bar:$tag")
+            } finally {f.recycle()}
+        } catch(t:Exception) {
+            if(t is kotlinx.coroutines.CancellationException) throw t
+            ObservedValue.Unknown("ROOM_COINS_READ_FAILED:${t.javaClass.simpleName}",now,tag)
+        }
+        flow.emit(tag,result=if(value is ObservedValue.Known) "PASS" else "UNREAD",
+            reason=if(value is ObservedValue.Known) "coins=${value.value}" else (value as ObservedValue.Unknown).reason)
+        return value
     }
 
     /**

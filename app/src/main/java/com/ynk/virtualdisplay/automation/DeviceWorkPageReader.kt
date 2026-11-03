@@ -184,6 +184,9 @@ class DeviceWorkPageReader(
         return if (payrollSeen) {
             CompletionResult(true, 0, "COMPLETION_MINUTES_UNREAD")
         } else {
+            // The page the shift ended on is the only evidence of why: 2026-11-03 it was the outdoor
+            // map after the Wi-Fi dropped at the shift's last second, found only by a manual capture.
+            saveCurrent("work-completion-unobserved")
             CompletionResult(false, 0, "TIMER_EXPIRED_PAGE_NOT_FINISHED")
         }
     }
@@ -306,6 +309,16 @@ class DeviceWorkPageReader(
         }
         emit("work-completion-dismiss", result = "FAIL", reason = "PAYROLL_RETURN_DESTINATION_UNCONFIRMED")
         PayrollNavigationPolicy.ExitResult(PayrollNavigationPolicy.Page.UNKNOWN, "PAYROLL_RETURN_DESTINATION_UNCONFIRMED")
+    }
+
+    /** Evidence only: a failed capture must not replace the failure it was meant to document. */
+    private suspend fun saveCurrent(name: String) = with(flow) {
+        try {
+            val f = frame()
+            try { save(f, name) } finally { f.recycle() }
+        } catch (t: Exception) {
+            if (t is kotlinx.coroutines.CancellationException) throw t
+        }
     }
 
     private suspend fun readLines(): List<TextLine> = with(flow) {

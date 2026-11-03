@@ -61,6 +61,19 @@ class RoomWalletParserTest {
         assertEquals(86, (value as ObservedValue.Known).value)
     }
 
+    @Test fun aSecondReadOfTheLeadingDigitIsNotAnotherNumber() {
+        // 2026-11-03: balance 670 read as "670" plus "6", reported AMBIGUOUS:670/6.
+        val lines = listOf(line("670", 525, 260, w = 44), line("6", 508, 260, w = 12))
+        val value = RoomWalletParser.parse(lines, width, height, 1000L, "fixture")
+        assertEquals(670, (value as ObservedValue.Known).value)
+    }
+
+    @Test fun aSubstringBesideTheNumberStaysAmbiguous() {
+        val lines = listOf(line("670", 520, 260, w = 30), line("6", 550, 260, w = 10))
+        val value = RoomWalletParser.parse(lines, width, height, 1000L, "fixture")
+        assertTrue(value is ObservedValue.Unknown)
+    }
+
     @Test fun zeroIsAReadableBalance() {
         val value = RoomWalletParser.parse(
             listOf(line("0", 524, 260)), width, height, 1000L, "fixture")

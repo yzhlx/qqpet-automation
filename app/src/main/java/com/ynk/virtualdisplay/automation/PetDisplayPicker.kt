@@ -29,6 +29,27 @@ object PetDisplayPicker {
     }
 
     /**
+     * Managed screens of the calibrated size that 一键创建 left behind empty, safe to release.
+     *
+     * Only once QQ is confirmed on [keep]: without that proof no screen is known to be spare. A screen
+     * QQ is on is never a leftover, and neither is an unmanaged one (this app holds no handle to it).
+     */
+    fun leftovers(
+        displays: List<Candidate>,
+        width: Int,
+        height: Int,
+        managedIds: Set<Int>,
+        qqDisplayIds: Set<Int>,
+        keep: Int?,
+    ): List<Int> {
+        if (keep == null || keep !in qqDisplayIds) return emptyList()
+        return displays.filter {
+            it.width == width && it.height == height && it.id != keep &&
+                it.id in managedIds && it.id !in qqDisplayIds
+        }.map { it.id }.sorted()
+    }
+
+    /**
      * Display ids that hold an activity of [packageName], read from `dumpsys activity activities`.
      * Sections start with `Display #N`; an `ActivityRecord{… u0 pkg/…}` line inside belongs to N.
      */

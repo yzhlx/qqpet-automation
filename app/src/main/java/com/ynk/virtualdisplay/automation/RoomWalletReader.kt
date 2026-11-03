@@ -55,23 +55,40 @@ object RoomWalletParser {
         val cy = COIN_CENTRE_Y * frameHeight
         val halfW = COIN_HALF_WIDTH * frameWidth
         val halfH = COIN_HALF_HEIGHT * frameHeight
-        val candidates = lines.mapNotNull { line ->
+        val inRegion = lines.filter { line ->
             val bounds = line.bounds
             val lineCx = (bounds.left + bounds.right) / 2f
             val lineCy = (bounds.top + bounds.bottom) / 2f
-            val inside = kotlin.math.abs(lineCx - cx) <= halfW && kotlin.math.abs(lineCy - cy) <= halfH
-            val text = line.text.trim()
-            if (!inside || !DIGITS.matches(text)) null else text.toIntOrNull()
+            kotlin.math.abs(lineCx - cx) <= halfW && kotlin.math.abs(lineCy - cy) <= halfH &&
+                DIGITS.matches(line.text.trim())
         }
+        val candidates = inRegion.filterNot { part -> inRegion.any { whole -> isFragmentOf(part, whole) } }
         return when {
             candidates.size == 1 -> ObservedValue.Known(
-                candidates.single(), observedAt, 1.0, evidence, ObservationSource.DIGIT_RECOGNITION)
+                candidates.single().text.trim().toInt(), observedAt, 1.0, evidence, ObservationSource.DIGIT_RECOGNITION)
             candidates.isEmpty() ->
                 ObservedValue.Unknown("WALLET_COIN_REGION_UNREAD", observedAt, evidence)
             else -> ObservedValue.Unknown(
-                "WALLET_COIN_REGION_AMBIGUOUS:${candidates.joinToString("/")}", observedAt, evidence)
+                "WALLET_COIN_REGION_AMBIGUOUS:" + candidates.joinToString("/") {
+                    "${it.text.trim()}@${it.bounds.left}-${it.bounds.right}"
+                }, observedAt, evidence)
         }
     }
+
+    /**
+     * A second read of part of the same number: its digits are a strict substring of [whole]'s and it
+     * sits over [whole]'s span. Measured 2026-11-03 (balance 670): ML Kit returned "670" and "6"
+     * together and the read failed as AMBIGUOUS:670/6. Two different numbers stay ambiguous.
+     */
+    private fun isFragmentOf(part: TextLine, whole: TextLine): Boolean {
+        val p = part.text.trim()
+        val w = whole.text.trim()
+        if (p.length >= w.length || !w.contains(p)) return false
+        val partCx = (part.bounds.left + part.bounds.right) / 2f
+        return partCx >= whole.bounds.left - FRAGMENT_SLACK_PX && partCx <= whole.bounds.right + FRAGMENT_SLACK_PX
+    }
+
+    private const val FRAGMENT_SLACK_PX = 4
 }
 
 /**

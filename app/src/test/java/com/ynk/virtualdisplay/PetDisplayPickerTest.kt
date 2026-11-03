@@ -30,6 +30,23 @@ class PetDisplayPickerTest {
         assertNull(PetDisplayPicker.pick(listOf(Candidate(9, 1080, 1920)), 720, 1600, setOf(9), setOf(9)))
     }
 
+    @Test fun emptyManagedScreensAreLeftoversOnceQqIsFound() {
+        // 2026-11-03: 28 and 29 stayed empty beside QQ on 30.
+        assertEquals(listOf(28, 29), PetDisplayPicker.leftovers(phone, 720, 1600, setOf(28, 29, 30), setOf(30), 30))
+        assertEquals(listOf(29), PetDisplayPicker.leftovers(phone, 720, 1600, setOf(29, 30), setOf(30), 30))
+    }
+
+    @Test fun nothingIsReleasedWithoutProofOfTheQqScreen() {
+        assertEquals(emptyList<Int>(), PetDisplayPicker.leftovers(phone, 720, 1600, setOf(28, 29, 30), emptySet(), 30))
+        assertEquals(emptyList<Int>(), PetDisplayPicker.leftovers(phone, 720, 1600, setOf(28, 29, 30), setOf(30), null))
+        assertEquals(emptyList<Int>(), PetDisplayPicker.leftovers(phone, 720, 1600, setOf(28, 29, 30), setOf(30), 29))
+    }
+
+    @Test fun otherSizesAndQqScreensAreKept() {
+        val mixed = phone + Candidate(31, 1080, 1920)
+        assertEquals(listOf(28), PetDisplayPicker.leftovers(mixed, 720, 1600, setOf(28, 29, 30, 31), setOf(29, 30), 30))
+    }
+
     @Test fun dumpsysSectionsAttributeQqToItsDisplay() {
         val dumpsys = """
             Display #0 (activities from top to bottom):

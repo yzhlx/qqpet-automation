@@ -14,6 +14,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.ynk.virtualdisplay.automation.PetDisplayPicker
 import com.ynk.virtualdisplay.automation.PetProfile
+import com.ynk.virtualdisplay.automation.PetRuntime
 import com.ynk.virtualdisplay.data.model.ShizukuState
 import com.ynk.virtualdisplay.data.repository.IDisplayRepository
 import com.ynk.virtualdisplay.data.repository.ConnectionStatus
@@ -330,7 +331,30 @@ class MainViewModel(
                 qqDisplayIds = hosting,
                 petDisplayId = pickPetDisplay(it.displays, repository.managedDisplayIds.value, hosting),
             ) }
+            releaseLeftoverPetDisplays(context)
         }
+    }
+
+    /**
+     * Releases the empty screens earlier 一键创建 runs left beside the QQ screen (2026-11-03: 28 and
+     * 29 beside QQ on 30). Never during a creation, whose new screen is empty until QQ arrives, and
+     * never while a session runs.
+     */
+    private suspend fun releaseLeftoverPetDisplays(context: Context) {
+        val state = _uiState.value
+        if (state.isLoading || PetRuntime.state.value.running) return
+        val profile = PetProfile.calibrated()
+        val leftovers = PetDisplayPicker.leftovers(
+            state.displays.map { PetDisplayPicker.Candidate(it.id, it.width, it.height) },
+            profile.displayWidth, profile.displayHeight,
+            repository.managedDisplayIds.value, state.qqDisplayIds, state.petDisplayId,
+        )
+        if (leftovers.isEmpty()) return
+        leftovers.forEach { id ->
+            repository.releaseDisplay(id).onFailure { Log.w("MainViewModel", "release leftover $id failed", it) }
+        }
+        Log.i("MainViewModel", "released leftover pet displays $leftovers")
+        refreshDisplays(context)
     }
 
     private fun pickPetDisplay(displays: List<DisplayInfoModel>, managed: Set<Int>, qq: Set<Int>): Int? {
