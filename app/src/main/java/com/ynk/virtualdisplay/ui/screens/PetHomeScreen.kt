@@ -1,5 +1,6 @@
 package com.ynk.virtualdisplay.ui.screens
 
+import com.ynk.virtualdisplay.ui.main.petDisplay
 import android.content.Intent
 import android.os.SystemClock
 import androidx.compose.foundation.background
@@ -159,9 +160,7 @@ fun PetHomeScreen(
     val health = HealthStatPresentation.stats(managed, wallNowMs, managedView.sessionIsCurrent, fmt)
     val pill = StatusPillPresentation.of(managedView, runtime.running)
 
-    val readyDisplay = uiState.displays.firstOrNull {
-        it.width == profile.displayWidth && it.height == profile.displayHeight
-    }
+    val readyDisplay = uiState.petDisplay
     val managedIds by viewModel.repository.managedDisplayIds.collectAsState()
     val canStart = uiState.shizukuState is ShizukuState.Ready &&
         readyDisplay != null && readyDisplay.id in managedIds && profileErrors.isEmpty()

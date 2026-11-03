@@ -80,4 +80,10 @@ interface IDisplayService {
      * 重新调整指定虚拟显示器的物理尺寸和 DPI。
      */
     void resizeVirtualDisplay(int displayId, int width, int height, int dpi);
+
+    /**
+     * 返回当前有该应用 Activity 的 displayId 列表（读 dumpsys activity activities）。
+     * 用于从多个后台画面里认出 QQ 所在的那个。
+     */
+    int[] getDisplaysHostingPackage(String packageName);
 }

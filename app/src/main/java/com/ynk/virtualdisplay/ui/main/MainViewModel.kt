@@ -12,6 +12,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.ynk.virtualdisplay.automation.PetDisplayPicker
+import com.ynk.virtualdisplay.automation.PetProfile
 import com.ynk.virtualdisplay.data.model.ShizukuState
 import com.ynk.virtualdisplay.data.repository.IDisplayRepository
 import com.ynk.virtualdisplay.data.repository.ConnectionStatus
@@ -170,7 +172,8 @@ class MainViewModel(
             ).onSuccess { displayId ->
                 refreshDisplays(appContext)
                 // QQ opening is best effort: the user only needs the pet screen, which they open next.
-                val launched = repository.launchApp("com.tencent.mobileqq", displayId).isSuccess
+                val launched = repository.launchApp(PetDisplayPicker.QQ_PACKAGE, displayId).isSuccess
+                refreshDisplays(appContext)
                 _uiState.update { it.copy(
                     isLoading = false,
                     statusMessage = if (launched) "虚拟屏已创建" else "虚拟屏已创建，QQ 没有自动打开",
@@ -318,8 +321,24 @@ class MainViewModel(
         _uiState.update { it.copy(
             displays = displaysList,
             orphanDisplayIds = orphans,
+            petDisplayId = pickPetDisplay(displaysList, managedByService, it.qqDisplayIds),
             statusMessage = if (it.statusMessage.startsWith("Error:")) it.statusMessage else "Displays refreshed"
         ) }
+        viewModelScope.launch {
+            val hosting = repository.displaysHosting(PetDisplayPicker.QQ_PACKAGE).getOrNull() ?: return@launch
+            _uiState.update { it.copy(
+                qqDisplayIds = hosting,
+                petDisplayId = pickPetDisplay(it.displays, repository.managedDisplayIds.value, hosting),
+            ) }
+        }
+    }
+
+    private fun pickPetDisplay(displays: List<DisplayInfoModel>, managed: Set<Int>, qq: Set<Int>): Int? {
+        val profile = PetProfile.calibrated()
+        return PetDisplayPicker.pick(
+            displays.map { PetDisplayPicker.Candidate(it.id, it.width, it.height) },
+            profile.displayWidth, profile.displayHeight, managed, qq,
+        )
     }
 
     fun releaseDisplay(displayId: Int, context: Context) {

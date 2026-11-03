@@ -17,6 +17,7 @@ import com.genymobile.scrcpy.device.Device
 import com.genymobile.scrcpy.wrappers.ServiceManager
 import org.lsposed.hiddenapibypass.HiddenApiBypass
 import java.util.concurrent.ConcurrentHashMap
+import com.ynk.virtualdisplay.automation.PetDisplayPicker
 import android.media.ImageReader
 import android.graphics.PixelFormat
 import android.os.HandlerThread
@@ -88,6 +89,13 @@ class DisplayUserService @Keep constructor(private val context: Context) : IDisp
                 }
             }.onFailure { Log.w(TAG, "Stale $suffix cleanup failed", it) }
         }
+    }
+
+    override fun getDisplaysHostingPackage(packageName: String): IntArray {
+        val dumpsys = ProcessBuilder("dumpsys", "activity", "activities").redirectErrorStream(true).start()
+        val output = dumpsys.inputStream.bufferedReader().use { it.readText() }
+        dumpsys.waitFor()
+        return PetDisplayPicker.displaysHosting(output, packageName).toIntArray()
     }
 
     private fun getCurrentProcessName(): String {

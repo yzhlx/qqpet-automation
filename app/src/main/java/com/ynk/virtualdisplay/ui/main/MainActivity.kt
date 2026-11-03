@@ -153,10 +153,7 @@ private fun PetApp(uiState: MainUiState, viewModel: MainViewModel) {
                 OverlayScreen.PLAN_SHEET -> PetPlanSheetScreen(
                     onClose = { viewModel.closeOverlay() },
                     onStarted = { viewModel.switchTab(ScreenTab.HOST) },
-                    displayId = uiState.displays.firstOrNull {
-                        it.width == com.ynk.virtualdisplay.automation.PetProfile.calibrated().displayWidth &&
-                            it.height == com.ynk.virtualdisplay.automation.PetProfile.calibrated().displayHeight
-                    }?.id,
+                    displayId = uiState.petDisplayId,
                 )
 
                 OverlayScreen.LOGS -> PetLogScreen(onClose = { viewModel.closeOverlay() })

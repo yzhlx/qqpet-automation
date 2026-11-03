@@ -1,5 +1,6 @@
 package com.ynk.virtualdisplay.ui.screens
 
+import com.ynk.virtualdisplay.ui.main.petDisplay
 import android.graphics.Bitmap
 import android.widget.Toast
 import androidx.compose.foundation.layout.Arrangement
@@ -56,9 +57,7 @@ fun PetCalibrationScreen(viewModel: MainViewModel) {
     var lastSaved by remember { mutableStateOf<String?>(null) }
 
     val uiState by viewModel.uiState.collectAsState()
-    val target = uiState.displays.firstOrNull {
-        it.width == profile.displayWidth && it.height == profile.displayHeight
-    }
+    val target = uiState.petDisplay
 
     Column(Modifier.fillMaxSize()) {
         Column(

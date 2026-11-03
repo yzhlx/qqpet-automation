@@ -1260,7 +1260,18 @@ class PetNavigation(private val flow: PetFlowContext, private val workReader: Wo
             try {
                 verifySettled(listOf(outdoor), "${serial++}-$action-after")
             } catch (mismatch: IllegalStateException) {
-                if (mismatch is kotlinx.coroutines.CancellationException || workReader?.readPayrollPage() != true) throw mismatch
+                if (mismatch is kotlinx.coroutines.CancellationException) throw mismatch
+                // A class report the player never closed opens the same way: 出门 showed the 01:26
+                // 宠物成绩单 instead of the map and the run stopped at outdoor 0.809 (measured
+                // 2026-11-03, 1.0.99). Its back arrow leads to the map.
+                val reportScore = frame().let { f -> try { score(f, listOf(profile.resultProbe)) } finally { f.recycle() } }
+                if (reportScore >= profile.matchThreshold) {
+                    emit("$action-leave-result", reportScore, "RESULT")
+                    safety(); input.tap(PAYROLL_BACK_X, BACK_Y); delay(profile.pageSettleMs)
+                    verifySettled(listOf(outdoor), "${serial++}-$action-after-result")
+                    return@with
+                }
+                if (workReader?.readPayrollPage() != true) throw mismatch
                 emit("$action-leave-payroll", null, "PAYROLL")
                 safety(); input.tap(PAYROLL_BACK_X, BACK_Y); delay(profile.pageSettleMs)
                 verifySettled(listOf(outdoor), "${serial++}-$action-after-payroll")

@@ -33,6 +33,9 @@ interface IDisplayRepository {
      */
     val managedDisplayIds: StateFlow<Set<Int>>
 
+    /** Displays that currently hold an activity of [packageName]; empty when the service can't tell. */
+    suspend fun displaysHosting(packageName: String): Result<Set<Int>> = Result.success(emptySet())
+
     /**
      * 绑定并初始化 Shizuku 服务
      */

@@ -1,5 +1,6 @@
 package com.ynk.virtualdisplay.ui.screens
 
+import com.ynk.virtualdisplay.ui.main.petDisplay
 import android.app.NotificationManager
 import android.content.ActivityNotFoundException
 import android.content.Context
@@ -120,9 +121,7 @@ fun PetSettingsScreen(
     }
 
     val shizukuReady = uiState.shizukuState is ShizukuState.Ready
-    val petDisplay = uiState.displays.firstOrNull {
-        it.width == profile.displayWidth && it.height == profile.displayHeight
-    }
+    val petDisplay = uiState.petDisplay
     val petDisplayManaged = petDisplay != null && petDisplay.id in managedIds
 
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 15.dp)) {
