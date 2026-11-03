@@ -6,7 +6,7 @@ enum class RunOrigin { WORK_SHORTCUT, CARE_SHORTCUT, STUDY_SHORTCUT, ADVENTURE_S
 enum class RunState { CREATED, PREFLIGHT, RUNNING, COMPLETED, STOPPED, FAILED, UNCONFIRMED }
 enum class StepState { PENDING, RUNNING, COMPLETED, SKIPPED, BLOCKED, FAILED, UNCONFIRMED, CANCELLED }
 enum class AttemptState { PREPARED, BUDGET_RESERVED, INPUT_PENDING, START_CONFIRMED, COMPLETED, UNCONFIRMED }
-enum class SkipReason { FUNDS_SUFFICIENT, ALREADY_SATISFIED, DAILY_LIMIT_REACHED }
+enum class SkipReason { FUNDS_SUFFICIENT, ALREADY_SATISFIED, DAILY_LIMIT_REACHED, UNAVAILABLE }
 
 /** Length-prefixing avoids collisions when IDs themselves contain separators. */
 data class AttemptId(val runId: String, val stepId: String, val iteration: Int) {
@@ -54,9 +54,10 @@ data class RunCounts(
     val adventureCompleted: Int = 0,
     val signInCompleted: Int = 0,
     val mailboxCompleted: Int = 0,
+    val luckyBagCompleted: Int = 0,
 ) {
     init {
-        require(workShiftsCompleted >= 0 && careCompleted >= 0 && studyRoundsCompleted >= 0 && adventureCompleted >= 0 && signInCompleted >= 0 && mailboxCompleted >= 0) { "RUN_COUNT_NEGATIVE" }
+        require(workShiftsCompleted >= 0 && careCompleted >= 0 && studyRoundsCompleted >= 0 && adventureCompleted >= 0 && signInCompleted >= 0 && mailboxCompleted >= 0 && luckyBagCompleted >= 0) { "RUN_COUNT_NEGATIVE" }
     }
 }
 
@@ -82,6 +83,7 @@ class StepExecution(
                 (type == PlanStepType.CARE && reason == SkipReason.ALREADY_SATISFIED.name) ||
                 (type == PlanStepType.SIGN_IN && reason == SkipReason.ALREADY_SATISFIED.name) ||
                 (type == PlanStepType.MAILBOX && reason == SkipReason.ALREADY_SATISFIED.name) ||
+                (type == PlanStepType.LUCKY_BAG && (reason == SkipReason.ALREADY_SATISFIED.name || reason == SkipReason.DAILY_LIMIT_REACHED.name || reason == SkipReason.UNAVAILABLE.name)) ||
                 (type == PlanStepType.ADVENTURE && (reason == SkipReason.ALREADY_SATISFIED.name || reason == SkipReason.DAILY_LIMIT_REACHED.name))) { "STEP_SKIP_REASON_INVALID" }
         }
         if (state in setOf(StepState.BLOCKED, StepState.FAILED, StepState.UNCONFIRMED, StepState.CANCELLED)) {

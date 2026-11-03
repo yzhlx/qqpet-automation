@@ -25,6 +25,7 @@ class PlanV2StoreTest {
             val steps = order.map { type -> when (type) {
                 PlanStepType.SIGN_IN -> SignInStep("si")
                 PlanStepType.MAILBOX -> MailboxStep("mb")
+                PlanStepType.LUCKY_BAG -> LuckyBagStep("lb", 5, 30)
                 PlanStepType.WORK -> WorkStep("w", "work:竹影武馆/帮武馆跑腿")
                 PlanStepType.CARE -> CareStep("c", 70, 80)
                 PlanStepType.STUDY -> StudyStep("s", "study:田径运动课", 4)
@@ -169,5 +170,17 @@ class PlanV2StoreTest {
         assertTrue(file.isFile)
         assertTrue(file.readText(Charsets.UTF_8).contains("田径运动课"))
         assertEquals(expected, PlanV2Store(file).load())
+    }
+
+    @Test fun luckyBagStepRoundtripsWithLimitsAndInterval() {
+        val file = File(temporary.root, PlanV2Store.FILE_NAME)
+        val p = plan(listOf(LuckyBagStep("lb-1", 10, 45)))
+        PlanV2Store(file).save(p)
+        val loaded = PlanV2Store(file).load()
+        assertNotNull(loaded)
+        val step = loaded!!.steps.single() as LuckyBagStep
+        assertEquals("lb-1", step.stepId)
+        assertEquals(10, step.maxDailyCount)
+        assertEquals(45, step.scanIntervalMinutes)
     }
 }

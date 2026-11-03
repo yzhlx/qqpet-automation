@@ -414,6 +414,7 @@ class PetSessionController(context:Context,capture:HeadlessDisplayCapture,input:
         val execution=PlanDeviceExecution(store,checkNotNull(planAttemptBudget),preflight,
             signIn={step,ctx -> pausePoint("每日签到");activePlanContext=ctx;runPlanSignIn(step)},
             mailbox={step,ctx -> pausePoint("信箱待领");activePlanContext=ctx;runPlanMailbox(step)},
+            luckyBag={step,ctx -> pausePoint("福袋任务");activePlanContext=ctx;runPlanLuckyBag(step)},
             work={step,ctx -> pausePoint("打工");activePlanContext=ctx;runPlanWork(step)},
             care={step,ctx -> pausePoint("护理");activePlanContext=ctx;runPlanCare(step)},
             study={step,ctx -> activePlanContext=ctx;runPlanStudy(step)},
@@ -714,6 +715,74 @@ class PetSessionController(context:Context,capture:HeadlessDisplayCapture,input:
                 ctx.unconfirmed(1, outcome.reason)
                 flow.emit("plan-mailbox-failed", result = outcome.reason)
                 StepOutcome.Failed(outcome.reason)
+            }
+        }
+    }
+
+    private var lastLuckyBagCheckMs: Long = 0L
+
+    private suspend fun runPlanLuckyBag(step: LuckyBagStep): StepOutcome {
+        flow.round = 1
+        flow.state = "LUCKY_BAG"
+        snapshot = snapshot.copy(currentFlow = "LUCKY_BAG", nextStep = "福袋任务")
+        val ctx = checkNotNull(activePlanContext)
+
+        val now = System.currentTimeMillis()
+        val intervalMs = step.scanIntervalMinutes * 60_000L
+        if (lastLuckyBagCheckMs > 0 && (now - lastLuckyBagCheckMs) < intervalMs) {
+            val remainMin = ((intervalMs - (now - lastLuckyBagCheckMs)) / 60_000L).coerceAtLeast(1)
+            flow.emit("plan-lucky-bag-cooldown-skipped", result = "remainingMinutes=$remainMin")
+            return StepOutcome.Skipped(SkipReason.ALREADY_SATISFIED)
+        }
+
+        val luckyBagFlow = PetLuckyBagFlow(
+            flow = flow,
+            lineReader = {
+                val f = flow.frame(latest = true)
+                try {
+                    reader.read(f)
+                } finally {
+                    f.recycle()
+                }
+            },
+            tap = { point, settleMs ->
+                flow.safety()
+                flow.input.tap(point.x, point.y)
+                kotlinx.coroutines.delay(settleMs)
+            },
+            onBeforeClaim = {
+                ctx.beforeConsumingInput(1, 0)
+            }
+        )
+
+        return when (val outcome = luckyBagFlow.run()) {
+            is LuckyBagOutcome.Completed -> {
+                lastLuckyBagCheckMs = System.currentTimeMillis()
+                ctx.completed(1, 0)
+                flow.emit("plan-lucky-bag-complete", result = "coins=" + (outcome.reward.coinAward ?: 0))
+                StepOutcome.Completed()
+            }
+            is LuckyBagOutcome.AlreadyDone -> {
+                lastLuckyBagCheckMs = System.currentTimeMillis()
+                flow.emit("plan-lucky-bag-limit-reached")
+                StepOutcome.Skipped(SkipReason.DAILY_LIMIT_REACHED)
+            }
+            is LuckyBagOutcome.Cooldown -> {
+                lastLuckyBagCheckMs = System.currentTimeMillis()
+                flow.emit("plan-lucky-bag-cooldown", result = "sec=" + outcome.secondsRemaining)
+                StepOutcome.Skipped(SkipReason.ALREADY_SATISFIED)
+            }
+            is LuckyBagOutcome.Skipped -> {
+                flow.emit("plan-lucky-bag-skipped", result = outcome.reason)
+                StepOutcome.Skipped(SkipReason.ALREADY_SATISFIED)
+            }
+            is LuckyBagOutcome.Blocked -> {
+                flow.emit("plan-lucky-bag-blocked-nonfatal", result = outcome.reason)
+                StepOutcome.Skipped(SkipReason.UNAVAILABLE)
+            }
+            is LuckyBagOutcome.Failed -> {
+                flow.emit("plan-lucky-bag-failed-nonfatal", result = outcome.reason)
+                StepOutcome.Skipped(SkipReason.UNAVAILABLE)
             }
         }
     }
@@ -1156,6 +1225,7 @@ class PetSessionController(context:Context,capture:HeadlessDisplayCapture,input:
             "adventureCompleted" to (planRunSnapshot?.counts?.adventureCompleted ?: if (mode == SessionMode.ADVENTURE && terminal == SessionRunState.COMPLETED) 1 else 0),
             "signInCompleted" to (planRunSnapshot?.counts?.signInCompleted ?: 0),
             "mailboxCompleted" to (planRunSnapshot?.counts?.mailboxCompleted ?: 0),
+            "luckyBagCompleted" to (planRunSnapshot?.counts?.luckyBagCompleted ?: 0),
             "roomCoinsBefore" to sessionRoomCoinsBefore,
             "roomCoinsAfter" to sessionRoomCoinsAfter)
         File(evidence,"run-record.json").writeText(EventJson.encode(record))

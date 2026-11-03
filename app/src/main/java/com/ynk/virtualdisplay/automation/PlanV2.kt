@@ -2,7 +2,7 @@ package com.ynk.virtualdisplay.automation
 
 import java.util.Collections
 
-enum class PlanStepType { SIGN_IN, MAILBOX, WORK, CARE, STUDY, ADVENTURE }
+enum class PlanStepType { SIGN_IN, MAILBOX, LUCKY_BAG, WORK, CARE, STUDY, ADVENTURE }
 enum class WorkTrigger { ALWAYS, IF_FUNDS_SHORT }
 enum class ExecutionProfile { SELECTED_ACTIONS, LEGACY_MANAGED }
 
@@ -70,6 +70,20 @@ data class MailboxStep(
     }
 }
 
+data class LuckyBagStep(
+    override val stepId: String,
+    val maxDailyCount: Int = 5,
+    val scanIntervalMinutes: Int = 30,
+) : PlanStep {
+    override val type: PlanStepType get() = PlanStepType.LUCKY_BAG
+    init {
+        require(stepId.isNotBlank()) { "PLAN_STEP_ID_BLANK" }
+        require(maxDailyCount in 1..20) { "PLAN_LUCKY_BAG_MAX_DAILY_COUNT_OUT_OF_RANGE:$maxDailyCount" }
+        require(scanIntervalMinutes in 5..180) { "PLAN_LUCKY_BAG_SCAN_INTERVAL_OUT_OF_RANGE:$scanIntervalMinutes" }
+    }
+}
+
+
 data class AdventureStep(
     override val stepId: String,
     val mode: AdventureMode = AdventureMode.NEARBY_WALK,
@@ -104,7 +118,7 @@ class PlanV2(
         require(planId.isNotBlank()) { "PLAN_ID_BLANK" }
         require(name.isNotBlank() && name.length in 1..80) { "PLAN_NAME_INVALID" }
         require(dailyBudgetMinutes in 1..480) { "PLAN_BUDGET_OUT_OF_RANGE:$dailyBudgetMinutes" }
-        require(this.steps.size in 1..6) { "PLAN_STEPS_COUNT_INVALID:${this.steps.size}" }
+        require(this.steps.size in 1..7) { "PLAN_STEPS_COUNT_INVALID:${this.steps.size}" }
         require(this.steps.map { it.stepId }.distinct().size == this.steps.size) { "PLAN_STEP_ID_DUPLICATE" }
         require(this.steps.map { it.type }.distinct().size == this.steps.size) { "PLAN_STEP_TYPE_DUPLICATE" }
         require(this.steps.zipWithNext().all { (left, right) -> left.type.ordinal < right.type.ordinal }) {

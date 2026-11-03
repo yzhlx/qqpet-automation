@@ -253,3 +253,27 @@
   - 真机安装：通过 ADB 成功覆盖安装至真机 DKS9K23420020242（Success）。
 - 提交与推送：提交 feat(daily): 增加每日签到、信箱待领与冒险上限控制 (SOC-03, SOC-04, STR-14)，推送到远端 backup/feat/onboarding-troubleshooting-p0，更新 PR #4。
 - 下一步：实现第二阶段 SOC-05 福袋任务（独立开关、扫描间隔、每日上限），或进入第三阶段任务目标策略排班（STR-01~05）。
+
+## 福袋任务与失败安全跳过（2026-11-03，feat/onboarding-troubleshooting-p0）
+- 目标：
+  1. SOC-05 福袋任务：独立开关、扫描间隔控制（默认 30 分钟）、今日上限配置（默认 5 次）。
+  2. 确保失败不阻塞主流程：解析/流程异常自动安全回退为 Skipped 状态，不影响后续打工、学习、护理。
+  3. 全链路闭环：新增 PlanStepType.LUCKY_BAG、LuckyBagStep、解析器 LuckyBagParser、执行器 PetLuckyBagFlow、UI 配置卡片与运行记录。
+- 改动：
+  - LuckyBagParser.kt：识别福袋入口、冷却倒计时（秒、分秒格式）、今日上限判定（文本和剩余次数），解析开启按钮与关闭按钮、金币与道具奖励。
+  - PetLuckyBagFlow.kt：开窗检测、上限/冷却跳过、延迟授权门禁 (onBeforeClaim)、开启动作与结算解析、安全关闭弹窗。
+  - PlanV2.kt & PlanV2Store.kt：新增 LuckyBagStep（含 maxDailyCount 与 scanIntervalMinutes），JSON 编码/解码支持。
+  - PlanExecutionModels.kt：RunCounts 新增 luckyBagCompleted；SkipReason 新增 UNAVAILABLE（用于失败安全跳过），StepExecution 校验允许 LUCKY_BAG 类型的跳过原因。
+  - PlanDeviceExecution.kt & PlanRunner.kt：LUCKY_BAG 纳入执行类型分发与 0 分钟预算/防重放校验。
+  - PetSessionController.kt：runPlanLuckyBag 接线；实现基于 lastLuckyBagCheckMs 的扫描间隔防抖；Blocked/Failed 降级为 Skipped(UNAVAILABLE) 实现失败不影响主流程。
+  - PlanRunStore.kt & PlanRunJsonCodec.kt：run-record.json 持久化 luckyBagCompleted。
+  - PetEvidence.kt & RecordsPresentation.kt：SessionRunRecord 解析 luckyBagCompleted，历史卡片标签展示“福袋 x 次”。
+  - SessionStartRequest.kt & PetHomeScreen.kt：模式枚举与主页摘要展示支持。
+  - PetPlanSheetScreen.kt：方案配置页增加“福袋任务”开关（默认关闭），“福袋上限（次）”与“扫描间隔（分）”参数配置。
+  - 单元测试：新增 LuckyBagParserTest (8)，更新 PlanV2StoreTest，PlanRunnerCompositionTest（含失败跳过与计数测试）。
+- 验证结果：
+  - 单元测试：96 个测试套件、924 项单元测试 100% PASS（0 failures, 0 errors）。
+  - 构建打包：assembleDebug 构建通过，APK 45.8MB。
+  - 真机安装：通过 ADB 成功覆盖安装至真机 DKS9K23420020242（Success）。
+- 提交与推送：提交 feat(daily): 增加福袋任务、每日上限控制与失败安全跳过 (SOC-05)，推送到远端 backup/feat/onboarding-troubleshooting-p0，更新 PR #4。
+- 下一步：实现第二阶段剩余的每日完成次数及收益记录汇总呈现（OBS-03~06），或进入第三阶段任务目标策略排班（STR-01~05）。

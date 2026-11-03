@@ -22,6 +22,10 @@ object PlanV2JsonCodec {
                 when (step) {
                     is SignInStep -> { }
                     is MailboxStep -> { }
+                    is LuckyBagStep -> {
+                        put("maxDailyCount", step.maxDailyCount)
+                        put("scanIntervalMinutes", step.scanIntervalMinutes)
+                    }
                     is WorkStep -> {
                         put("workOptionId", step.workOptionId); put("trigger", step.trigger.name); put("shifts", step.shifts)
                     }
@@ -56,6 +60,12 @@ object PlanV2JsonCodec {
                 PlanStepType.MAILBOX -> {
                     step.only("stepId", "type")
                     MailboxStep(id)
+                }
+                PlanStepType.LUCKY_BAG -> {
+                    step.only("stepId", "type", "maxDailyCount", "scanIntervalMinutes")
+                    val maxDaily = if (step.containsKey("maxDailyCount")) step.int("maxDailyCount") else 5
+                    val interval = if (step.containsKey("scanIntervalMinutes")) step.int("scanIntervalMinutes") else 30
+                    LuckyBagStep(id, maxDaily, interval)
                 }
                 PlanStepType.WORK -> {
                     step.only("stepId", "type", "workOptionId", "trigger", "shifts")

@@ -15,6 +15,7 @@ internal object PlanRunJsonCodec {
                 is WorkStep -> fields.putAll(obj("workOptionId" to s.workOptionId, "trigger" to s.trigger.name, "shifts" to s.shifts))
                 is SignInStep -> { }
                 is MailboxStep -> { }
+                is LuckyBagStep -> fields.putAll(obj("maxDailyCount" to s.maxDailyCount, "scanIntervalMinutes" to s.scanIntervalMinutes))
                 is CareStep -> fields.putAll(obj("energyThreshold" to s.energyThreshold, "cleanlinessThreshold" to s.cleanlinessThreshold))
                 is StudyStep -> fields.putAll(obj("courseId" to s.courseId, "rounds" to s.rounds))
                 is AdventureStep -> fields.putAll(obj("mode" to s.mode.name, "rounds" to s.rounds, "maxDailyRounds" to s.maxDailyRounds))
@@ -32,7 +33,8 @@ internal object PlanRunJsonCodec {
                 "careCompleted" to s.counts.careCompleted, "studyRoundsCompleted" to s.counts.studyRoundsCompleted,
                 "adventureCompleted" to s.counts.adventureCompleted,
                 "signInCompleted" to s.counts.signInCompleted,
-                "mailboxCompleted" to s.counts.mailboxCompleted),
+                "mailboxCompleted" to s.counts.mailboxCompleted,
+                "luckyBagCompleted" to s.counts.luckyBagCompleted),
             "startedAtMs" to s.startedAtMs, "endedAtMs" to s.endedAtMs, "stopReason" to s.stopReason,
             "steps" to s.steps.map { e -> obj("runId" to e.runId, "stepId" to e.stepId, "index" to e.index,
                 "type" to e.type.name, "state" to e.state.name, "reason" to e.reason,
@@ -57,6 +59,7 @@ internal object PlanRunJsonCodec {
                 when (enumValueOf<PlanStepType>(step.string("type"))) {
                     PlanStepType.SIGN_IN -> SignInStep(id)
                     PlanStepType.MAILBOX -> MailboxStep(id)
+                    PlanStepType.LUCKY_BAG -> LuckyBagStep(id, if (step.containsKey("maxDailyCount")) step.int("maxDailyCount") else 5, if (step.containsKey("scanIntervalMinutes")) step.int("scanIntervalMinutes") else 30)
                     PlanStepType.WORK -> WorkStep(id, step.string("workOptionId"), enumValueOf(step.string("trigger")), step.int("shifts"))
                     PlanStepType.CARE -> CareStep(id, step.int("energyThreshold"), step.int("cleanlinessThreshold"))
                     PlanStepType.STUDY -> StudyStep(id, step.string("courseId"), step.int("rounds"))
@@ -71,7 +74,7 @@ internal object PlanRunJsonCodec {
             StepExecution(e.string("runId"), e.string("stepId"), e.int("index"), enumValueOf(e.string("type")),
                 enumValueOf(e.string("state")), e.nullString("reason"), e.nullLong("startedAtMs"), e.nullLong("endedAtMs"),
                 e.list("evidenceIds").map { id -> id as? String ?: error("RUN_JSON_STRING_REQUIRED") })
-        }, RunCounts(counts.int("workShiftsCompleted"), counts.int("careCompleted"), counts.int("studyRoundsCompleted"), if (counts.containsKey("adventureCompleted")) counts.int("adventureCompleted") else 0, if (counts.containsKey("signInCompleted")) counts.int("signInCompleted") else 0, if (counts.containsKey("mailboxCompleted")) counts.int("mailboxCompleted") else 0),
+        }, RunCounts(counts.int("workShiftsCompleted"), counts.int("careCompleted"), counts.int("studyRoundsCompleted"), if (counts.containsKey("adventureCompleted")) counts.int("adventureCompleted") else 0, if (counts.containsKey("signInCompleted")) counts.int("signInCompleted") else 0, if (counts.containsKey("mailboxCompleted")) counts.int("mailboxCompleted") else 0, if (counts.containsKey("luckyBagCompleted")) counts.int("luckyBagCompleted") else 0),
             s.nullLong("startedAtMs"), s.nullLong("endedAtMs"), s.nullString("stopReason"))
         val reasons = linkedMapOf<String, String>()
         val attempts = root.list("attempts").map {

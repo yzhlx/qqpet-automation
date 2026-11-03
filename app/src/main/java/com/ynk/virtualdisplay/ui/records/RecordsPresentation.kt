@@ -53,6 +53,7 @@ data class RecordsSummary(
     val adventureCount: Int = 0,
     val signInCount: Int = 0,
     val mailboxCount: Int = 0,
+    val luckyBagCount: Int = 0,
 )
 
 data class SessionHistoryRow(
@@ -116,6 +117,7 @@ object RecordsPresentation {
         val adventureCount = records.sumOf { it.adventureCompleted ?: 0 }
         val signInCount = records.sumOf { it.signInCompleted ?: 0 }
         val mailboxCount = records.sumOf { it.mailboxCompleted ?: 0 }
+        val luckyBagCount = records.sumOf { it.luckyBagCompleted ?: 0 }
         return RecordsSummary(
             rangeText = rangeText,
             // Time the runs took, which is not the 今日已用 figure: that one counts game minutes.
@@ -127,6 +129,7 @@ object RecordsPresentation {
             adventureCount = adventureCount,
             signInCount = signInCount,
             mailboxCount = mailboxCount,
+            luckyBagCount = luckyBagCount,
         )
     }
 
@@ -278,12 +281,15 @@ object RecordsPresentation {
         }
         if ((record.adventureCompleted ?: 0) > 0) {
             taskParts += "冒险 ${record.adventureCompleted} 轮"
+        }
         if ((record.signInCompleted ?: 0) > 0) {
             taskParts += "每日签到"
         }
         if ((record.mailboxCompleted ?: 0) > 0) {
             taskParts += "信箱待领"
         }
+        if ((record.luckyBagCompleted ?: 0) > 0) {
+            taskParts += "福袋 ${record.luckyBagCompleted} 次"
         }
         val taskDesc = if (taskParts.isEmpty()) "完成 ${record.completedRounds}/${record.rounds} 节" else taskParts.joinToString(" · ")
         SessionHistoryRow(

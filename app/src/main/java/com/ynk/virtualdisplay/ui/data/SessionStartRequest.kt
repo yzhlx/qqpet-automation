@@ -36,6 +36,7 @@ object SessionStartRequest {
         val mode = if (plan.steps.size == 1) when (plan.steps.single().type) {
             PlanStepType.SIGN_IN -> SessionMode.PLAN
             PlanStepType.MAILBOX -> SessionMode.PLAN
+            PlanStepType.LUCKY_BAG -> SessionMode.PLAN
             PlanStepType.WORK -> SessionMode.WORK
             PlanStepType.CARE -> SessionMode.CARE
             PlanStepType.STUDY -> SessionMode.STUDY

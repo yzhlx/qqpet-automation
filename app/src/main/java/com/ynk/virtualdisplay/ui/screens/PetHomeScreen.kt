@@ -54,6 +54,7 @@ import com.ynk.virtualdisplay.automation.PlanV2
 import com.ynk.virtualdisplay.automation.AdventureStep
 import com.ynk.virtualdisplay.automation.SignInStep
 import com.ynk.virtualdisplay.automation.MailboxStep
+import com.ynk.virtualdisplay.automation.LuckyBagStep
 import com.ynk.virtualdisplay.automation.PlanV2Store
 import com.ynk.virtualdisplay.automation.SessionMode
 import com.ynk.virtualdisplay.automation.SessionPlan
@@ -372,6 +373,7 @@ private fun planSummary(saved: PlanV2?, plan: SessionPlan): String {
         when (step) {
             is SignInStep -> "签到"
             is MailboxStep -> "信箱"
+            is LuckyBagStep -> "福袋 ${step.maxDailyCount}次"
             is StudyStep -> "学习 ${step.rounds} 节"
             is CareStep -> "护理"
             is WorkStep -> "打工"

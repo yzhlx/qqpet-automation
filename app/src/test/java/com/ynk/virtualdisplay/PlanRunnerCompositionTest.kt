@@ -49,6 +49,10 @@ class PlanRunnerCompositionTest {
             log.hit(PlanStepType.MAILBOX); c.beforeConsumingInput(1, 0); c.startConfirmed(1); c.completed(1, 0)
             StepOutcome.Completed()
         },
+        PlanStepType.LUCKY_BAG to StepExecutor { _, c ->
+            log.hit(PlanStepType.LUCKY_BAG); c.beforeConsumingInput(1, 0); c.startConfirmed(1); c.completed(1, 0)
+            StepOutcome.Completed()
+        },
         PlanStepType.WORK to StepExecutor { _, _ -> log.hit(PlanStepType.WORK); StepOutcome.Completed() },
         PlanStepType.CARE to StepExecutor { _, _ -> log.hit(PlanStepType.CARE); StepOutcome.Completed() },
         PlanStepType.STUDY to StepExecutor { _, c ->
@@ -237,5 +241,36 @@ class PlanRunnerCompositionTest {
         assertEquals(0, outcome.counts.signInCompleted)
         assertEquals(0, outcome.counts.mailboxCompleted)
         assertEquals(0, outcome.counts.adventureCompleted)
+    }
+
+    @Test fun luckyBagCanCompleteAndCount() = runBlocking {
+        val store = FakeRunStore()
+        val luckyBag = LuckyBagStep("lb", 5, 30)
+        val log = CallLog()
+        val outcome = PlanRunner(store, readyPreflight(), completingExecutors(log))
+            .run(request(plan(luckyBag)), "run-lucky-bag")
+        assertEquals(RunState.COMPLETED, outcome.state)
+        assertEquals(StepState.COMPLETED, outcome.steps[0].state)
+        assertEquals(1, outcome.counts.luckyBagCompleted)
+        assertEquals(1, log.count(PlanStepType.LUCKY_BAG))
+    }
+
+    @Test fun luckyBagSkippedOnCooldownDoesNotBlockLaterSteps() = runBlocking {
+        val store = FakeRunStore()
+        val luckyBag = LuckyBagStep("lb", 5, 30)
+        val care = CareStep("c", 70, 70)
+        val log = CallLog()
+        val executors = completingExecutors(log).toMutableMap().apply {
+            put(PlanStepType.LUCKY_BAG, StepExecutor { _, _ ->
+                log.hit(PlanStepType.LUCKY_BAG)
+                StepOutcome.Skipped(SkipReason.ALREADY_SATISFIED)
+            })
+        }
+        val outcome = PlanRunner(store, readyPreflight(), executors)
+            .run(request(plan(luckyBag, care)), "run-skip-lb")
+        assertEquals(RunState.COMPLETED, outcome.state)
+        assertEquals(StepState.SKIPPED, outcome.steps[0].state)
+        assertEquals(StepState.COMPLETED, outcome.steps[1].state)
+        assertEquals(1, log.count(PlanStepType.CARE))
     }
 }

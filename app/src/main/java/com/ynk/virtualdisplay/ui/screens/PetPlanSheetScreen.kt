@@ -54,6 +54,7 @@ import com.ynk.virtualdisplay.automation.PlanStepType
 import com.ynk.virtualdisplay.automation.AdventureStep
 import com.ynk.virtualdisplay.automation.SignInStep
 import com.ynk.virtualdisplay.automation.MailboxStep
+import com.ynk.virtualdisplay.automation.LuckyBagStep
 import com.ynk.virtualdisplay.automation.PlanV2
 import com.ynk.virtualdisplay.automation.PlanV2Store
 import com.ynk.virtualdisplay.automation.PlanValidator
@@ -99,6 +100,9 @@ fun PetPlanSheetScreen(onClose: () -> Unit, onStarted: () -> Unit, displayId: In
     var selectedAdventure by remember { mutableStateOf(false) }
     var selectedSignIn by remember { mutableStateOf(false) }
     var selectedMailbox by remember { mutableStateOf(false) }
+    var selectedLuckyBag by remember { mutableStateOf(false) }
+    var luckyBagMaxDaily by remember { mutableStateOf(5) }
+    var luckyBagIntervalMinutes by remember { mutableStateOf(30) }
     var adventureMode by remember { mutableStateOf(com.ynk.virtualdisplay.automation.AdventureMode.NEARBY_WALK) }
     var adventureRounds by remember { mutableStateOf(1) }
     var adventureMaxDaily by remember { mutableStateOf(5) }
@@ -132,9 +136,14 @@ fun PetPlanSheetScreen(onClose: () -> Unit, onStarted: () -> Unit, displayId: In
             legacySource = stored.legacySource
             val signIn = stored.steps.filterIsInstance<SignInStep>().singleOrNull()
             val mailbox = stored.steps.filterIsInstance<MailboxStep>().singleOrNull()
+            val luckyBag = stored.steps.filterIsInstance<LuckyBagStep>().singleOrNull()
             val adventure = stored.steps.filterIsInstance<AdventureStep>().singleOrNull()
             selectedWork = work != null; selectedCare = care != null; selectedStudy = study != null; selectedAdventure = adventure != null
-            selectedSignIn = signIn != null; selectedMailbox = mailbox != null
+            selectedSignIn = signIn != null; selectedMailbox = mailbox != null; selectedLuckyBag = luckyBag != null
+            if (luckyBag != null) {
+                luckyBagMaxDaily = luckyBag.maxDailyCount
+                luckyBagIntervalMinutes = luckyBag.scanIntervalMinutes
+            }
             if (adventure != null) {
                 adventureMode = adventure.mode
                 adventureRounds = adventure.rounds
@@ -168,7 +177,7 @@ fun PetPlanSheetScreen(onClose: () -> Unit, onStarted: () -> Unit, displayId: In
     val selectedCourse = unlocked.firstOrNull { it.id == plan.courseId }
     val validationMessage = when {
         loading -> "正在读取方案…"
-        !selectedSignIn && !selectedMailbox && !selectedWork && !selectedCare && !selectedStudy && !selectedAdventure -> "请选择至少一个动作。"
+        !selectedSignIn && !selectedMailbox && !selectedLuckyBag && !selectedWork && !selectedCare && !selectedStudy && !selectedAdventure -> "请选择至少一个动作。"
         selectedWork && verified.none { it.id == plan.workOptionId } -> "请选择打工岗位。"
         selectedStudy && !fresh && plan.targetAttribute == null && catalog == null -> "请先读取我的课程或选择上方目标属性。"
         selectedStudy && plan.targetAttribute == null && selectedCourse?.durationMinutes == null -> "请选择一门时长已读出的课程。"
@@ -185,6 +194,7 @@ fun PetPlanSheetScreen(onClose: () -> Unit, onStarted: () -> Unit, displayId: In
                 val steps = buildList<PlanStep> {
                     if (selectedSignIn) add(SignInStep(stepIds[PlanStepType.SIGN_IN] ?: "$planId:sign_in"))
                     if (selectedMailbox) add(MailboxStep(stepIds[PlanStepType.MAILBOX] ?: "$planId:mailbox"))
+                    if (selectedLuckyBag) add(LuckyBagStep(stepIds[PlanStepType.LUCKY_BAG] ?: "$planId:lucky_bag", maxDailyCount = luckyBagMaxDaily, scanIntervalMinutes = luckyBagIntervalMinutes))
                     if (selectedWork) add(WorkStep(stepIds[PlanStepType.WORK] ?: "$planId:work",
                         plan.workOptionId ?: error("未选择岗位"),
                         if (selectedStudy && plan.workBeforeStudy) WorkTrigger.IF_FUNDS_SHORT else WorkTrigger.ALWAYS))
@@ -250,6 +260,7 @@ fun PetPlanSheetScreen(onClose: () -> Unit, onStarted: () -> Unit, displayId: In
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     ActionChoice("每日签到", PetGlyph.Check, selectedSignIn, !busy, Modifier.weight(1f)) { selectedSignIn = it; changed() }
                     ActionChoice("信箱待领", PetGlyph.Bell, selectedMailbox, !busy, Modifier.weight(1f)) { selectedMailbox = it; changed() }
+                    ActionChoice("福袋任务", PetGlyph.Play, selectedLuckyBag, !busy, Modifier.weight(1f)) { selectedLuckyBag = it; changed() }
                 }
                 Spacer(Modifier.height(8.dp))
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -265,7 +276,7 @@ fun PetPlanSheetScreen(onClose: () -> Unit, onStarted: () -> Unit, displayId: In
                     ActionChoice("冒险", PetGlyph.Locate, selectedAdventure, !busy, Modifier.weight(1f)) { selectedAdventure = it; changed() }
                 }
                 Spacer(Modifier.height(8.dp))
-                PetNote("按签到 → 信箱 → 打工 → 护理 → 学习 → 冒险的顺序执行，只做勾选的动作。")
+                PetNote("按签到 → 信箱 → 福袋 → 打工 → 护理 → 学习 → 冒险的顺序执行，只做勾选的动作。")
                 loadNote?.let { PetNote(it) }
                 if (showCompatibilityNote) PetNote("保存为新版方案后，护理执行一次；打工前需已满足岗位条件。")
             }
@@ -389,6 +400,14 @@ fun PetPlanSheetScreen(onClose: () -> Unit, onStarted: () -> Unit, displayId: In
                     }
                     ParamRow("每日上限（轮）", PetGlyph.Locate, adventureMaxDaily, 1..20, 1, !busy) {
                         adventureMaxDaily = it; changed()
+                    }
+                }
+                if (selectedLuckyBag) {
+                    ParamRow("福袋上限（次）", PetGlyph.Play, luckyBagMaxDaily, 1..20, 1, !busy) {
+                        luckyBagMaxDaily = it; changed()
+                    }
+                    ParamRow("扫描间隔（分）", PetGlyph.Clock, luckyBagIntervalMinutes, 5..180, 5, !busy) {
+                        luckyBagIntervalMinutes = it; changed()
                     }
                 }
                 if (selectedCare) {
