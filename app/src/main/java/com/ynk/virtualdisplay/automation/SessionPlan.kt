@@ -53,12 +53,6 @@ data class SessionPlan(
     val courseName: String get() = courseId.substringAfter(':', courseId)
 
     /**
-     * True when this course's lesson length was measured on device. Both the budget guard and the
-     * UI read this one rule: a 托管 session can only start on a course whose minutes it can charge.
-     */
-    val hasKnownDuration: Boolean get() = hasMeasuredDuration(courseId)
-
-    /**
      * Minutes one lesson of [courseId] charges against the shared daily budget. Only the
      * historically verified course has a known duration; a scanned course carries its own and the
      * caller passes it in. Charging a guess would let the budget guard pass a lesson the game
@@ -95,21 +89,10 @@ data class SessionPlan(
          */
         val KNOWN_COURSE_MINUTES: Map<String, Int> = mapOf(DEFAULT_COURSE_ID to 10)
 
-        /** The single rule behind [SessionPlan.hasKnownDuration], usable before a plan is built. */
-        fun hasMeasuredDuration(courseId: String): Boolean = KNOWN_COURSE_MINUTES.containsKey(courseId)
-
-        /** The ranges the plan sheet offers. Same source as the [SessionPlan] checks above. */
+        /** The ranges a plan may hold, shared by the [SessionPlan] checks above. */
         val ROUNDS_RANGE = MIN_ROUNDS..MAX_ROUNDS
         val THRESHOLD_RANGE = MIN_THRESHOLD..MAX_THRESHOLD
         val BUDGET_RANGE = 1..DailyBudgetStore.HARD_STOP_MINUTES
-
-        /**
-         * One numeric field of the plan sheet. Text that is empty, unparsable or outside [range] is
-         * not a value yet: "6" on the way to "65" must never be committed, because the plan's own
-         * range check would throw and take the composition down with it.
-         */
-        fun parseIntOrNull(raw: String, range: IntRange): Int? =
-            raw.toIntOrNull()?.takeIf { it in range }
 
         /** A missing or older file decodes as the defaults, so an upgrade changes nothing. */
         fun fromJson(json: JSONObject): SessionPlan = SessionPlan(

@@ -6,6 +6,8 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
+import androidx.annotation.DrawableRes
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -16,7 +18,9 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Scaffold
@@ -24,12 +28,18 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ynk.virtualdisplay.MyApplication
+import com.ynk.virtualdisplay.R
 import com.ynk.virtualdisplay.data.model.ShizukuState
 import com.ynk.virtualdisplay.data.repository.ShizukuDisplayRepository
 import com.ynk.virtualdisplay.ui.kit.PetGlyph
@@ -41,7 +51,8 @@ import com.ynk.virtualdisplay.ui.screens.PetLogScreen
 import com.ynk.virtualdisplay.ui.screens.PetPlanSheetScreen
 import com.ynk.virtualdisplay.ui.screens.PetRecordsScreen
 import com.ynk.virtualdisplay.ui.screens.PetSettingsScreen
-import com.ynk.virtualdisplay.ui.screens.ShizukuPermissionScreen
+import com.ynk.virtualdisplay.ui.screens.OnboardingFlow
+import com.ynk.virtualdisplay.ui.screens.OnboardingScreen
 import com.ynk.virtualdisplay.ui.screens.VirtualDisplayScreen
 import com.ynk.virtualdisplay.ui.theme.MyApplicationTheme
 import com.ynk.virtualdisplay.ui.theme.PetTokens
@@ -72,25 +83,25 @@ class MainActivity : ComponentActivity() {
         setContent {
             MyApplicationTheme {
                 val uiState by viewModel.uiState.collectAsState()
+                val guidePrefs = remember { getSharedPreferences("virtual_display_settings", MODE_PRIVATE) }
+                var guideCompleted by remember { mutableStateOf(guidePrefs.getBoolean("onboarding_completed", false)) }
 
                 Scaffold(
                     modifier = Modifier.fillMaxSize(),
                     containerColor = PetTokens.Bg,
                 ) { innerPadding ->
                     Box(Modifier.padding(innerPadding).fillMaxSize()) {
-                        when (val state = uiState.shizukuState) {
-                            is ShizukuState.Checking -> Box(
+                        val state = uiState.shizukuState
+                        when {
+                            // Polling from the guide passes through Checking, which must not flash a spinner.
+                            state is ShizukuState.Checking && guideCompleted -> Box(
                                 Modifier.fillMaxSize(), contentAlignment = Alignment.Center,
                             ) { CircularProgressIndicator() }
 
-                            is ShizukuState.Ready -> PetApp(
-                                uiState = uiState,
-                                viewModel = viewModel,
-                            )
-
-                            else -> ShizukuPermissionScreen(
+                            OnboardingFlow.shown(guideCompleted, state is ShizukuState.Ready) -> OnboardingScreen(
                                 state = state,
-                                onRetry = { viewModel.checkShizukuStatus(this@MainActivity) },
+                                completedBefore = guideCompleted,
+                                onCheck = { viewModel.checkShizukuStatus(this@MainActivity) },
                                 onRequestPermission = {
                                     try {
                                         Shizuku.requestPermission(ShizukuDisplayRepository.REQUEST_CODE)
@@ -98,6 +109,15 @@ class MainActivity : ComponentActivity() {
                                         Log.e("MainActivity", "Failed to request permission", e)
                                     }
                                 },
+                                onFinish = {
+                                    guidePrefs.edit().putBoolean("onboarding_completed", true).apply()
+                                    guideCompleted = true
+                                },
+                            )
+
+                            else -> PetApp(
+                                uiState = uiState,
+                                viewModel = viewModel,
                             )
                         }
 
@@ -132,11 +152,8 @@ private fun PetApp(uiState: MainUiState, viewModel: MainViewModel) {
             when (uiState.overlay) {
                 OverlayScreen.PLAN_SHEET -> PetPlanSheetScreen(
                     onClose = { viewModel.closeOverlay() },
-                    onOpenConsole = { viewModel.openOverlay(OverlayScreen.CONSOLE) },
-                    displayId = uiState.displays.firstOrNull {
-                        it.width == com.ynk.virtualdisplay.automation.PetProfile.calibrated().displayWidth &&
-                            it.height == com.ynk.virtualdisplay.automation.PetProfile.calibrated().displayHeight
-                    }?.id,
+                    onStarted = { viewModel.switchTab(ScreenTab.HOST) },
+                    displayId = uiState.petDisplayId,
                 )
 
                 OverlayScreen.LOGS -> PetLogScreen(onClose = { viewModel.closeOverlay() })
@@ -153,7 +170,6 @@ private fun PetApp(uiState: MainUiState, viewModel: MainViewModel) {
 
                 OverlayScreen.NONE -> when (uiState.currentTab) {
                     ScreenTab.HOST -> Column(Modifier.fillMaxSize()) {
-                        PetTitleBar("宠物托管")
                         PetHomeScreen(
                             viewModel = viewModel,
                             onOpenPlanSheet = { viewModel.openOverlay(OverlayScreen.PLAN_SHEET) },
@@ -162,7 +178,7 @@ private fun PetApp(uiState: MainUiState, viewModel: MainViewModel) {
                     }
 
                     ScreenTab.RECORDS -> Column(Modifier.fillMaxSize()) {
-                        PetTitleBar("记录")
+                        PetTitleBar("记录", crab = R.drawable.crab_wave)
                         PetRecordsScreen()
                     }
 
@@ -190,17 +206,46 @@ private fun PetApp(uiState: MainUiState, viewModel: MainViewModel) {
 
 /** Reference `.ab` title bar: 19px/700, left-aligned, on the app background. */
 @Composable
-fun PetTitleBar(title: String, onBack: (() -> Unit)? = null) {
-    Row(
-        Modifier.fillMaxWidth().padding(horizontal = 15.dp, vertical = 10.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        if (onBack != null) {
-            Box(Modifier.clickable { onBack() }.padding(end = 10.dp)) {
-                PetIcon(PetGlyph.ArrowBack, 20.dp, PetTokens.Ink)
+fun PetTitleBar(
+    title: String,
+    onBack: (() -> Unit)? = null,
+    subtitle: String? = null,
+    @DrawableRes crab: Int? = null,
+) {
+    Box(Modifier.fillMaxWidth()) {
+        Row(
+            Modifier.fillMaxWidth()
+                .padding(horizontal = 17.dp, vertical = 10.dp)
+                .padding(bottom = if (crab != null) 16.dp else 0.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            if (onBack != null) {
+                Box(Modifier.clickable { onBack() }.padding(end = 10.dp)) {
+                    PetIcon(PetGlyph.ArrowBack, 20.dp, PetTokens.Ink)
+                }
+            }
+            Column {
+                Text(title, fontSize = 24.sp, fontWeight = FontWeight.Bold, color = PetTokens.Ink)
+                if (subtitle != null) Text(subtitle, fontSize = 12.5.sp, color = PetTokens.Ink2)
             }
         }
-        Text(title, fontSize = 19.sp, fontWeight = FontWeight.Bold, color = PetTokens.Ink)
+        // Taller than the bar on purpose: the next card is drawn later, so it covers the crab's lower
+        // half and the crab reads as sitting behind the card, as in the mock-ups.
+        if (crab != null) {
+            // The peek art is only a head, so at full size the card would cut across its eyes.
+            val peek = crab == R.drawable.crab_peek
+            Box(Modifier.matchParentSize()) {
+                Image(
+                    painter = painterResource(crab),
+                    contentDescription = null,
+                    modifier = Modifier.align(Alignment.TopEnd)
+                        .padding(end = if (peek) 18.dp else 12.dp)
+                        .requiredSize(if (peek) 84.dp else 104.dp)
+                        .offset(y = if (peek) 11.dp else 22.dp),
+                    contentScale = ContentScale.Fit,
+                )
+            }
+        }
     }
 }
 

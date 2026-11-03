@@ -23,7 +23,14 @@ class WorkCatalog(private val entries: List<WorkCatalogEntry> = defaultEntries()
         val confidence: RewardConfidence,
         val evidence: String,
         val caveat: String? = null,
+        /** Null means the entry fee has not been established; it never means zero. */
+        val entryFeeCoins: Int? = null,
+        val entryFeeEvidence: String? = null,
     )
+
+    fun verifiedZeroEntryIds(): Set<String> = entries.filter {
+        WorkEvidencePolicy.allowsUnknownBaseline(it, 0)
+    }.map { it.id }.toSet()
 
     fun find(venue: String, optionId: String): WorkCatalogEntry? =
         entries.firstOrNull { it.venue == venue && it.id == optionId }
@@ -48,7 +55,7 @@ class WorkCatalog(private val entries: List<WorkCatalogEntry> = defaultEntries()
         if (page.durationMinutes != entry.durationMinutes) {
             diffs += "时长 页面${page.durationMinutes} vs 目录${entry.durationMinutes}"
         }
-        if (page.pageCoinReward != entry.coinReward) {
+        if (!coinRewardAccepted(entry.coinReward, page.pageCoinReward)) {
             diffs += "金币 页面${page.pageCoinReward} vs 目录${entry.coinReward}"
         }
         if (page.pageWorkScoreReward != entry.workScoreReward) {
@@ -64,6 +71,14 @@ class WorkCatalog(private val entries: List<WorkCatalogEntry> = defaultEntries()
     }
 
     companion object {
+        /**
+         * The catalog holds the pre-promotion pay. A job star-up raises it (measured 2026-11-01:
+         * 68 became 71 at 习武小童 1 星), so a higher reading is real; below the base, or beyond
+         * double it, is treated as a misread.
+         */
+        fun coinRewardAccepted(baseCoins: Int, pageCoins: Int): Boolean =
+            if (baseCoins == 0) pageCoins == 0 else pageCoins in baseCoins..baseCoins * 2
+
         /**
          * P5.1 measured values, 2026-10-12, on display 4.
          *
@@ -84,6 +99,8 @@ class WorkCatalog(private val entries: List<WorkCatalogEntry> = defaultEntries()
                 cleanlinessCost = 2,
                 confidence = RewardConfidence.VERIFIED,
                 evidence = "docs/P5-01-career-discovery.md §5 真实打工闭环 2026-10-12 19:18",
+                entryFeeCoins = 0,
+                entryFeeEvidence = "2026-10-21 run13711e66: 消耗行仅体力5/清洁2，单次开工与10分钟工资68已确认",
             ),
             WorkCatalogEntry(
                 id = "work:竹影武馆/陪练基础课",

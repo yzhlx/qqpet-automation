@@ -288,6 +288,15 @@ class PetWorkGateTest {
     }
 
     @Test
+    fun `aPromotedPayIsAcceptedButAMisreadIsNot`() {
+        assertTrue(WorkCatalog.coinRewardAccepted(68, 68))
+        assertTrue(WorkCatalog.coinRewardAccepted(68, 71))
+        assertFalse(WorkCatalog.coinRewardAccepted(68, 67))
+        assertFalse(WorkCatalog.coinRewardAccepted(68, 710))
+        assertFalse(WorkCatalog.coinRewardAccepted(0, 71))
+    }
+
+    @Test
     fun `anUnknownCatalogRewardIsAHoleNotAZero`() {
         // 街巷跑腿's reward was blocked by QQ rate limiting. Treating the placeholder 0 as a real
         // reading would let the optimiser plan on a number nobody measured.

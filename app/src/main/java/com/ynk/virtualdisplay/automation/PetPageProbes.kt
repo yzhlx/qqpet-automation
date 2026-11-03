@@ -22,14 +22,28 @@ object PetPageProbes {
 
     val home = experimental("home", 600, 130, 670, 190)
     /**
-     * Room page IDENTITY: the left icon column (back / gear / bell / notebook / hat). Chosen over
-     * the 出门 button region because that button drifts vertically between sessions (measured
-     * y1354 in one session, y1332 in the next), which broke full-frame identification with
-     * INITIAL_PAGE_UNKNOWN. The icon column measured 0.9991 across two independent sessions and
-     * at most 0.771 on the outdoor map, so the 0.97 threshold keeps a wide margin.
+     * Room page IDENTITY: the pet bed / chair arm at the left of the scene, a stable SCENE region.
+     *
+     * It used to be the left icon column (back / gear / avatar / notebook / hat). That column is
+     * QQ's own chrome, NOT the pet game: it carries the signed-in user's avatar and an unread
+     * badge, both of which the app does not control. Measured on the real device (2026-10-25):
+     * the column scored 0.9593 against the shipped template on a frame the app itself had
+     * verified as the room page, and 0.8420 on the 22:57 frames - the badge repaint inside the
+     * ROI alone aborted a managed session with `INITIAL_PAGE_UNKNOWN`. The same column also
+     * leaks: it measures 0.9738..0.9888 on the FOOD page, above the shipping gate of 0.95, so
+     * room only avoided misclassifying food because `initialise` tests foodScene first.
+     *
+     * The scene region is static furniture with no chrome and no state-dependent pixels. Replay
+     * of the shipping matcher over 85 recorded frames (every state the app ever proved, the room
+     * page under the health sheet, the 22:57 abort frames, and the four room-* fixtures):
+     *   1.0000 on ALL 29 room frames (worst foreign 0.8097 bath, 0.7936 food, 0.8089 academy,
+     *   0.7957 outdoor, 0.7591 QQ message list) - a 0.19 margin under the 0.95 gate and 0.16
+     *   under the 0.97 the identity test asserts, versus the old region's 0.01 and its leak.
+     * Asset provenance: pet_experimental/room.json (exact raw-pixel crop of a verified
+     * `round-0:initial-home` PASS frame at this ROI, so the rescale branch is skipped).
      */
-    val room = experimental("room", 40, 120, 130, 560)
-    val healthPanel = experimental("health", 169, 228, 250, 415)
+    val room = experimental("room", 20, 720, 120, 840)
+    val healthPanel = experimental("health", 169, 228, 250, 415).copy(exactDrift = true)
 
     /**
      * The cookie/plate item. A legitimate page TARGET and legacy measured item, but NOT the FOOD
@@ -67,6 +81,22 @@ object PetPageProbes {
      */
     val foodScene = mvp("food_scene", 480, 690, 690, 960)
 
+    /**
+     * Empty-cookie stock proof only: the bottom 「兑换食物」 bubble on the food scene.
+     * Measured 2026-10-22 from the live zero-stock frame
+     * `.build-tmp/device-acceptance/care-feed-scene.png` at [275,1330,450,1420).
+     * Present only while cookie stock is empty; absent after a purchase lands on the plate.
+     * Never page identity — always scored after foodScene has already matched.
+     */
+    val foodExchangeBubble = mvp("food_exchange_bubble", 275, 1330, 450, 1420)
+
+    /**
+     * Empty-soap stock proof: the bottom 「兑换洗澡道具」 bubble on the bath scene.
+     * Measured 2026-10-22 from the live zero-stock frame care-bath-now.png at [250,1330,470,1420).
+     * Present only while soap stock is empty. Never page identity.
+     */
+    val bathExchangeBubble = mvp("bath_exchange_bubble", 250, 1330, 470, 1420)
+
     /** Measured soap gesture/tap target on the bath page. Target only, never page identity. */
     val soap = mvp("soap", 280, 1280, 440, 1400)
 
@@ -79,6 +109,35 @@ object PetPageProbes {
     val bath = mvp("bath", 10, 690, 260, 990)
 
     val outdoor = experimental("outdoor", 126, 610, 275, 663)
+
+    /**
+     * QQ HOST page identity: the orange 宠物 mini-program icon in the search result's 功能 row.
+     *
+     * The pet mini-program is hosted by QQ, so the mini-program's own back arrow can pop the
+     * whole mini-program and leave the QQ search page behind (measured 2026-10-21, session
+     * 68564b34: the outdoor-map back arrow at (80,160) landed on the QQ search page instead of
+     * the pet room, and the session died with PAGE_MISMATCH:...:51-health-return-home-after).
+     * Recovering from that needs a positive proof that the pet app is GONE, which this icon
+     * gives: it exists only on the QQ host page.
+     *
+     * The asset is an exact raw-pixel crop of a real VD4 frame (`.build-tmp/vd4.png`, the QQ
+     * search page after the mini-program closed), 104x104 at [48,451,152,555). Host-side replay
+     * of the shipping matcher: 1.000000 on that QQ frame and at most 0.787466 on the pet room,
+     * the outdoor map, the academy map, the course panel and the QQ search page before the
+     * 结果 row is shown - a wide margin under the unchanged 0.97 threshold.
+     */
+    val qqHostSearch = experimental("qq_host_search", 48, 451, 152, 555)
+
+    /**
+     * QQ HOST page after a search for 宠物: the orange icon of the 宠物 - 功能 row, measured on
+     * the device (2026-11-03). The row sits lower than [qqHostSearch] on this layout (the stored
+     * icon scores 0.68 at its old spot here), so this is a separate template, cropped from a real
+     * frame at [59,562,163,666). Replayed against the frames of the same search (results top and
+     * scrolled) it scores 1.000000, and at most 0.78 on the pet room, the QQ main page, the search
+     * box, the 小程序 tab and the WeChat login page - the same wide margin under 0.97.
+     * Tapping the row's label at (224,617) opens the pet room (verified on the device).
+     */
+    val qqSearchPetRow = experimental("qq_search_pet_row", 59, 562, 163, 666)
     val academy = experimental("academy", 330, 158, 346, 177)
     val highFive = experimental("high_five", 284, 344, 355, 400)
     val gradeA = experimental("grade_a", 545, 385, 695, 525)
@@ -87,7 +146,7 @@ object PetPageProbes {
     val careUpgradeReward = experimental("care_upgrade_reward", 240, 1020, 480, 1080)
 
     fun byName(): Map<String, PetProfile.Probe> = listOf(
-        home, room, healthPanel, cookie, foodScene, soap, bath, outdoor, academy, highFive,
-        gradeA, upgrade, careUpgradeHint, careUpgradeReward,
+        home, room, healthPanel, cookie, foodScene, foodExchangeBubble, soap, bath, bathExchangeBubble, outdoor, academy, highFive,
+        gradeA, upgrade, careUpgradeHint, careUpgradeReward, qqHostSearch, qqSearchPetRow,
     ).associateBy { it.name }
 }

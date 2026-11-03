@@ -215,7 +215,7 @@ object ManagedRuntimePresentation {
     }
 
     fun pauseText(pauseCount: Int, pauseReason: String?): String =
-        if (pauseReason == null) "暂停：$pauseCount 次" else "暂停：$pauseCount 次 · 原因：$pauseReason"
+        if (pauseReason == null) "暂停：$pauseCount 次" else "暂停：$pauseCount 次 · 原因：${com.ynk.virtualdisplay.ui.records.RecordsPresentation.stopReasonText(pauseReason)}"
 
     /**
      * Wall-clock instant after which no Known reading in this snapshot can still be current.

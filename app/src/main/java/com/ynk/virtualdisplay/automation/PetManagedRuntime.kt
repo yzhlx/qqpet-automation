@@ -18,6 +18,8 @@ data class ManagedRuntimeState(
     val nextStep:String="等待启动",
     val pauseReason:String?=null,
     val pauseCount:Int=0,
+    /** Boundaries between actions not yet passed, where a manual pause can still take effect. */
+    val pauseBoundariesLeft:Int=0,
     val runtimeMs:Long=0,
     val energy:ObservedValue<Int> = ObservedValue.Unknown("NOT_OBSERVED",0,"session not started"),
     val cleanliness:ObservedValue<Int> = ObservedValue.Unknown("NOT_OBSERVED",0,"session not started"),

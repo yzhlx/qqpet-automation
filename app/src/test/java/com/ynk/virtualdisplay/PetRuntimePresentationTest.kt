@@ -401,7 +401,7 @@ class PetRuntimePresentationTest {
         assertEquals("轮次：2/3", view.roundText)
         assertEquals("已完成：1/3", view.completedText)
         assertEquals("运行时长：02:05", view.durationText)
-        assertEquals("暂停：2 次 · 原因：RECOVERY_PAGE_MISMATCH", view.pauseText)
+        assertEquals("暂停：2 次 · 原因：页面对不上", view.pauseText)
         assertEquals("等待成绩", view.nextStepText)
         assertEquals(ManagedSessionPhase.CURRENT, view.sessionPhase)
     }

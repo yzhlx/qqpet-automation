@@ -37,7 +37,9 @@ class PetActiveCaptureTest {
         var count = 0
         var physical = 0
         val matcher = TemplateMatcher(app)
-        val room = PetProfile.Probe("room", Rect(320,1340,405,1465), "pet_experimental/room.png")
+        // Room identity comes from PetPageProbes: a private copy here previously read the same
+        // asset at a different ROI, so this gate could pass while the shipping flow aborted.
+        val room = PetPageProbes.room
         val health = PetProfile.Probe("health", Rect(169,228,250,415), "pet_experimental/health.png")
         fun shell(command: String) = inst.uiAutomation.executeShellCommand(command).use {
             ParcelFileDescriptor.AutoCloseInputStream(it).bufferedReader().readText()

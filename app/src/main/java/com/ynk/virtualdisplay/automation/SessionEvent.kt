@@ -29,6 +29,10 @@ data class SessionEvent(val eventId: String, val sessionId: String, val sequence
         "bootId" to bootId.fields(),"source" to source.name,"kind" to kind.name,"payload" to payload,"evidence" to evidence))
 }
 
+/** Stable event payload for flow observations; result must survive into the durable JSONL journal. */
+internal fun sessionErrorEventPayload(state: String, action: String, result: String, reason: String?): Map<String, Any?> =
+    linkedMapOf("state" to state, "action" to action, "result" to result, "reason" to reason)
+
 /** One local ordered durable JSONL stream; no queue or product state machine. */
 class SessionEventStore(directory: File, val sessionId: String, private val clock: EventClock) {
     val file=File(directory,"$sessionId.jsonl")

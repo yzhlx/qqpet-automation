@@ -62,6 +62,20 @@ data class SessionHistoryRow(
 
 object RecordsPresentation {
 
+    /** The raw code stays in the run's log; 记录 only says what happened in words. */
+    fun stopReasonText(reason: String): String = when {
+        reason == com.ynk.virtualdisplay.automation.ManualPause.REASON -> "你手动暂停"
+        reason.contains("USER_STOP", true) || reason == "用户停止" -> "用户停止"
+        reason.contains("PAGE_MISMATCH", true) -> "页面对不上"
+        reason.startsWith("WORK_NOT_STARTED", true) -> "条件不够，没有开始打工"
+        reason.startsWith("WORK_", true) -> "打工未完成"
+        reason.startsWith("TOWN_EXIT", true) -> "没能回到宠物房间"
+        reason.startsWith("PLAN_", true) -> "方案条件不满足"
+        reason.contains("BUDGET", true) -> "今天蟹累了，明天再来"
+        else -> "中途停止"
+    }
+
+
     /**
      * Aggregates today's sessions. Only sessions that actually produced a run record are counted, so
      * the summary can never be larger than what really ran.
@@ -86,7 +100,8 @@ object RecordsPresentation {
         val minutes = records.sumOf { it.runtimeMs } / 60_000L
         return RecordsSummary(
             rangeText = rangeText,
-            minutesText = "$minutes 分钟",
+            // Time the runs took, which is not the 今日已用 figure: that one counts game minutes.
+            minutesText = "运行 $minutes 分钟",
             courses = records.sumOf { it.completedRounds },
             careCount = records.sumOf { it.care?.total ?: 0 },
             pauseCount = records.sumOf { it.pauseCount },
@@ -218,7 +233,7 @@ object RecordsPresentation {
             outcomeTone = tone,
             detail = "完成 ${record.completedRounds}/${record.rounds} 节 · " +
                 "${record.runtimeMs / 60_000L} 分钟 · 护理 ${record.care?.total ?: 0} 次" +
-                (record.stopReason?.let { " · ${it.take(40)}" } ?: ""),
+                (record.stopReason?.let { " · ${stopReasonText(it)}" } ?: ""),
             screenshots = ev.screenshots.size,
         )
     }

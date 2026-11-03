@@ -120,7 +120,10 @@ class DisplayActivity : ComponentActivity() {
         // 方案 B：不再在此设置全局的 FLAG_NOT_FOCUSABLE，而是通过只允许隐藏文本框聚焦来解决焦点冲突
 
         val displayId = intent.getIntExtra("display_id", -1)
-        require(displayId != -1) { "Invalid display_id" }
+        if (displayId == -1) {
+            finish()
+            return
+        }
         remoteDisplayId = displayId
 
         enterFullscreen()

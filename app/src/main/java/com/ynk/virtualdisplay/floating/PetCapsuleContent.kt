@@ -35,9 +35,11 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.ynk.virtualdisplay.R
 import com.ynk.virtualdisplay.ui.theme.PetTokens
 
 @Composable
@@ -75,6 +77,11 @@ fun CapsuleExpandedCard(
     }
     val frame by DisplayPreviewHub.frame.collectAsState()
     var previewExpanded by remember { mutableStateOf(false) }
+    val manualPause by com.ynk.virtualdisplay.automation.ManualPause.state.collectAsState()
+    val runtime by com.ynk.virtualdisplay.automation.PetRuntime.state.collectAsState()
+    val managed by com.ynk.virtualdisplay.automation.PetManagedRuntime.state.collectAsState()
+    val pauseLabel = com.ynk.virtualdisplay.automation.ManualPause.actionLabel(
+        runtime.running, managed.pauseBoundariesLeft, manualPause)
     val accent = accentOf(model.visual)
 
     Column(
@@ -87,6 +94,13 @@ fun CapsuleExpandedCard(
             .padding(12.dp),
     ) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Image(
+                painterResource(R.drawable.crab_peek),
+                contentDescription = null,
+                modifier = Modifier.size(34.dp),
+                contentScale = ContentScale.Fit,
+            )
+            Spacer(Modifier.width(8.dp))
             Column(Modifier.weight(1f)) {
                 Text(model.title, color = PetTokens.Ink, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
                 Text(model.statusText + " · " + model.durationText, color = accent, fontSize = 12.sp)
@@ -153,8 +167,14 @@ fun CapsuleExpandedCard(
 
         Spacer(Modifier.height(12.dp))
 
+        if (pauseLabel != null) {
+            CapsuleActionButton(pauseLabel, PetTokens.BlueSoft, PetTokens.BlueInk, Modifier.fillMaxWidth()) {
+                com.ynk.virtualdisplay.automation.ManualPause.toggle()
+            }
+            Spacer(Modifier.height(8.dp))
+        }
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            CapsuleActionButton("回到 QQPet", PetTokens.BlueSoft, PetTokens.BlueInk, Modifier.weight(1f), onOpenApp)
+            CapsuleActionButton("回到蟹啦", PetTokens.BlueSoft, PetTokens.BlueInk, Modifier.weight(1f), onOpenApp)
             if (model.canStop) {
                 CapsuleActionButton("停止托管", PetTokens.RedSoft, PetTokens.RedInk, Modifier.weight(1f), onStop)
             }

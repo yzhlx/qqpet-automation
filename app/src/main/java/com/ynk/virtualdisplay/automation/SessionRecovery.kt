@@ -52,7 +52,8 @@ class SessionRecovery(val sessionId: String,private val store: CheckpointStore,
         check(state!=SessionRunState.STOPPED) {"RECOVERY_ALREADY_STOPPED"}
         blockInput();change(SessionRunState.PAUSED,reason)
         val cp=try {store.load()} catch(t: Exception) {stop("CHECKPOINT_INVALID:${t.message}")}
-            ?: stop("CHECKPOINT_MISSING")
+            // Keep the original failure: with no checkpoint yet, this reason is the only clue to what broke.
+            ?: stop("CHECKPOINT_MISSING:$reason")
         if(cp.sessionId!=sessionId || cp!=checkpoint) stop("CHECKPOINT_IDENTITY_MISMATCH")
         // A delivered DOWN must never be resent merely because capture failed afterwards.
         if(cp.actionPending) stop("CHECKPOINT_ACTION_UNCONFIRMED")

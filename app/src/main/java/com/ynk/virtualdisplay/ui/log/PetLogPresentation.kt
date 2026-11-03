@@ -195,7 +195,24 @@ object PetLogPresentation {
             }
             "SELECT_COURSE" -> pageConfirmed(time, step, payload)
             "CLEAR_PREVIOUS_RESULT" -> pageConfirmed(time, step, payload)
-            else -> PetLogEntry(time, "${entry.state} · ${result.take(44)}", PetTokens.Ink3)
+            else -> if (raw) PetLogEntry(time, "${entry.state} · ${result.take(44)}", PetTokens.Ink3)
+            else readableStep(time, entry.state, result, payload)
+        }
+    }
+
+    /** Plan steps log JSON and tokens for the raw viewer; the timeline keeps only what reads as words. */
+    private fun readableStep(time: String, state: String, result: String, payload: JSONObject?): PetLogEntry? {
+        val flow = when (state) {
+            "WORK" -> "打工"
+            "CARE" -> "护理"
+            "STUDY" -> "学习"
+            else -> return null
+        }
+        val label = payload?.optString("label").orEmpty()
+        return when {
+            label.isNotEmpty() -> PetLogEntry(time, "$flow · 点击「$label」", PetTokens.Ink3)
+            payload != null || result.none { it.code > 0x2E7F } -> null
+            else -> PetLogEntry(time, "$flow · ${result.take(44)}", PetTokens.Ink3)
         }
     }
 
@@ -208,7 +225,7 @@ object PetLogPresentation {
         val label = friendlyStep(step)
         return PetLogEntry(
             time,
-            if (template.isEmpty()) label else "$label（$template）",
+            label,
             if (passed) PetTokens.Green else PetTokens.AmberStrong,
             if (passed) null else "待确认",
             if (passed) PetTokens.GraySoft else PetTokens.AmberSoft,

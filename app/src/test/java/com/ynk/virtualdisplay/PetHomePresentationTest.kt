@@ -1,6 +1,8 @@
 package com.ynk.virtualdisplay
 
 import com.ynk.virtualdisplay.automation.ManagedRuntimeState
+import com.ynk.virtualdisplay.automation.ManualPause
+import com.ynk.virtualdisplay.automation.ManualPauseState
 import com.ynk.virtualdisplay.automation.ObservationSource
 import com.ynk.virtualdisplay.automation.ObservedValue
 import com.ynk.virtualdisplay.automation.SessionRunState
@@ -17,6 +19,7 @@ import com.ynk.virtualdisplay.ui.screens.ManagedRuntimePresentation
 import com.ynk.virtualdisplay.ui.screens.RoundProgressPresentation
 import com.ynk.virtualdisplay.ui.screens.StatusPillPresentation
 import com.ynk.virtualdisplay.ui.screens.StatusPillTone
+import com.ynk.virtualdisplay.ui.screens.StudyStepTrack
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -26,7 +29,7 @@ import org.junit.Test
 /**
  * Pure JVM coverage for the v0.1 presentation rules. These tests exist to pin down the honesty
  * contract of the product UI: a missing reading can never become a number, a sent input can never
- * become a confirmed effect, and the pause control can never become operable.
+ * become a confirmed effect, and the pause control is only operable where a pause can take effect.
  */
 class PetHomePresentationTest {
 
@@ -35,6 +38,18 @@ class PetHomePresentationTest {
 
     private fun known(value: Int, observedAt: Long = wall) =
         ObservedValue.Known(value, observedAt, 1.0, "frame.png", ObservationSource.DIGIT_RECOGNITION)
+
+    // --- study stage track -----------------------------------------------------------------------
+
+    @Test
+    fun `study steps map onto the four stages and anything else stays unmapped`() {
+        assertEquals(4, StudyStepTrack.LABELS.size)
+        assertEquals(0, StudyStepTrack.indexOf("CHECK_STATE"))
+        assertEquals(1, StudyStepTrack.indexOf("start_course"))
+        assertEquals(2, StudyStepTrack.indexOf("WAIT_RESULT"))
+        assertEquals(3, StudyStepTrack.indexOf("READ_POST_STATE"))
+        assertNull(StudyStepTrack.indexOf("WORK_SHIFT"))
+    }
 
     // --- health stats --------------------------------------------------------------------------
 
@@ -77,7 +92,7 @@ class PetHomePresentationTest {
         val stats = HealthStatPresentation.stats(state, wall, true, at(old))
         assertEquals(HealthStatStatus.STALE, stats[0].status)
         assertTrue(stats[0].valueText.startsWith("≈"))
-        assertTrue(stats[0].meta.contains("已过期"))
+        assertTrue(stats[0].meta.startsWith("上次 "))
         assertFalse(stats[0].current)
     }
 
@@ -95,15 +110,67 @@ class PetHomePresentationTest {
     // --- controls ------------------------------------------------------------------------------
 
     @Test
-    fun `pause is never operable in v0_1`() {
+    fun `a single-action session offers no pause button`() {
         val controls = ManagedControlsPresentation.of(
-            legacyActive = true, runState = SessionRunState.RUNNING, canStart = true,
+            legacyActive = true, runState = SessionRunState.RUNNING, canStart = true, pausable = false,
         )
         assertFalse(controls.pauseEnabled)
         assertFalse(controls.manualPauseAvailable)
         assertFalse(controls.showStartPrimary)
         assertTrue(controls.stopEnabled)
-        assertTrue(controls.pauseUnavailableReason.contains("未开放手动暂停"))
+        assertNull(controls.pauseUnavailableReason)
+    }
+
+    @Test
+    fun `manual pause moves from pause to withdraw to continue`() {
+        fun at(state: ManualPauseState, runState: SessionRunState = SessionRunState.RUNNING) =
+            ManagedControlsPresentation.of(
+                legacyActive = true, runState = runState, canStart = false, pausable = true, manualPause = state,
+            )
+        val idle = at(ManualPauseState.NONE)
+        assertTrue(idle.pauseEnabled)
+        assertFalse(idle.resumeEnabled)
+        assertEquals("暂停", idle.pauseButtonText)
+        assertNull(idle.manualPauseNote)
+
+        val requested = at(ManualPauseState.REQUESTED)
+        assertFalse(requested.pauseEnabled)
+        assertTrue(requested.resumeEnabled)
+        assertEquals("取消暂停", requested.pauseButtonText)
+        assertTrue(requested.manualPauseNote!!.contains("不会被打断"))
+
+        val held = at(ManualPauseState.HELD, SessionRunState.PAUSED)
+        assertTrue(held.resumeEnabled)
+        assertEquals("继续", held.pauseButtonText)
+        assertFalse(held.automaticRecoveryActive)
+        assertNull(held.manualPauseNote)
+    }
+
+    @Test
+    fun `a held pause keeps its continue button after the last boundary passed`() {
+        val held = ManagedControlsPresentation.of(
+            legacyActive = true, runState = SessionRunState.PAUSED, canStart = false, pausable = false,
+            manualPause = ManualPauseState.HELD,
+        )
+        assertTrue(held.manualPauseAvailable)
+        assertTrue(held.resumeEnabled)
+        assertEquals("继续", held.pauseButtonText)
+    }
+
+    @Test
+    fun `pause cannot be pressed while automatic recovery owns the session`() {
+        val recovering = ManagedControlsPresentation.of(
+            legacyActive = true, runState = SessionRunState.RESUMING, canStart = false, pausable = true,
+        )
+        assertTrue(recovering.manualPauseAvailable)
+        assertFalse(recovering.pauseEnabled)
+        assertTrue(recovering.automaticRecoveryActive)
+        assertTrue(recovering.pauseUnavailableReason!!.contains("自动恢复"))
+    }
+
+    @Test
+    fun `a manual pause reads as the user's own pause, not a failure`() {
+        assertEquals("你手动暂停", RecordsPresentation.stopReasonText(ManualPause.REASON))
     }
 
     @Test
@@ -170,7 +237,7 @@ class PetHomePresentationTest {
         val legacy = com.ynk.virtualdisplay.automation.PetRuntime.Snapshot()
         val view = ManagedRuntimePresentation.of(state, legacy, wall, wall)
         val pill = StatusPillPresentation.of(view, legacyActive = false)
-        assertEquals("空闲", pill.text)
+        assertEquals("蟹在歇着", pill.text)
         assertEquals(StatusPillTone.NEUTRAL, pill.tone)
     }
 
@@ -307,7 +374,8 @@ class PetHomePresentationTest {
         assertEquals(VerdictTone.CONFIRMED, rows[0].outcomeTone)
         assertEquals(2, rows[0].screenshots)
         assertEquals("失败", rows[1].outcomeText)
-        assertTrue(rows[1].detail.contains("PAGE_MISMATCH"))
+        assertTrue(rows[1].detail.contains("页面对不上"))
+        assertFalse(rows[1].detail.contains("PAGE_MISMATCH"))
     }
 
     @Test
