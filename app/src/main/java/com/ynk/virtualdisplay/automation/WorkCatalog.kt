@@ -40,6 +40,16 @@ class WorkCatalog(private val entries: List<WorkCatalogEntry> = defaultEntries()
     fun all(): List<WorkCatalogEntry> = entries
 
     /**
+     * CORE-10: 打工候选岗位切换。
+     * 当主选岗位条件不符或受阻时，提供按优先级排列的备选已验证岗位，避免死循环。
+     */
+    fun candidatesFor(primaryOptionId: String): List<WorkCatalogEntry> {
+        val primary = entries.firstOrNull { it.id == primaryOptionId }
+        val fallbacks = entries.filter { it.id != primaryOptionId && it.confidence != RewardConfidence.UNKNOWN }
+        return listOfNotNull(primary) + fallbacks
+    }
+
+    /**
      * Compares a freshly re-read page row against the catalog entry.
      *
      * Returns the list of field-level differences (empty means the page agrees with the catalog).

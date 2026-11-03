@@ -26,7 +26,7 @@ object PlanV2JsonCodec {
                     is CareStep -> {
                         put("energyThreshold", step.energyThreshold); put("cleanlinessThreshold", step.cleanlinessThreshold)
                     }
-                    is StudyStep -> { put("courseId", step.courseId); put("rounds", step.rounds) }
+                    is StudyStep -> { put("courseId", step.courseId); put("rounds", step.rounds); if (step.targetAttribute != null) put("targetAttribute", step.targetAttribute) }
                 }
             }
         }
@@ -52,8 +52,8 @@ object PlanV2JsonCodec {
                     CareStep(id, step.int("energyThreshold"), step.int("cleanlinessThreshold"))
                 }
                 PlanStepType.STUDY -> {
-                    step.only("stepId", "type", "courseId", "rounds")
-                    StudyStep(id, step.string("courseId"), step.int("rounds"))
+                    step.only("stepId", "type", "courseId", "rounds", "targetAttribute")
+                    StudyStep(id, step.string("courseId"), step.int("rounds"), step.optionalString("targetAttribute"))
                 }
             }
         }

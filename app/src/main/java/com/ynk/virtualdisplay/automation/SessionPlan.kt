@@ -39,6 +39,7 @@ data class SessionPlan(
     val workBeforeStudy: Boolean = false,
     /** Catalog id of the shift to run. Only consulted when [workBeforeStudy] is set. */
     val workOptionId: String? = DEFAULT_WORK_OPTION_ID,
+    val targetAttribute: String? = null,
 ) {
     init {
         require(courseId.isNotBlank()) { "PLAN_COURSE_BLANK" }
@@ -69,6 +70,7 @@ data class SessionPlan(
         .put("dailyBudgetMinutes", dailyBudgetMinutes)
         .put("workBeforeStudy", workBeforeStudy)
         .put("workOptionId", workOptionId ?: JSONObject.NULL)
+        .put("targetAttribute", targetAttribute ?: JSONObject.NULL)
 
     companion object {
         const val DEFAULT_COURSE_ID = "study:蹦蹦跳跳体能课"
@@ -87,7 +89,15 @@ data class SessionPlan(
          * Durations confirmed by a real completed lesson. The scan records a duration per course
          * too, but until that reading is closed-loop verified the budget guard trusts only this.
          */
-        val KNOWN_COURSE_MINUTES: Map<String, Int> = mapOf(DEFAULT_COURSE_ID to 10)
+        val KNOWN_COURSE_MINUTES: Map<String, Int> = mapOf(
+            DEFAULT_COURSE_ID to 10,
+            "study:看图识世界课" to 10,
+            "study:闪亮自我表达课" to 10,
+            "study:田径运动课" to 10,
+            "study:世界地理课" to 10,
+            "study:演说表达课" to 10,
+            "study:萌芽夏令营" to 10,
+        )
 
         /** The ranges a plan may hold, shared by the [SessionPlan] checks above. */
         val ROUNDS_RANGE = MIN_ROUNDS..MAX_ROUNDS
@@ -103,6 +113,7 @@ data class SessionPlan(
             dailyBudgetMinutes = json.optInt("dailyBudgetMinutes", DailyBudgetStore.HARD_STOP_MINUTES),
             workBeforeStudy = json.optBoolean("workBeforeStudy", false),
             workOptionId = if (json.has("workOptionId") && !json.isNull("workOptionId")) json.getString("workOptionId") else null,
+            targetAttribute = if (json.has("targetAttribute") && !json.isNull("targetAttribute")) json.getString("targetAttribute") else null,
         )
     }
 }

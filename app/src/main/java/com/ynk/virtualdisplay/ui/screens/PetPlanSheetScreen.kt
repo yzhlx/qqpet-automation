@@ -6,6 +6,7 @@ import androidx.compose.foundation.clickable
 import android.content.Context
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -122,6 +123,7 @@ fun PetPlanSheetScreen(onClose: () -> Unit, onStarted: () -> Unit, displayId: In
             legacySource = stored.legacySource
             selectedWork = work != null; selectedCare = care != null; selectedStudy = study != null
             plan = plan.copy(courseId = study?.courseId ?: plan.courseId, rounds = study?.rounds ?: plan.rounds,
+                targetAttribute = study?.targetAttribute ?: plan.targetAttribute,
                 energyThreshold = care?.energyThreshold ?: plan.energyThreshold,
                 cleanlinessThreshold = care?.cleanlinessThreshold ?: plan.cleanlinessThreshold,
                 dailyBudgetMinutes = stored.dailyBudgetMinutes,
@@ -150,8 +152,8 @@ fun PetPlanSheetScreen(onClose: () -> Unit, onStarted: () -> Unit, displayId: In
         loading -> "正在读取方案…"
         !selectedWork && !selectedCare && !selectedStudy -> "请选择至少一个动作。"
         selectedWork && verified.none { it.id == plan.workOptionId } -> "请选择打工岗位。"
-        selectedStudy && !fresh -> "请先读取我的课程。"
-        selectedStudy && selectedCourse?.durationMinutes == null -> "请选择一门时长已读出的课程。"
+        selectedStudy && !fresh && plan.targetAttribute == null && catalog == null -> "请先读取我的课程或选择上方目标属性。"
+        selectedStudy && plan.targetAttribute == null && selectedCourse?.durationMinutes == null -> "请选择一门时长已读出的课程。"
         else -> null
     }
     fun changed() { saved = false; lastSavedSnapshot = null; saveError = null }
@@ -168,7 +170,7 @@ fun PetPlanSheetScreen(onClose: () -> Unit, onStarted: () -> Unit, displayId: In
                         if (selectedStudy && plan.workBeforeStudy) WorkTrigger.IF_FUNDS_SHORT else WorkTrigger.ALWAYS))
                     if (selectedCare) add(CareStep(stepIds[PlanStepType.CARE] ?: "$planId:care",
                         plan.energyThreshold, plan.cleanlinessThreshold))
-                    if (selectedStudy) add(StudyStep(stepIds[PlanStepType.STUDY] ?: "$planId:study", plan.courseId, plan.rounds))
+                    if (selectedStudy) add(StudyStep(stepIds[PlanStepType.STUDY] ?: "$planId:study", plan.courseId, plan.rounds, plan.targetAttribute))
                 }
                 val snapshot = PlanV2(planId = planId, name = name, dailyBudgetMinutes = plan.dailyBudgetMinutes,
                     steps = steps, executionProfile = ExecutionProfile.SELECTED_ACTIONS, legacySource = legacySource)
@@ -268,6 +270,35 @@ fun PetPlanSheetScreen(onClose: () -> Unit, onStarted: () -> Unit, displayId: In
             }
 
             if (selectedStudy) PetCard {
+                PetSection("培养目标属性")
+                Spacer(Modifier.height(8.dp))
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    for (attr in com.ynk.virtualdisplay.automation.StudyAttribute.entries) {
+                        val isSelected = plan.targetAttribute == attr.label ||
+                            (plan.targetAttribute == null && com.ynk.virtualdisplay.automation.StudyAttribute.forCourseId(plan.courseId) == attr)
+                        Box(
+                            Modifier
+                                .weight(1f)
+                                .clip(RoundedCornerShape(PetTokens.ChipRadius))
+                                .background(if (isSelected) PetTokens.Blue else PetTokens.Surface)
+                                .clickable(enabled = !busy) {
+                                    val resolved = com.ynk.virtualdisplay.automation.StudyAttribute.resolveCourse(attr, catalog)
+                                    plan = plan.copy(targetAttribute = attr.label, courseId = resolved.id)
+                                    changed()
+                                }
+                                .padding(vertical = 7.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                attr.label,
+                                fontSize = 13.sp,
+                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                color = if (isSelected) PetTokens.Surface else PetTokens.Ink,
+                            )
+                        }
+                    }
+                }
+                Spacer(Modifier.height(10.dp))
                 PetSection("课程")
                 Spacer(Modifier.height(8.dp))
                 if (!fresh) PetNote("需要 7 天内读取过的课表，请先读取。")

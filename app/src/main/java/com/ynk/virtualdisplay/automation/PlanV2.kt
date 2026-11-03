@@ -42,6 +42,7 @@ data class StudyStep(
     override val stepId: String,
     val courseId: String,
     val rounds: Int = 1,
+    val targetAttribute: String? = null,
 ) : PlanStep {
     override val type: PlanStepType get() = PlanStepType.STUDY
     init {

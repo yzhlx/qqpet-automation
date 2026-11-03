@@ -286,13 +286,28 @@ class PetSessionController(context:Context,capture:HeadlessDisplayCapture,input:
         // room (2026-10-21 screenshot pre-work2.png). The old (360,1390) landed below the icon and the
         // page stayed on the room, failing PAGE_MISMATCH on the outdoor probe.
         navigation.enterOutdoor("work-only-outdoor")
-        val target=WorkTarget(entry.venue,entry.optionLabel,entry.id)
-        work.authorise(WorkStartAuthorisation.grant(entry.venue,entry.id,maxStarts=1,
-            maxCoinsSpent=0,maxEnergySpent=entry.energyCost,grantedBy="work-shortcut",
-            nowMs=System.currentTimeMillis()))
-        val started=work.run(target)
-        leaveTownIfWorkRefused(started)
-        check(started is WorkOutcome.Started) {"WORK_NOT_STARTED:${started::class.simpleName}"}
+        val candidates = WorkCatalog().candidatesFor(entry.id)
+        var startedOutcome: Pair<WorkCatalog.WorkCatalogEntry, WorkOutcome.Started>? = null
+        val refusedReasons = mutableListOf<String>()
+
+        for (candidate in candidates) {
+            val candidateTarget = WorkTarget(candidate.venue, candidate.optionLabel, candidate.id)
+            work.authorise(WorkStartAuthorisation.grant(candidate.venue, candidate.id, maxStarts=1,
+                maxCoinsSpent=0, maxEnergySpent=candidate.energyCost, grantedBy="work-shortcut",
+                nowMs=System.currentTimeMillis()))
+            val outcome = work.run(candidateTarget)
+            if (outcome is WorkOutcome.Started) {
+                startedOutcome = candidate to outcome
+                break
+            } else {
+                val reason = if (outcome is WorkOutcome.Blocked) outcome.reason else outcome::class.simpleName ?: "REFUSED"
+                refusedReasons += "${candidate.optionLabel} ($reason)"
+                flow.emit("work-candidate-refused", result = "candidate=${candidate.id} reason=$reason")
+                leaveTownIfWorkRefused(outcome)
+            }
+        }
+        val (activeEntry, started) = startedOutcome ?: error("WORK_ALL_CANDIDATES_REFUSED:${refusedReasons.joinToString("; ")}")
+        val target = WorkTarget(activeEntry.venue, activeEntry.optionLabel, activeEntry.id)
         onWorkStarted(started.durationMinutes)
         val done=work.waitAndVerify(target)
         check(done is WorkOutcome.Completed) {"WORK_NOT_COMPLETED:${done::class.simpleName}"}
@@ -421,13 +436,28 @@ class PetSessionController(context:Context,capture:HeadlessDisplayCapture,input:
         workResources.setCoursePageBalance(roomCoinsBefore as? ObservedValue.Known)
         flow.state="WORK"
         navigation.enterOutdoor("plan-work-outdoor")
-        val target=WorkTarget(entry.venue,entry.optionLabel,entry.id)
-        work.authorise(WorkStartAuthorisation.grant(entry.venue,entry.id,maxStarts=1,
-            maxCoinsSpent=0,maxEnergySpent=entry.energyCost,grantedBy="plan",
-            nowMs=System.currentTimeMillis()))
-        val started=work.run(target)
-        leaveTownIfWorkRefused(started)
-        check(started is WorkOutcome.Started) {"WORK_NOT_STARTED:${started::class.simpleName}"}
+        val candidates = WorkCatalog().candidatesFor(entry.id)
+        var startedOutcome: Pair<WorkCatalog.WorkCatalogEntry, WorkOutcome.Started>? = null
+        val refusedReasons = mutableListOf<String>()
+
+        for (candidate in candidates) {
+            val candidateTarget = WorkTarget(candidate.venue, candidate.optionLabel, candidate.id)
+            work.authorise(WorkStartAuthorisation.grant(candidate.venue, candidate.id, maxStarts=1,
+                maxCoinsSpent=0, maxEnergySpent=candidate.energyCost, grantedBy="plan",
+                nowMs=System.currentTimeMillis()))
+            val outcome = work.run(candidateTarget)
+            if (outcome is WorkOutcome.Started) {
+                startedOutcome = candidate to outcome
+                break
+            } else {
+                val reason = if (outcome is WorkOutcome.Blocked) outcome.reason else outcome::class.simpleName ?: "REFUSED"
+                refusedReasons += "${candidate.optionLabel} ($reason)"
+                flow.emit("work-candidate-refused", result = "candidate=${candidate.id} reason=$reason")
+                leaveTownIfWorkRefused(outcome)
+            }
+        }
+        val (activeEntry, started) = startedOutcome ?: error("WORK_ALL_CANDIDATES_REFUSED:${refusedReasons.joinToString("; ")}")
+        val target = WorkTarget(activeEntry.venue, activeEntry.optionLabel, activeEntry.id)
         checkNotNull(activePlanContext).startConfirmed(1)
         val done=work.waitAndVerify(target)
         check(done is WorkOutcome.Completed) {"WORK_NOT_COMPLETED:${done::class.simpleName}"}
