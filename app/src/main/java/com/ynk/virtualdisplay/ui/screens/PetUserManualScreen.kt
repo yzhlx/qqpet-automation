@@ -168,7 +168,7 @@ fun PetUserManualScreen(
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         PetIcon(PetGlyph.Play, 18.dp)
                         Spacer(Modifier.width(8.dp))
-                        PetSection("二、开始打工、学习与护理")
+                        PetSection("二、开始打工、学习、护理与冒险")
                     }
                     Spacer(Modifier.height(8.dp))
                     ManualStepItem(
@@ -185,6 +185,11 @@ fun PetUserManualScreen(
                         step = "护理",
                         title = "清洁与饱食状态维持",
                         body = "当清洁度或体力低于阈值时，自动执行洗澡或喂食动作。如背包香皂或饼干不足，会安全提示并不盲目购买扣费。",
+                    )
+                    ManualStepItem(
+                        step = "冒险",
+                        title = "基础自动冒险与安全退出 (CORE-11)",
+                        body = "经户外地图进入「冒险」，支持「附近走走」短途探索与「诗和远方」旅行。开跑前自动检查体力与今日次数，受阻时安全停止；完成后自动核对奇遇结算与金币明细，安全返回房间。",
                     )
                     PetNote("开始前请确保 QQ 已在后台登录养宠账号并停留在宠物房间。")
                 }
