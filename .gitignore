@@ -50,3 +50,5 @@ __pycache__/
 *.keystore
 *.jks
 .env*
+
+/.build-test/

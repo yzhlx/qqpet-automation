@@ -47,6 +47,7 @@ import com.ynk.virtualdisplay.floating.OverlayPermission
 import com.ynk.virtualdisplay.ui.data.PetEvidenceRepository
 import com.ynk.virtualdisplay.ui.feedback.FeedbackChannels
 import com.ynk.virtualdisplay.ui.feedback.FeedbackDialog
+import com.ynk.virtualdisplay.ui.feedback.DiagnosticDialog
 import com.ynk.virtualdisplay.ui.kit.PetCard
 import com.ynk.virtualdisplay.ui.kit.PetChip
 import com.ynk.virtualdisplay.ui.kit.PetNote
@@ -90,9 +91,11 @@ fun PetSettingsScreen(
     var budgetUsed by remember { mutableStateOf(0) }
     var notificationsEnabled by remember { mutableStateOf(true) }
     var showFeedback by remember { mutableStateOf(false) }
+    var showDiagnostic by remember { mutableStateOf(false) }
     var showAdvanced by remember { mutableStateOf(false) }
 
     if (showFeedback) FeedbackDialog(onDismiss = { showFeedback = false })
+    if (showDiagnostic) DiagnosticDialog(repository = viewModel.repository, shizukuState = uiState.shizukuState, onDismiss = { showDiagnostic = false })
 
     // The display list is only filled by the console, so the page must ask for it itself; otherwise a
     // screen created elsewhere still reads as 未创建.
@@ -182,6 +185,16 @@ fun PetSettingsScreen(
                     showChevron = !notificationsEnabled,
                 )
             }
+            Column(Modifier.clickable { showDiagnostic = true }) {
+                PetListRow(
+                    tileBg = PetTokens.BlueSoft,
+                    icon = { PetIcon(PetGlyph.Check, 17.dp) },
+                    title = "检查运行环境",
+                    sub = "分层诊断基础状态、截图能力与虚拟屏",
+                    trailing = { PetChip("开始诊断", PetTokens.BlueSoft, PetTokens.BlueInk) },
+                    showChevron = true,
+                )
+            }
             if (uiState.shizukuState !is ShizukuState.Ready) {
                 Row(Modifier.fillMaxWidth().padding(bottom = 10.dp)) {
                     PetNote("Shizuku 未就绪时不能开始托管。")
@@ -238,6 +251,18 @@ fun PetSettingsScreen(
                     icon = { PetIcon(PetGlyph.TabRec, 17.dp) },
                     title = "导出运行日志",
                     sub = "存到手机「下载」，出问题时可直接发给开发者",
+                    showChevron = true,
+                )
+            }
+            Column(Modifier.clickable {
+                com.ynk.virtualdisplay.ui.screens.OnboardingStore(context).reset()
+                android.widget.Toast.makeText(context, "已重置引导进度，返回或刷新即可重新配置", android.widget.Toast.LENGTH_SHORT).show()
+            }) {
+                PetListRow(
+                    tileBg = PetTokens.GraySoft,
+                    icon = { PetIcon(PetGlyph.Help, 17.dp) },
+                    title = "重新打开新手引导",
+                    sub = "清除引导进度并重新运行配置向导",
                     showChevron = true,
                 )
             }

@@ -83,8 +83,10 @@ class MainActivity : ComponentActivity() {
         setContent {
             MyApplicationTheme {
                 val uiState by viewModel.uiState.collectAsState()
-                val guidePrefs = remember { getSharedPreferences("virtual_display_settings", MODE_PRIVATE) }
-                var guideCompleted by remember { mutableStateOf(guidePrefs.getBoolean("onboarding_completed", false)) }
+                val onboardingStore = remember { com.ynk.virtualdisplay.ui.screens.OnboardingStore(this@MainActivity) }
+                var guideProgress by remember { mutableStateOf(onboardingStore.load()) }
+                var permissionError by remember { mutableStateOf<String?>(null) }
+                var showGuideManual by remember { mutableStateOf(false) }
 
                 Scaffold(
                     modifier = Modifier.fillMaxSize(),
@@ -92,26 +94,40 @@ class MainActivity : ComponentActivity() {
                 ) { innerPadding ->
                     Box(Modifier.padding(innerPadding).fillMaxSize()) {
                         val state = uiState.shizukuState
+                        val showGuide = showGuideManual || OnboardingFlow.shown(
+                            completedBefore = guideProgress.completed,
+                            shizukuReady = state is ShizukuState.Ready,
+                            previewMode = guideProgress.previewMode
+                        )
                         when {
                             // Polling from the guide passes through Checking, which must not flash a spinner.
-                            state is ShizukuState.Checking && guideCompleted -> Box(
+                            state is ShizukuState.Checking && guideProgress.completed -> Box(
                                 Modifier.fillMaxSize(), contentAlignment = Alignment.Center,
                             ) { CircularProgressIndicator() }
 
-                            OnboardingFlow.shown(guideCompleted, state is ShizukuState.Ready) -> OnboardingScreen(
+                            showGuide -> OnboardingScreen(
                                 state = state,
-                                completedBefore = guideCompleted,
+                                completedBefore = guideProgress.completed,
+                                permissionError = permissionError,
                                 onCheck = { viewModel.checkShizukuStatus(this@MainActivity) },
                                 onRequestPermission = {
                                     try {
+                                        permissionError = null
                                         Shizuku.requestPermission(ShizukuDisplayRepository.REQUEST_CODE)
                                     } catch (e: Exception) {
                                         Log.e("MainActivity", "Failed to request permission", e)
+                                        permissionError = e.localizedMessage ?: "Shizuku 服务未响应"
                                     }
                                 },
                                 onFinish = {
-                                    guidePrefs.edit().putBoolean("onboarding_completed", true).apply()
-                                    guideCompleted = true
+                                    onboardingStore.saveCompleted(true)
+                                    guideProgress = onboardingStore.load()
+                                    showGuideManual = false
+                                },
+                                onPreview = {
+                                    onboardingStore.savePreviewMode(true)
+                                    guideProgress = onboardingStore.load()
+                                    showGuideManual = false
                                 },
                             )
 
