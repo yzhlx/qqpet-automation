@@ -412,6 +412,8 @@ class PetSessionController(context:Context,capture:HeadlessDisplayCapture,input:
                 ResourcePreflight.Ready("device-preflight-${System.currentTimeMillis()}",planSkipWork,false)
             })
         val execution=PlanDeviceExecution(store,checkNotNull(planAttemptBudget),preflight,
+            signIn={step,ctx -> pausePoint("每日签到");activePlanContext=ctx;runPlanSignIn(step)},
+            mailbox={step,ctx -> pausePoint("信箱待领");activePlanContext=ctx;runPlanMailbox(step)},
             work={step,ctx -> pausePoint("打工");activePlanContext=ctx;runPlanWork(step)},
             care={step,ctx -> pausePoint("护理");activePlanContext=ctx;runPlanCare(step)},
             study={step,ctx -> activePlanContext=ctx;runPlanStudy(step)},
@@ -610,6 +612,112 @@ class PetSessionController(context:Context,capture:HeadlessDisplayCapture,input:
      * requires the threshold precondition that only a lesson needs.
      */
 
+    private suspend fun runPlanSignIn(step: SignInStep): StepOutcome {
+        flow.round = 1
+        flow.state = "SIGN_IN"
+        snapshot = snapshot.copy(currentFlow = "SIGN_IN", nextStep = "每日签到")
+        val ctx = checkNotNull(activePlanContext)
+
+        val signInFlow = PetSignInFlow(
+            flow = flow,
+            lineReader = {
+                val f = flow.frame(latest = true)
+                try {
+                    reader.read(f)
+                } finally {
+                    f.recycle()
+                }
+            },
+            tap = { point, settleMs ->
+                flow.safety()
+                flow.input.tap(point.x, point.y)
+                kotlinx.coroutines.delay(settleMs)
+            },
+            onBeforeClaim = {
+                ctx.beforeConsumingInput(1, 0)
+            }
+        )
+
+        return when (val outcome = signInFlow.run()) {
+            is SignInOutcome.Completed -> {
+                ctx.completed(1, 0)
+                flow.emit("plan-sign-in-complete", result = "coins=" + (outcome.reward.coinAward ?: 0))
+                StepOutcome.Completed()
+            }
+            is SignInOutcome.AlreadyDone -> {
+                flow.emit("plan-sign-in-already-done")
+                StepOutcome.Skipped(SkipReason.ALREADY_SATISFIED)
+            }
+            is SignInOutcome.Skipped -> {
+                flow.emit("plan-sign-in-skipped", result = outcome.reason)
+                StepOutcome.Skipped(SkipReason.ALREADY_SATISFIED)
+            }
+            is SignInOutcome.Blocked -> {
+                ctx.unconfirmed(1, outcome.reason)
+                flow.emit("plan-sign-in-blocked", result = outcome.reason)
+                StepOutcome.Blocked(outcome.reason)
+            }
+            is SignInOutcome.Failed -> {
+                ctx.unconfirmed(1, outcome.reason)
+                flow.emit("plan-sign-in-failed", result = outcome.reason)
+                StepOutcome.Failed(outcome.reason)
+            }
+        }
+    }
+
+    private suspend fun runPlanMailbox(step: MailboxStep): StepOutcome {
+        flow.round = 1
+        flow.state = "MAILBOX"
+        snapshot = snapshot.copy(currentFlow = "MAILBOX", nextStep = "信箱待领")
+        val ctx = checkNotNull(activePlanContext)
+
+        val mailboxFlow = PetMailboxFlow(
+            flow = flow,
+            lineReader = {
+                val f = flow.frame(latest = true)
+                try {
+                    reader.read(f)
+                } finally {
+                    f.recycle()
+                }
+            },
+            tap = { point, settleMs ->
+                flow.safety()
+                flow.input.tap(point.x, point.y)
+                kotlinx.coroutines.delay(settleMs)
+            },
+            onBeforeClaim = {
+                ctx.beforeConsumingInput(1, 0)
+            }
+        )
+
+        return when (val outcome = mailboxFlow.run()) {
+            is MailboxOutcome.Completed -> {
+                ctx.completed(1, 0)
+                flow.emit("plan-mailbox-complete", result = "coins=" + (outcome.reward.coinAward ?: 0))
+                StepOutcome.Completed()
+            }
+            is MailboxOutcome.AlreadyDone -> {
+                flow.emit("plan-mailbox-already-done")
+                StepOutcome.Skipped(SkipReason.ALREADY_SATISFIED)
+            }
+            is MailboxOutcome.Skipped -> {
+                flow.emit("plan-mailbox-skipped", result = outcome.reason)
+                StepOutcome.Skipped(SkipReason.ALREADY_SATISFIED)
+            }
+            is MailboxOutcome.Blocked -> {
+                ctx.unconfirmed(1, outcome.reason)
+                flow.emit("plan-mailbox-blocked", result = outcome.reason)
+                StepOutcome.Blocked(outcome.reason)
+            }
+            is MailboxOutcome.Failed -> {
+                ctx.unconfirmed(1, outcome.reason)
+                flow.emit("plan-mailbox-failed", result = outcome.reason)
+                StepOutcome.Failed(outcome.reason)
+            }
+        }
+    }
+
     private suspend fun runPlanAdventure(step: AdventureStep): StepOutcome {
         val adventureFlow = PetAdventureFlow(
             flow = flow,
@@ -628,36 +736,58 @@ class PetSessionController(context:Context,capture:HeadlessDisplayCapture,input:
                 kotlinx.coroutines.delay(settleMs)
             }
         )
-        repeat(step.rounds) { index ->
-            pausePoint("第 " + (index + 1) + "/" + step.rounds + " 轮冒险: " + step.mode.label)
+        val maxRounds = if (step.maxDailyRounds != null) minOf(step.rounds, step.maxDailyRounds) else step.rounds
+        if (maxRounds <= 0) {
+            flow.emit("plan-adventure-skipped", result = "DAILY_LIMIT_REACHED")
+            return StepOutcome.Skipped(SkipReason.DAILY_LIMIT_REACHED)
+        }
+        repeat(maxRounds) { index ->
+            pausePoint("第 " + (index + 1) + "/" + maxRounds + " 轮冒险: " + step.mode.label)
             flow.round = index + 1
             flow.state = "ADVENTURE"
-            snapshot = snapshot.copy(currentFlow = "ADVENTURE", nextStep = "第 " + (index + 1) + "/" + step.rounds + " 轮冒险: " + step.mode.label)
+            snapshot = snapshot.copy(currentFlow = "ADVENTURE", nextStep = "第 " + (index + 1) + "/" + maxRounds + " 轮冒险: " + step.mode.label)
             val ctx = checkNotNull(activePlanContext)
             val durationMinutes = step.mode.durationMinutes
-            ctx.beforeConsumingInput(index + 1, durationMinutes)
-            val outcome = adventureFlow.run(mode = step.mode)
+            var inputDispatched = false
+            val outcome = adventureFlow.run(
+                mode = step.mode,
+                onBeforeStart = {
+                    ctx.beforeConsumingInput(index + 1, durationMinutes)
+                    inputDispatched = true
+                }
+            )
             when (outcome) {
                 is AdventureOutcome.Completed -> {
                     ctx.completed(index + 1, durationMinutes)
                     flow.emit("ADVENTURE_COMPLETE", result = "round=" + (index + 1) + " coins=" + outcome.coinAward)
                 }
                 is AdventureOutcome.Blocked -> {
-                    ctx.unconfirmed(index + 1, outcome.reason)
+                    if (inputDispatched) {
+                        ctx.unconfirmed(index + 1, outcome.reason)
+                    }
                     flow.emit("ADVENTURE_BLOCKED", result = outcome.reason)
+                    if (outcome.reason.startsWith("ADVENTURE_LIMITED")) {
+                        return if (index == 0) StepOutcome.Skipped(SkipReason.DAILY_LIMIT_REACHED) else StepOutcome.Completed()
+                    }
                     return StepOutcome.Blocked(outcome.reason)
                 }
                 is AdventureOutcome.Failed -> {
-                    ctx.unconfirmed(index + 1, outcome.reason)
+                    if (inputDispatched) {
+                        ctx.unconfirmed(index + 1, outcome.reason)
+                    }
                     flow.emit("ADVENTURE_FAILED", result = outcome.reason)
                     return StepOutcome.Failed(outcome.reason)
                 }
                 is AdventureOutcome.Interrupted -> {
-                    ctx.unconfirmed(index + 1, "INTERRUPTED")
+                    if (inputDispatched) {
+                        ctx.unconfirmed(index + 1, "INTERRUPTED")
+                    }
                     return StepOutcome.Blocked("ADVENTURE_INTERRUPTED")
                 }
                 else -> {
-                    ctx.unconfirmed(index + 1, "UNCONFIRMED")
+                    if (inputDispatched) {
+                        ctx.unconfirmed(index + 1, "UNCONFIRMED")
+                    }
                     return StepOutcome.Unconfirmed("ADVENTURE_UNCONFIRMED")
                 }
             }
@@ -1024,6 +1154,8 @@ class PetSessionController(context:Context,capture:HeadlessDisplayCapture,input:
             "requestedRounds" to ledger.attemptCount,
             "workCompleted" to (planRunSnapshot?.counts?.workShiftsCompleted ?: if (mode == SessionMode.WORK && terminal == SessionRunState.COMPLETED) 1 else 0),
             "adventureCompleted" to (planRunSnapshot?.counts?.adventureCompleted ?: if (mode == SessionMode.ADVENTURE && terminal == SessionRunState.COMPLETED) 1 else 0),
+            "signInCompleted" to (planRunSnapshot?.counts?.signInCompleted ?: 0),
+            "mailboxCompleted" to (planRunSnapshot?.counts?.mailboxCompleted ?: 0),
             "roomCoinsBefore" to sessionRoomCoinsBefore,
             "roomCoinsAfter" to sessionRoomCoinsAfter)
         File(evidence,"run-record.json").writeText(EventJson.encode(record))

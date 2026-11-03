@@ -231,3 +231,25 @@
   2. 确认 VD4 宠物在 display 4；若黑屏则 force-stop QQ + 搜索入口拉回。
   3. 托管田径×1：期望出现 `prework-fresh` 或 `prework-needed`→工资页 `work-reward-payroll-award`→护理→上课→`MANAGED_BATCH_PASS`。若金币仍 ≥ 学费+护理估算，需先压币（阈值已 100/100）再验严格打工链路。
 - 阻塞项：设备 offline；未授权卸载清数据/推送/外传钥匙。
+
+## 每日重复玩法与上限控制（2026-11-04，feat/onboarding-troubleshooting-p0）
+- 目标：
+  1. SOC-03 每日签到：识别房间签到入口、开窗前/开窗后已签到状态检测（防重复执行）、领取按钮与到账解析、安全回房。
+  2. SOC-04 信箱奖励待领：识别信箱入口与未读状态、空信箱自动安全跳过、一键领取与到账解析、安全回房。
+  3. STR-14 冒险每日次数与上限控制：扩充冒险上限识别（含上限已满/明日再来等关键词），提取剩余轮次，支持 onBeforeStart 延迟授权门禁与上限平滑结束。
+  4. 编排与 UI 闭环：在方案配置页 PetPlanSheetScreen 增加每日签到与信箱待领独立开关（默认关闭，不擅自执行），增加冒险每日轮次上限配置；运行记录与历史详情统计签到与信箱待领完成次数。
+- 改动：
+  - SignInParser.kt & PetSignInFlow.kt：实现签到流程与解析。
+  - MailboxParser.kt & PetMailboxFlow.kt：实现信箱流程与解析。
+  - AdventureParser.kt & PetAdventureFlow.kt：扩充上限关键字识别与延迟授权门禁。
+  - PlanRunner.kt, PlanDeviceExecution.kt, PetSessionController.kt：接入签到与信箱步骤执行、预算防重放重入校验、记录回写。
+  - PlanV2.kt, PlanV2Store.kt, PlanExecutionModels.kt, PlanRunJsonCodec.kt, PlanRunStore.kt：数据持久化支持签到与信箱开关和完成状态。
+  - PetPlanSheetScreen.kt, PetHomeScreen.kt, SessionStartRequest.kt：UI 方案配置开关与摘要穷举。
+  - PetEvidence.kt, RecordsPresentation.kt：运行报告与卡片支持签到、信箱完成展示。
+  - 单元测试：新增 SignInParserTest (7), MailboxParserTest (5)，更新 AdventureFlowTest, PlanRunnerCompositionTest, PlanV2StoreTest, SessionStartRequestTest。
+- 验证结果：
+  - 单元测试：95 个测试套件、913 项单元测试 100% PASS（0 failures, 0 errors）。
+  - 构建打包：assembleDebug 成功，生成 app-debug.apk（47.9MB）。
+  - 真机安装：通过 ADB 成功覆盖安装至真机 DKS9K23420020242（Success）。
+- 提交与推送：提交 feat(daily): 增加每日签到、信箱待领与冒险上限控制 (SOC-03, SOC-04, STR-14)，推送到远端 backup/feat/onboarding-troubleshooting-p0，更新 PR #4。
+- 下一步：实现第二阶段 SOC-05 福袋任务（独立开关、扫描间隔、每日上限），或进入第三阶段任务目标策略排班（STR-01~05）。

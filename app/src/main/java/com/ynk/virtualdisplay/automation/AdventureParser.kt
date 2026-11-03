@@ -11,7 +11,7 @@ object AdventureParser {
     const val ADVENTURE_ENTRY_LABEL = "冒险"
     private val START_BUTTON_LABELS = listOf("开始冒险", "立即出发", "出发", "开始探索", "前往探索")
     private val SETTLEMENT_KEYWORDS = listOf("冒险归来", "冒险结算", "获得奖励", "奇遇结算", "探索成功", "收获")
-    private val LIMIT_KEYWORDS = listOf("今日次数已达上限", "次数已用尽", "体力不足", "正在冒险中", "冷却中")
+    private val LIMIT_KEYWORDS = listOf("今日次数已达上限", "次数已用尽", "体力不足", "正在冒险中", "冷却中", "明日再来", "上限已满", "无法冒险", "次数不足")
 
     private fun point(x: Float, y: Float): PointF = PointF().apply {
         this.x = x
@@ -62,11 +62,27 @@ object AdventureParser {
         return null
     }
 
-    /** 检查是否触发限制、疲劳或冷却 */
+    /** 检查是否触发限制、疲劳或冷却（STR-14） */
     fun detectLimitOrCooldown(lines: List<TextLine>): String? {
+        val remaining = parseRemainingRounds(lines)
+        if (remaining == 0) return "今日剩余次数为0"
         val joined = lines.joinToString(";") { it.text }
         for (kw in LIMIT_KEYWORDS) {
             if (joined.contains(kw)) return kw
+        }
+        return null
+    }
+
+    /** 从冒险页面解析今日剩余探索次数（若有显示） */
+    fun parseRemainingRounds(lines: List<TextLine>): Int? {
+        for (line in lines) {
+            val t = line.text.filterNot { it.isWhitespace() }
+            val m1 = Regex("""(?:剩余次数|今日剩余)[：:]?(\d+)""").find(t)
+            if (m1 != null) return m1.groupValues[1].toIntOrNull()
+            val m2 = Regex("""(\d+)/(\d+)""").find(t)
+            if (m2 != null && (t.contains("次") || t.contains("轮") || t.contains("冒险"))) {
+                return m2.groupValues[1].toIntOrNull()
+            }
         }
         return null
     }

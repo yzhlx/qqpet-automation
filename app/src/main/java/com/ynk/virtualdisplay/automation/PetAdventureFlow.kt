@@ -26,6 +26,7 @@ class PetAdventureFlow(
     suspend fun run(
         mode: AdventureMode = AdventureMode.NEARBY_WALK,
         settleWaitTimeoutMs: Long = 45_000L,
+        onBeforeStart: suspend () -> Unit = {},
     ): AdventureOutcome = with(flow) {
         flow.state = "ADVENTURE"
         this@PetAdventureFlow.phase = AdventurePhase.NAVIGATING_OUTDOOR
@@ -91,6 +92,7 @@ class PetAdventureFlow(
             }
 
             this@PetAdventureFlow.phase = AdventurePhase.START_REQUESTED
+            onBeforeStart()
             tap(startPoint, pageSettleMs)
             val startedAt = clock()
             this@PetAdventureFlow.phase = AdventurePhase.IN_PROGRESS

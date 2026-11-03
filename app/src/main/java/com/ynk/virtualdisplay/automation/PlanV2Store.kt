@@ -20,6 +20,8 @@ object PlanV2JsonCodec {
         root["steps"] = plan.steps.map { step ->
             linkedMapOf<String, Any?>("stepId" to step.stepId, "type" to step.type.name).apply {
                 when (step) {
+                    is SignInStep -> { }
+                    is MailboxStep -> { }
                     is WorkStep -> {
                         put("workOptionId", step.workOptionId); put("trigger", step.trigger.name); put("shifts", step.shifts)
                     }
@@ -27,7 +29,10 @@ object PlanV2JsonCodec {
                         put("energyThreshold", step.energyThreshold); put("cleanlinessThreshold", step.cleanlinessThreshold)
                     }
                     is StudyStep -> { put("courseId", step.courseId); put("rounds", step.rounds); if (step.targetAttribute != null) put("targetAttribute", step.targetAttribute) }
-                    is AdventureStep -> { put("mode", step.mode.name); put("rounds", step.rounds) }
+                    is AdventureStep -> {
+                        put("mode", step.mode.name); put("rounds", step.rounds)
+                        if (step.maxDailyRounds != null) put("maxDailyRounds", step.maxDailyRounds)
+                    }
                 }
             }
         }
@@ -44,6 +49,14 @@ object PlanV2JsonCodec {
             val step = item.objectValue()
             val id = step.string("stepId")
             when (enumValueOf<PlanStepType>(step.string("type"))) {
+                PlanStepType.SIGN_IN -> {
+                    step.only("stepId", "type")
+                    SignInStep(id)
+                }
+                PlanStepType.MAILBOX -> {
+                    step.only("stepId", "type")
+                    MailboxStep(id)
+                }
                 PlanStepType.WORK -> {
                     step.only("stepId", "type", "workOptionId", "trigger", "shifts")
                     WorkStep(id, step.string("workOptionId"), enumValueOf(step.string("trigger")), step.int("shifts"))
@@ -57,9 +70,10 @@ object PlanV2JsonCodec {
                     StudyStep(id, step.string("courseId"), step.int("rounds"), step.optionalString("targetAttribute"))
                 }
                 PlanStepType.ADVENTURE -> {
-                    step.only("stepId", "type", "mode", "rounds")
+                    step.only("stepId", "type", "mode", "rounds", "maxDailyRounds")
                     val mode = if (step.containsKey("mode")) enumValueOf<AdventureMode>(step.string("mode")) else AdventureMode.NEARBY_WALK
-                    AdventureStep(id, mode, step.int("rounds"))
+                    val maxDaily = if (step.containsKey("maxDailyRounds")) step.int("maxDailyRounds") else null
+                    AdventureStep(id, mode, step.int("rounds"), maxDaily)
                 }
             }
         }

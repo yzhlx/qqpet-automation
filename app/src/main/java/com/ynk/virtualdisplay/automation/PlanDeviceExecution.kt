@@ -23,7 +23,7 @@ class PlanBudgetExecutionContext(
     override fun beforeConsumingInput(iteration: Int, minutes: Int) {
         checkAuthority()
         if (iteration in reserved) {
-            check(step is CareStep && iteration !in done && minutes == 0) { "ATTEMPT_ALREADY_RESERVED_NO_REPLAY" }
+            check((step is CareStep || step is SignInStep || step is MailboxStep) && iteration !in done && minutes == 0) { "ATTEMPT_ALREADY_RESERVED_NO_REPLAY" }
             return
         }
         delegate.beforeConsumingInput(iteration, minutes)
@@ -61,6 +61,8 @@ class PlanDeviceExecution(
     private val care: suspend (CareStep, StepExecutionContext) -> StepOutcome,
     private val study: suspend (StudyStep, StepExecutionContext) -> StepOutcome,
     private val adventure: suspend (AdventureStep, StepExecutionContext) -> StepOutcome = { _, _ -> StepOutcome.Completed() },
+    private val signIn: suspend (SignInStep, StepExecutionContext) -> StepOutcome = { _, _ -> StepOutcome.Completed() },
+    private val mailbox: suspend (MailboxStep, StepExecutionContext) -> StepOutcome = { _, _ -> StepOutcome.Completed() },
     private val checkAuthority: () -> Unit,
 ) {
     suspend fun run(request: RunRequest, runId: String): RunSnapshot {
@@ -70,6 +72,8 @@ class PlanDeviceExecution(
             try {
                 checkAuthority()
                 when (type) {
+                    PlanStepType.SIGN_IN -> signIn(step as SignInStep, guarded)
+                    PlanStepType.MAILBOX -> mailbox(step as MailboxStep, guarded)
                     PlanStepType.WORK -> work(step as WorkStep, guarded)
                     PlanStepType.CARE -> care(step as CareStep, guarded)
                     PlanStepType.STUDY -> study(step as StudyStep, guarded)

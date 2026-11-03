@@ -23,6 +23,8 @@ class PlanV2StoreTest {
         val file = File(temporary.root, PlanV2Store.FILE_NAME)
         expectedOrders.forEach { order ->
             val steps = order.map { type -> when (type) {
+                PlanStepType.SIGN_IN -> SignInStep("si")
+                PlanStepType.MAILBOX -> MailboxStep("mb")
                 PlanStepType.WORK -> WorkStep("w", "work:竹影武馆/帮武馆跑腿")
                 PlanStepType.CARE -> CareStep("c", 70, 80)
                 PlanStepType.STUDY -> StudyStep("s", "study:田径运动课", 4)

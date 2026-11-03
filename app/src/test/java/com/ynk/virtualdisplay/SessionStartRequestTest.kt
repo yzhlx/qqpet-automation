@@ -95,11 +95,11 @@ class SessionStartRequestTest {
         assertFalse(SessionMode.WORK.runsStudy)
 
         val modes = SessionMode.entries.toList()
-        // 方案 (PLAN) is the sixth mode: the saved plan carries its own steps and lesson count, so
-        // the mode itself runs no lesson and never inherits the selector.
-        assertEquals(6, modes.size)
+        // PLAN and ADVENTURE are non-study modes; only FULL and STUDY run lessons.
+        assertEquals(7, modes.size)
         assertEquals(2, modes.count { it.runsStudy })
         assertFalse(SessionMode.PLAN.runsStudy)
+        assertFalse(SessionMode.ADVENTURE.runsStudy)
         // Every single-pass mode ignores the selector even when the user left it on a long batch.
         for (mode in modes.filter { !it.runsStudy }) {
             assertEquals("$mode must stay single-pass",

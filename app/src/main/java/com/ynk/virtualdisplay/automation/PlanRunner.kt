@@ -153,8 +153,8 @@ internal class ExecutingContext(
         val existing = store.attempt(id)
         // A previously unconfirmed attempt for this iteration must NOT be replayed.
         if (existing != null) error("ATTEMPT_ALREADY_EXISTS_NO_REPLAY:${id.value}")
-        require(iteration <= if(step is StudyStep) step.rounds else 1) { "ATTEMPT_ITERATION_OUT_OF_RANGE" }
-        require(if(step is CareStep) minutes == 0 else minutes > 0) { "ATTEMPT_DURATION_INVALID" }
+        require(iteration <= if(step is StudyStep) step.rounds else if(step is AdventureStep) step.rounds else 1) { "ATTEMPT_ITERATION_OUT_OF_RANGE" }
+        require(if(step is CareStep || step is SignInStep || step is MailboxStep) minutes == 0 else minutes > 0) { "ATTEMPT_DURATION_INVALID" }
         store.persistIntent(ActivityAttempt(id, minutes, AttemptState.INPUT_PENDING,
             inputPending = true, inputDispatchedAtMs = nowMs()))
     }

@@ -41,6 +41,14 @@ class PlanRunnerCompositionTest {
     }
 
     private fun completingExecutors(log: CallLog): Map<PlanStepType, StepExecutor> = mapOf(
+        PlanStepType.SIGN_IN to StepExecutor { _, c ->
+            log.hit(PlanStepType.SIGN_IN); c.beforeConsumingInput(1, 0); c.startConfirmed(1); c.completed(1, 0)
+            StepOutcome.Completed()
+        },
+        PlanStepType.MAILBOX to StepExecutor { _, c ->
+            log.hit(PlanStepType.MAILBOX); c.beforeConsumingInput(1, 0); c.startConfirmed(1); c.completed(1, 0)
+            StepOutcome.Completed()
+        },
         PlanStepType.WORK to StepExecutor { _, _ -> log.hit(PlanStepType.WORK); StepOutcome.Completed() },
         PlanStepType.CARE to StepExecutor { _, _ -> log.hit(PlanStepType.CARE); StepOutcome.Completed() },
         PlanStepType.STUDY to StepExecutor { _, c ->
@@ -195,5 +203,39 @@ class PlanRunnerCompositionTest {
         assertEquals(AttemptState.INPUT_PENDING, careAttempt.state)
         assertTrue(careAttempt.inputPending)
         assertTrue(store.hasPendingInput("run-mixed"))
+    }
+    @Test fun dailyStepsSignInAndMailboxCanCompleteAndCount() = runBlocking {
+        val store = FakeRunStore()
+        val signIn = SignInStep("si")
+        val mailbox = MailboxStep("mb")
+        val log = CallLog()
+        val outcome = PlanRunner(store, readyPreflight(), completingExecutors(log))
+            .run(request(plan(signIn, mailbox)), "run-daily")
+        assertEquals(RunState.COMPLETED, outcome.state)
+        assertEquals(StepState.COMPLETED, outcome.steps[0].state)
+        assertEquals(StepState.COMPLETED, outcome.steps[1].state)
+        assertEquals(1, outcome.counts.signInCompleted)
+        assertEquals(1, outcome.counts.mailboxCompleted)
+    }
+
+    @Test fun dailyStepsAndAdventureCanSkipGracefully() = runBlocking {
+        val store = FakeRunStore()
+        val signIn = SignInStep("si")
+        val mailbox = MailboxStep("mb")
+        val adventure = AdventureStep("a", AdventureMode.NEARBY_WALK, 1)
+        val executors = mapOf(
+            PlanStepType.SIGN_IN to StepExecutor { _, _ -> StepOutcome.Skipped(SkipReason.ALREADY_SATISFIED) },
+            PlanStepType.MAILBOX to StepExecutor { _, _ -> StepOutcome.Skipped(SkipReason.ALREADY_SATISFIED) },
+            PlanStepType.ADVENTURE to StepExecutor { _, _ -> StepOutcome.Skipped(SkipReason.DAILY_LIMIT_REACHED) },
+        )
+        val outcome = PlanRunner(store, readyPreflight(), executors)
+            .run(request(plan(signIn, mailbox, adventure)), "run-skips")
+        assertEquals(RunState.COMPLETED, outcome.state)
+        assertEquals(StepState.SKIPPED, outcome.steps[0].state)
+        assertEquals(StepState.SKIPPED, outcome.steps[1].state)
+        assertEquals(StepState.SKIPPED, outcome.steps[2].state)
+        assertEquals(0, outcome.counts.signInCompleted)
+        assertEquals(0, outcome.counts.mailboxCompleted)
+        assertEquals(0, outcome.counts.adventureCompleted)
     }
 }

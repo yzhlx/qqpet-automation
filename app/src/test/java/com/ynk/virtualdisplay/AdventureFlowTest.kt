@@ -83,8 +83,23 @@ class AdventureFlowTest {
         val linesTired = listOf(line("体力不足，请先喂食", 200, 500, 500, 550))
         assertEquals("体力不足", AdventureParser.detectLimitOrCooldown(linesTired))
 
+        val linesZero = listOf(line("今日剩余: 0次", 200, 500, 500, 550))
+        assertEquals("今日剩余次数为0", AdventureParser.detectLimitOrCooldown(linesZero))
+
         val linesNormal = listOf(line("出发冒险", 200, 500, 500, 550))
         assertNull(AdventureParser.detectLimitOrCooldown(linesNormal))
+    }
+
+    @Test
+    fun parseRemainingRoundsExtractsCount() {
+        val lines1 = listOf(line("今日剩余次数: 3", 200, 500, 500, 550))
+        assertEquals(3, AdventureParser.parseRemainingRounds(lines1))
+
+        val lines2 = listOf(line("剩余次数:0", 200, 500, 500, 550))
+        assertEquals(0, AdventureParser.parseRemainingRounds(lines2))
+
+        val lines3 = listOf(line("今日冒险 2/5 次", 200, 500, 500, 550))
+        assertEquals(2, AdventureParser.parseRemainingRounds(lines3))
     }
 
     @Test

@@ -51,6 +51,8 @@ data class RecordsSummary(
     val pauseCount: Int,
     val workCount: Int = 0,
     val adventureCount: Int = 0,
+    val signInCount: Int = 0,
+    val mailboxCount: Int = 0,
 )
 
 data class SessionHistoryRow(
@@ -70,7 +72,8 @@ object RecordsPresentation {
         reason.contains("USER_STOP", true) || reason == "用户停止" -> "用户停止"
         reason.contains("PERMISSION_DENIED", true) || reason.contains("SHIZUKU", true) || reason.contains("DISPLAY_PERMISSION", true) -> "系统权限不足，请在排故页检查 Shizuku 与显示授权"
         reason.contains("PLAN_DISPLAY_NOT_READY", true) -> "虚拟显示未就绪，请在主页选择或创建虚拟屏"
-        reason.contains("PAGE_MISMATCH", true) || reason.contains("OCR_TIMEOUT", true) || reason.contains("BUTTON_NOT_FOUND", true) -> "界面未识别目标按钮或入口，请确认 QQ 处于宠物页面"
+        reason.contains("PAGE_MISMATCH", true) -> "页面对不上"
+        reason.contains("OCR_TIMEOUT", true) || reason.contains("BUTTON_NOT_FOUND", true) -> "界面未识别目标按钮或入口，请确认 QQ 处于宠物页面"
         reason.contains("WORK_ALL_CANDIDATES_REFUSED", true) -> "候选打工岗位均未达到开工条件"
         reason.startsWith("WORK_NOT_STARTED", true) -> "条件不够，没有开始打工"
         reason.contains("ENERGY_INSUFFICIENT", true) -> "宠物当前体力不足，请先喂食护理"
@@ -111,6 +114,8 @@ object RecordsPresentation {
         val minutes = records.sumOf { it.runtimeMs } / 60_000L
         val workCount = records.sumOf { it.workCompleted ?: 0 }
         val adventureCount = records.sumOf { it.adventureCompleted ?: 0 }
+        val signInCount = records.sumOf { it.signInCompleted ?: 0 }
+        val mailboxCount = records.sumOf { it.mailboxCompleted ?: 0 }
         return RecordsSummary(
             rangeText = rangeText,
             // Time the runs took, which is not the 今日已用 figure: that one counts game minutes.
@@ -120,6 +125,8 @@ object RecordsPresentation {
             pauseCount = records.sumOf { it.pauseCount },
             workCount = workCount,
             adventureCount = adventureCount,
+            signInCount = signInCount,
+            mailboxCount = mailboxCount,
         )
     }
 
@@ -271,6 +278,12 @@ object RecordsPresentation {
         }
         if ((record.adventureCompleted ?: 0) > 0) {
             taskParts += "冒险 ${record.adventureCompleted} 轮"
+        if ((record.signInCompleted ?: 0) > 0) {
+            taskParts += "每日签到"
+        }
+        if ((record.mailboxCompleted ?: 0) > 0) {
+            taskParts += "信箱待领"
+        }
         }
         val taskDesc = if (taskParts.isEmpty()) "完成 ${record.completedRounds}/${record.rounds} 节" else taskParts.joinToString(" · ")
         SessionHistoryRow(

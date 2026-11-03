@@ -34,6 +34,8 @@ object SessionStartRequest {
         require(requestId.isNotBlank()) { "PLAN_REQUEST_ID_BLANK" }
         val study = plan.steps.filterIsInstance<StudyStep>().singleOrNull()
         val mode = if (plan.steps.size == 1) when (plan.steps.single().type) {
+            PlanStepType.SIGN_IN -> SessionMode.PLAN
+            PlanStepType.MAILBOX -> SessionMode.PLAN
             PlanStepType.WORK -> SessionMode.WORK
             PlanStepType.CARE -> SessionMode.CARE
             PlanStepType.STUDY -> SessionMode.STUDY

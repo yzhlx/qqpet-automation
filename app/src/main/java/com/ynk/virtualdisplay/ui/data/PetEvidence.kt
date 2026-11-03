@@ -133,6 +133,8 @@ data class SessionRunRecord(
     val requestedRounds: Int?,
     val workCompleted: Int? = null,
     val adventureCompleted: Int? = null,
+    val signInCompleted: Int? = null,
+    val mailboxCompleted: Int? = null,
     val roomCoinsBefore: Int? = null,
     val roomCoinsAfter: Int? = null,
 ) {
@@ -163,6 +165,8 @@ data class SessionRunRecord(
                 requestedRounds = o.intOrNull("requestedRounds"),
                 workCompleted = o.intOrNull("workCompleted"),
                 adventureCompleted = o.intOrNull("adventureCompleted"),
+                signInCompleted = o.intOrNull("signInCompleted"),
+                mailboxCompleted = o.intOrNull("mailboxCompleted"),
                 roomCoinsBefore = o.intOrNull("roomCoinsBefore"),
                 roomCoinsAfter = o.intOrNull("roomCoinsAfter"),
             )

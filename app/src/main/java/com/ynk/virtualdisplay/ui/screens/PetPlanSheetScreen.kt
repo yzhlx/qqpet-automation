@@ -52,6 +52,8 @@ import com.ynk.virtualdisplay.automation.PetRuntime
 import com.ynk.virtualdisplay.automation.PlanStep
 import com.ynk.virtualdisplay.automation.PlanStepType
 import com.ynk.virtualdisplay.automation.AdventureStep
+import com.ynk.virtualdisplay.automation.SignInStep
+import com.ynk.virtualdisplay.automation.MailboxStep
 import com.ynk.virtualdisplay.automation.PlanV2
 import com.ynk.virtualdisplay.automation.PlanV2Store
 import com.ynk.virtualdisplay.automation.PlanValidator
@@ -95,8 +97,11 @@ fun PetPlanSheetScreen(onClose: () -> Unit, onStarted: () -> Unit, displayId: In
     var selectedCare by remember { mutableStateOf(false) }
     var selectedStudy by remember { mutableStateOf(false) }
     var selectedAdventure by remember { mutableStateOf(false) }
+    var selectedSignIn by remember { mutableStateOf(false) }
+    var selectedMailbox by remember { mutableStateOf(false) }
     var adventureMode by remember { mutableStateOf(com.ynk.virtualdisplay.automation.AdventureMode.NEARBY_WALK) }
     var adventureRounds by remember { mutableStateOf(1) }
+    var adventureMaxDaily by remember { mutableStateOf(5) }
     var stepIds by remember { mutableStateOf(emptyMap<PlanStepType, String>()) }
     var legacySource by remember { mutableStateOf<String?>(null) }
     var showCompatibilityNote by remember { mutableStateOf(false) }
@@ -125,11 +130,15 @@ fun PetPlanSheetScreen(onClose: () -> Unit, onStarted: () -> Unit, displayId: In
             name = stored.name
             stepIds = stored.steps.associate { it.type to it.stepId }
             legacySource = stored.legacySource
+            val signIn = stored.steps.filterIsInstance<SignInStep>().singleOrNull()
+            val mailbox = stored.steps.filterIsInstance<MailboxStep>().singleOrNull()
             val adventure = stored.steps.filterIsInstance<AdventureStep>().singleOrNull()
             selectedWork = work != null; selectedCare = care != null; selectedStudy = study != null; selectedAdventure = adventure != null
+            selectedSignIn = signIn != null; selectedMailbox = mailbox != null
             if (adventure != null) {
                 adventureMode = adventure.mode
                 adventureRounds = adventure.rounds
+                adventureMaxDaily = adventure.maxDailyRounds ?: 5
             }
             plan = plan.copy(courseId = study?.courseId ?: plan.courseId, rounds = study?.rounds ?: plan.rounds,
                 targetAttribute = study?.targetAttribute ?: plan.targetAttribute,
@@ -159,7 +168,7 @@ fun PetPlanSheetScreen(onClose: () -> Unit, onStarted: () -> Unit, displayId: In
     val selectedCourse = unlocked.firstOrNull { it.id == plan.courseId }
     val validationMessage = when {
         loading -> "正在读取方案…"
-        !selectedWork && !selectedCare && !selectedStudy && !selectedAdventure -> "请选择至少一个动作。"
+        !selectedSignIn && !selectedMailbox && !selectedWork && !selectedCare && !selectedStudy && !selectedAdventure -> "请选择至少一个动作。"
         selectedWork && verified.none { it.id == plan.workOptionId } -> "请选择打工岗位。"
         selectedStudy && !fresh && plan.targetAttribute == null && catalog == null -> "请先读取我的课程或选择上方目标属性。"
         selectedStudy && plan.targetAttribute == null && selectedCourse?.durationMinutes == null -> "请选择一门时长已读出的课程。"
@@ -174,13 +183,15 @@ fun PetPlanSheetScreen(onClose: () -> Unit, onStarted: () -> Unit, displayId: In
             var didSave = false
             try {
                 val steps = buildList<PlanStep> {
+                    if (selectedSignIn) add(SignInStep(stepIds[PlanStepType.SIGN_IN] ?: "$planId:sign_in"))
+                    if (selectedMailbox) add(MailboxStep(stepIds[PlanStepType.MAILBOX] ?: "$planId:mailbox"))
                     if (selectedWork) add(WorkStep(stepIds[PlanStepType.WORK] ?: "$planId:work",
                         plan.workOptionId ?: error("未选择岗位"),
                         if (selectedStudy && plan.workBeforeStudy) WorkTrigger.IF_FUNDS_SHORT else WorkTrigger.ALWAYS))
                     if (selectedCare) add(CareStep(stepIds[PlanStepType.CARE] ?: "$planId:care",
                         plan.energyThreshold, plan.cleanlinessThreshold))
                     if (selectedStudy) add(StudyStep(stepIds[PlanStepType.STUDY] ?: "$planId:study", plan.courseId, plan.rounds, plan.targetAttribute))
-                    if (selectedAdventure) add(AdventureStep(stepIds[PlanStepType.ADVENTURE] ?: "$planId:adventure", adventureMode, adventureRounds))
+                    if (selectedAdventure) add(AdventureStep(stepIds[PlanStepType.ADVENTURE] ?: "$planId:adventure", adventureMode, adventureRounds, maxDailyRounds = adventureMaxDaily))
                 }
                 val snapshot = PlanV2(planId = planId, name = name, dailyBudgetMinutes = plan.dailyBudgetMinutes,
                     steps = steps, executionProfile = ExecutionProfile.SELECTED_ACTIONS, legacySource = legacySource)
@@ -237,6 +248,11 @@ fun PetPlanSheetScreen(onClose: () -> Unit, onStarted: () -> Unit, displayId: In
                 }
                 Spacer(Modifier.height(9.dp))
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    ActionChoice("每日签到", PetGlyph.Check, selectedSignIn, !busy, Modifier.weight(1f)) { selectedSignIn = it; changed() }
+                    ActionChoice("信箱待领", PetGlyph.Bell, selectedMailbox, !busy, Modifier.weight(1f)) { selectedMailbox = it; changed() }
+                }
+                Spacer(Modifier.height(8.dp))
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     ActionChoice("打工", PetGlyph.Coin, selectedWork, !busy, Modifier.weight(1f)) {
                         selectedWork = it
                         if (it && verified.none { option -> option.id == plan.workOptionId }) {
@@ -249,7 +265,7 @@ fun PetPlanSheetScreen(onClose: () -> Unit, onStarted: () -> Unit, displayId: In
                     ActionChoice("冒险", PetGlyph.Locate, selectedAdventure, !busy, Modifier.weight(1f)) { selectedAdventure = it; changed() }
                 }
                 Spacer(Modifier.height(8.dp))
-                PetNote("按打工 → 护理 → 学习 → 冒险的顺序执行，只做勾选的动作。")
+                PetNote("按签到 → 信箱 → 打工 → 护理 → 学习 → 冒险的顺序执行，只做勾选的动作。")
                 loadNote?.let { PetNote(it) }
                 if (showCompatibilityNote) PetNote("保存为新版方案后，护理执行一次；打工前需已满足岗位条件。")
             }
@@ -370,6 +386,9 @@ fun PetPlanSheetScreen(onClose: () -> Unit, onStarted: () -> Unit, displayId: In
                     }
                     ParamRow("冒险轮次", PetGlyph.Locate, adventureRounds, 1..10, 1, !busy) {
                         adventureRounds = it; changed()
+                    }
+                    ParamRow("每日上限（轮）", PetGlyph.Locate, adventureMaxDaily, 1..20, 1, !busy) {
+                        adventureMaxDaily = it; changed()
                     }
                 }
                 if (selectedCare) {

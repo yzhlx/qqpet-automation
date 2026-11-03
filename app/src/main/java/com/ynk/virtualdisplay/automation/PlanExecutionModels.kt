@@ -6,7 +6,7 @@ enum class RunOrigin { WORK_SHORTCUT, CARE_SHORTCUT, STUDY_SHORTCUT, ADVENTURE_S
 enum class RunState { CREATED, PREFLIGHT, RUNNING, COMPLETED, STOPPED, FAILED, UNCONFIRMED }
 enum class StepState { PENDING, RUNNING, COMPLETED, SKIPPED, BLOCKED, FAILED, UNCONFIRMED, CANCELLED }
 enum class AttemptState { PREPARED, BUDGET_RESERVED, INPUT_PENDING, START_CONFIRMED, COMPLETED, UNCONFIRMED }
-enum class SkipReason { FUNDS_SUFFICIENT, ALREADY_SATISFIED }
+enum class SkipReason { FUNDS_SUFFICIENT, ALREADY_SATISFIED, DAILY_LIMIT_REACHED }
 
 /** Length-prefixing avoids collisions when IDs themselves contain separators. */
 data class AttemptId(val runId: String, val stepId: String, val iteration: Int) {
@@ -52,9 +52,11 @@ data class RunCounts(
     val careCompleted: Int = 0,
     val studyRoundsCompleted: Int = 0,
     val adventureCompleted: Int = 0,
+    val signInCompleted: Int = 0,
+    val mailboxCompleted: Int = 0,
 ) {
     init {
-        require(workShiftsCompleted >= 0 && careCompleted >= 0 && studyRoundsCompleted >= 0 && adventureCompleted >= 0) { "RUN_COUNT_NEGATIVE" }
+        require(workShiftsCompleted >= 0 && careCompleted >= 0 && studyRoundsCompleted >= 0 && adventureCompleted >= 0 && signInCompleted >= 0 && mailboxCompleted >= 0) { "RUN_COUNT_NEGATIVE" }
     }
 }
 
@@ -77,7 +79,10 @@ class StepExecution(
         require(this.evidenceIds.all { it.isNotBlank() }) { "STEP_EVIDENCE_ID_BLANK" }
         if (state == StepState.SKIPPED) {
             require((type == PlanStepType.WORK && reason == SkipReason.FUNDS_SUFFICIENT.name) ||
-                (type == PlanStepType.CARE && reason == SkipReason.ALREADY_SATISFIED.name)) { "STEP_SKIP_REASON_INVALID" }
+                (type == PlanStepType.CARE && reason == SkipReason.ALREADY_SATISFIED.name) ||
+                (type == PlanStepType.SIGN_IN && reason == SkipReason.ALREADY_SATISFIED.name) ||
+                (type == PlanStepType.MAILBOX && reason == SkipReason.ALREADY_SATISFIED.name) ||
+                (type == PlanStepType.ADVENTURE && (reason == SkipReason.ALREADY_SATISFIED.name || reason == SkipReason.DAILY_LIMIT_REACHED.name))) { "STEP_SKIP_REASON_INVALID" }
         }
         if (state in setOf(StepState.BLOCKED, StepState.FAILED, StepState.UNCONFIRMED, StepState.CANCELLED)) {
             require(!reason.isNullOrBlank()) { "STEP_STOP_REASON_REQUIRED:$state" }
