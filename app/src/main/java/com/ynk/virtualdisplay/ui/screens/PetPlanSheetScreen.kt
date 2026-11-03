@@ -1,5 +1,8 @@
 package com.ynk.virtualdisplay.ui.screens
 
+import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.clickable
+
 import android.content.Context
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -80,7 +83,7 @@ import java.util.UUID
 
 /** Existing parameter controls now edit an explicit selection; unselected parameters never gate save. */
 @Composable
-fun PetPlanSheetScreen(onClose: () -> Unit, onStarted: () -> Unit, displayId: Int?) {
+fun PetPlanSheetScreen(onClose: () -> Unit, onStarted: () -> Unit, displayId: Int?, onOpenManual: (() -> Unit)? = null) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var plan by remember { mutableStateOf(SessionPlan()) }
@@ -194,6 +197,26 @@ fun PetPlanSheetScreen(onClose: () -> Unit, onStarted: () -> Unit, displayId: In
         PetTitleBar("运行方案", onBack = onClose, crab = com.ynk.virtualdisplay.R.drawable.crab_peek)
         Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(horizontal = 15.dp),
             verticalArrangement = Arrangement.spacedBy(11.dp)) {
+            if (onOpenManual != null) {
+                Row(
+                    Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(
+                        Modifier
+                            .clip(androidx.compose.foundation.shape.RoundedCornerShape(PetTokens.ChipRadius))
+                            .background(PetTokens.Surface)
+                            .clickable { onOpenManual() }
+                            .padding(horizontal = 10.dp, vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        PetIcon(PetGlyph.Help, 13.dp, PetTokens.Ink2)
+                        Spacer(Modifier.width(4.dp))
+                        Text("方案配置攻略", fontSize = 11.5.sp, color = PetTokens.Ink2)
+                    }
+                }
+            }
             PetCard {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     PetSection("选择执行动作")

@@ -51,6 +51,8 @@ import com.ynk.virtualdisplay.ui.screens.PetLogScreen
 import com.ynk.virtualdisplay.ui.screens.PetPlanSheetScreen
 import com.ynk.virtualdisplay.ui.screens.PetRecordsScreen
 import com.ynk.virtualdisplay.ui.screens.PetSettingsScreen
+import com.ynk.virtualdisplay.ui.screens.PetUserManualScreen
+import com.ynk.virtualdisplay.ui.screens.PetTutorialScreen
 import com.ynk.virtualdisplay.ui.screens.OnboardingFlow
 import com.ynk.virtualdisplay.ui.screens.OnboardingScreen
 import com.ynk.virtualdisplay.ui.screens.VirtualDisplayScreen
@@ -129,6 +131,12 @@ class MainActivity : ComponentActivity() {
                                     guideProgress = onboardingStore.load()
                                     showGuideManual = false
                                 },
+                                onOpenTutorial = {
+                                    onboardingStore.saveCompleted(true)
+                                    guideProgress = onboardingStore.load()
+                                    showGuideManual = false
+                                    viewModel.openOverlay(OverlayScreen.TUTORIAL)
+                                },
                             )
 
                             else -> PetApp(
@@ -162,6 +170,7 @@ class MainActivity : ComponentActivity() {
  */
 @Composable
 private fun PetApp(uiState: MainUiState, viewModel: MainViewModel) {
+    val context = androidx.compose.ui.platform.LocalContext.current
     Box(Modifier.fillMaxSize()) {
     Column(Modifier.fillMaxSize()) {
         Box(Modifier.weight(1f)) {
@@ -170,6 +179,20 @@ private fun PetApp(uiState: MainUiState, viewModel: MainViewModel) {
                     onClose = { viewModel.closeOverlay() },
                     onStarted = { viewModel.switchTab(ScreenTab.HOST) },
                     displayId = uiState.petDisplayId,
+                    onOpenManual = { viewModel.openOverlay(OverlayScreen.MANUAL) },
+                )
+
+                OverlayScreen.MANUAL -> PetUserManualScreen(
+                    onClose = { viewModel.closeOverlay() },
+                    onOpenTutorial = { viewModel.openOverlay(OverlayScreen.TUTORIAL) },
+                )
+
+                OverlayScreen.TUTORIAL -> PetTutorialScreen(
+                    onClose = { viewModel.closeOverlay() },
+                    onFinished = {
+                        com.ynk.virtualdisplay.ui.screens.OnboardingStore(context).saveTutorialCompleted(true)
+                        viewModel.closeOverlay()
+                    },
                 )
 
                 OverlayScreen.LOGS -> PetLogScreen(onClose = { viewModel.closeOverlay() })
@@ -206,6 +229,8 @@ private fun PetApp(uiState: MainUiState, viewModel: MainViewModel) {
                             onOpenLogs = { viewModel.openOverlay(OverlayScreen.LOGS) },
                             onOpenPlanSheet = { viewModel.openOverlay(OverlayScreen.PLAN_SHEET) },
                             onOpenCalibration = { viewModel.openOverlay(OverlayScreen.CALIBRATION) },
+                            onOpenManual = { viewModel.openOverlay(OverlayScreen.MANUAL) },
+                            onOpenTutorial = { viewModel.openOverlay(OverlayScreen.TUTORIAL) },
                         )
                     }
                 }

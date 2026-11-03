@@ -34,6 +34,8 @@ enum class OverlayScreen {
     LOGS,
     CONSOLE,
     CALIBRATION,
+    MANUAL,
+    TUTORIAL,
 }
 
 /**

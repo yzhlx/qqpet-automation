@@ -372,6 +372,7 @@ fun OnboardingScreen(
     onRequestPermission: () -> Unit,
     onFinish: () -> Unit,
     onPreview: (() -> Unit)? = null,
+    onOpenTutorial: (() -> Unit)? = null,
 ) {
     val context = LocalContext.current
     val store = remember { OnboardingStore(context) }

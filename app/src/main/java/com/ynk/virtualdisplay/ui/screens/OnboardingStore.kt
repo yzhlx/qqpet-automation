@@ -9,6 +9,7 @@ data class OnboardingProgress(
     val completed: Boolean = false,
     val previewMode: Boolean = false,
     val userConfirmedKeys: Set<String> = emptySet(),
+    val tutorialCompleted: Boolean = false,
 )
 
 /**
@@ -27,12 +28,14 @@ class OnboardingStore(private val prefs: SharedPreferences) {
             runCatching { OnboardingStep.valueOf(name) }.getOrNull()
         }.toSet()
         val confirmed = prefs.getStringSet(KEY_CONFIRMED, emptySet()) ?: emptySet()
+        val tutorial = prefs.getBoolean(KEY_TUTORIAL_COMPLETED, false)
         return OnboardingProgress(
             welcomed = welcomed,
             setAsideSteps = setAside,
             completed = completed,
             previewMode = preview,
             userConfirmedKeys = confirmed,
+            tutorialCompleted = tutorial,
         )
     }
 
@@ -62,6 +65,10 @@ class OnboardingStore(private val prefs: SharedPreferences) {
         prefs.edit().putBoolean(KEY_PREVIEW, preview).apply()
     }
 
+    fun saveTutorialCompleted(completed: Boolean) {
+        prefs.edit().putBoolean(KEY_TUTORIAL_COMPLETED, completed).apply()
+    }
+
     fun confirmKey(key: String) {
         val current = load().userConfirmedKeys + key
         prefs.edit().putStringSet(KEY_CONFIRMED, current).apply()
@@ -74,6 +81,7 @@ class OnboardingStore(private val prefs: SharedPreferences) {
             .remove(KEY_PREVIEW)
             .remove(KEY_SET_ASIDE)
             .remove(KEY_CONFIRMED)
+            .remove(KEY_TUTORIAL_COMPLETED)
             .apply()
     }
 
@@ -84,5 +92,6 @@ class OnboardingStore(private val prefs: SharedPreferences) {
         private const val KEY_PREVIEW = "onboarding_preview_mode"
         private const val KEY_SET_ASIDE = "onboarding_set_aside"
         private const val KEY_CONFIRMED = "onboarding_confirmed_keys"
+        private const val KEY_TUTORIAL_COMPLETED = "onboarding_tutorial_completed"
     }
 }

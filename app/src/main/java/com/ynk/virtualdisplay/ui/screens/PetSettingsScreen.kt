@@ -76,6 +76,8 @@ fun PetSettingsScreen(
     onOpenLogs: () -> Unit,
     onOpenPlanSheet: () -> Unit,
     onOpenCalibration: () -> Unit,
+    onOpenManual: () -> Unit = {},
+    onOpenTutorial: () -> Unit = {},
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -183,6 +185,26 @@ fun PetSettingsScreen(
                         else PetChip("去开启", PetTokens.RedSoft, PetTokens.RedInk)
                     },
                     showChevron = !notificationsEnabled,
+                )
+            }
+            Column(Modifier.clickable { onOpenManual() }) {
+                PetListRow(
+                    tileBg = PetTokens.BlueSoft,
+                    icon = { PetIcon(PetGlyph.Help, 17.dp) },
+                    title = "使用攻略",
+                    sub = "首次安装、打工学习、方案配置与常见排故",
+                    trailing = { PetChip("查阅", PetTokens.BlueSoft, PetTokens.BlueInk) },
+                    showChevron = true,
+                )
+            }
+            Column(Modifier.clickable { onOpenTutorial() }) {
+                PetListRow(
+                    tileBg = PetTokens.AmberSoft,
+                    icon = { PetIcon(PetGlyph.Play, 17.dp) },
+                    title = "新手教学演练",
+                    sub = "30 秒模拟演示核心流程，不消耗金币",
+                    trailing = { PetChip("演示", PetTokens.AmberSoft, PetTokens.AmberInk) },
+                    showChevron = true,
                 )
             }
             Column(Modifier.clickable { showDiagnostic = true }) {

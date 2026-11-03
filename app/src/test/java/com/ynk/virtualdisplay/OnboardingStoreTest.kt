@@ -53,6 +53,7 @@ class OnboardingStoreTest {
         assertFalse(p.welcomed)
         assertFalse(p.completed)
         assertFalse(p.previewMode)
+        assertFalse(p.tutorialCompleted)
         assertTrue(p.setAsideSteps.isEmpty())
         assertTrue(p.userConfirmedKeys.isEmpty())
     }
@@ -85,6 +86,16 @@ class OnboardingStoreTest {
     }
 
     @Test
+    fun saveTutorialCompletedPersists() {
+        val prefs = FakeSharedPrefs()
+        val store = OnboardingStore(prefs)
+        store.saveTutorialCompleted(true)
+
+        val p = store.load()
+        assertTrue(p.tutorialCompleted)
+    }
+
+    @Test
     fun confirmKeySavesKeyAndPersists() {
         val prefs = FakeSharedPrefs()
         val store = OnboardingStore(prefs)
@@ -102,12 +113,14 @@ class OnboardingStoreTest {
         val store = OnboardingStore(prefs)
         store.saveCompleted(true)
         store.confirmKey("developer_options")
+        store.saveTutorialCompleted(true)
 
         store.reset()
 
         val p = store.load()
         assertFalse(p.completed)
         assertFalse(p.welcomed)
+        assertFalse(p.tutorialCompleted)
         assertTrue(p.userConfirmedKeys.isEmpty())
     }
 }
