@@ -1320,10 +1320,11 @@ class PetNavigation(private val flow: PetFlowContext, private val workReader: Wo
      */
     suspend fun reenterPetApp(label: String) = with(flow) {
         val current=frame()
-        val host=try {score(current,listOf(qqHostSearch))>=profile.matchThreshold} finally {current.recycle()}
+        val host=try {score(current,listOf(qqHostSearch,qqSearchPetRow))>=profile.matchThreshold} finally {current.recycle()}
         check(host) { "PET_APP_NOT_EXITED:$label" }
         emit("$label-reenter-pet-app",null,"QQ_HOST_PAGE")
-        safety();input.tap(209f,506f);delay(profile.pageSettleMs)
+        // Search 宠物 result page: the 宠物 - 功能 row's label (verified on the device 2026-11-03).
+        safety();input.tap(224f,617f);delay(profile.pageSettleMs)
         verifySettled(listOf(room),"$label-reenter-pet-app-after")
     }
     /**
@@ -1365,7 +1366,7 @@ class PetNavigation(private val flow: PetFlowContext, private val workReader: Wo
                 val host: Boolean
                 val stillThere: Boolean
                 try {
-                    host=score(current,listOf(qqHostSearch))>=profile.matchThreshold
+                    host=score(current,listOf(qqHostSearch,qqSearchPetRow))>=profile.matchThreshold
                     stillThere=if(host) false else score(current,listOf(before))>=profile.matchThreshold
                 } finally {current.recycle()}
                 when(PetBackNavigation.recovery(host,stillThere,attempt)) {
@@ -1524,7 +1525,7 @@ class PetNavigation(private val flow: PetFlowContext, private val workReader: Wo
         val panelDrift=healthDrift(current)
         val sOutdoor=score(current,listOf(outdoor))
         val sResult=score(current,listOf(profile.resultProbe))
-        val sHost=score(current,listOf(qqHostSearch))
+        val sHost=score(current,listOf(qqHostSearch,qqSearchPetRow))
         val unknownDump=try {ByteArrayOutputStream().also {current.compress(Bitmap.CompressFormat.PNG,80,it)}} catch(t:Throwable) {null}
         val page=try {
             when {

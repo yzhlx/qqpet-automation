@@ -127,6 +127,17 @@ object PetPageProbes {
      * 结果 row is shown - a wide margin under the unchanged 0.97 threshold.
      */
     val qqHostSearch = experimental("qq_host_search", 48, 451, 152, 555)
+
+    /**
+     * QQ HOST page after a search for 宠物: the orange icon of the 宠物 - 功能 row, measured on
+     * the device (2026-11-03). The row sits lower than [qqHostSearch] on this layout (the stored
+     * icon scores 0.68 at its old spot here), so this is a separate template, cropped from a real
+     * frame at [59,562,163,666). Replayed against the frames of the same search (results top and
+     * scrolled) it scores 1.000000, and at most 0.78 on the pet room, the QQ main page, the search
+     * box, the 小程序 tab and the WeChat login page - the same wide margin under 0.97.
+     * Tapping the row's label at (224,617) opens the pet room (verified on the device).
+     */
+    val qqSearchPetRow = experimental("qq_search_pet_row", 59, 562, 163, 666)
     val academy = experimental("academy", 330, 158, 346, 177)
     val highFive = experimental("high_five", 284, 344, 355, 400)
     val gradeA = experimental("grade_a", 545, 385, 695, 525)
@@ -136,6 +147,6 @@ object PetPageProbes {
 
     fun byName(): Map<String, PetProfile.Probe> = listOf(
         home, room, healthPanel, cookie, foodScene, foodExchangeBubble, soap, bath, bathExchangeBubble, outdoor, academy, highFive,
-        gradeA, upgrade, careUpgradeHint, careUpgradeReward, qqHostSearch,
+        gradeA, upgrade, careUpgradeHint, careUpgradeReward, qqHostSearch, qqSearchPetRow,
     ).associateBy { it.name }
 }

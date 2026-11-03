@@ -44,6 +44,7 @@ class PetFlowContext(val context: Context, val capture: HeadlessDisplayCapture,
     val academy = PetPageProbes.academy
     /** QQ HOST page: proof that the pet mini-program is gone and QQ's search page is showing. */
     val qqHostSearch = PetPageProbes.qqHostSearch
+    val qqSearchPetRow = PetPageProbes.qqSearchPetRow
     val highFive = PetPageProbes.highFive
     val gradeA = PetPageProbes.gradeA
     val upgrade = PetPageProbes.upgrade
@@ -51,7 +52,7 @@ class PetFlowContext(val context: Context, val capture: HeadlessDisplayCapture,
     val careUpgradeReward = PetPageProbes.careUpgradeReward
     val recovery=PetRecoveryBoundary(context,capture,guard,
         (listOf(home,room,healthPanel,cookie,foodScene,soap,bath,outdoor,academy,highFive,profile.resultProbe,
-            profile.courseListProbe,profile.courseDetailProbe,qqHostSearch)).associate {it.name to listOf(it)}+
+            profile.courseListProbe,profile.courseDetailProbe,qqHostSearch,qqSearchPetRow)).associate {it.name to listOf(it)}+
             mapOf("LEARNING" to profile.learningProbes),onState=onRecovery,reconcile=reconcile,
             // Recovery around a lesson start must NOT re-impose the care thresholds: a paid-for lesson
             // is gated by course/tuition/minutes, so this only proves a health value was actually READ
