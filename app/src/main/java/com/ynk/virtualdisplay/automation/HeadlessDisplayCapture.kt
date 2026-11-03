@@ -206,6 +206,11 @@ class HeadlessDisplayCapture(
             imageReaderTimeout++; fallbackCount++
             setTelemetry("SHIZUKU_FALLBACK", "TIMEOUT", SystemClock.elapsedRealtime() - began)
             lastTelemetry.put("fallbackAttempted", true).put("frameDeliveryMiss", true)
+            // The in-app viewer shares this display's single surface slot: when its TextureView is
+            // disposed it sets the surface to null, which silently detaches this reader (measured
+            // 2026-11-03: every frame request timed out and SurfaceFlinger logged dequeueBuffer -19
+            // on the display). Re-attach our reader before judging the frame lost.
+            runCatching { repository.setDisplaySurface(displayId, reader.surface).getOrThrow() }
             val fallbackBegan = SystemClock.elapsedRealtime()
             try {
                 val captured = repository.captureDisplay(displayId).getOrThrow()
