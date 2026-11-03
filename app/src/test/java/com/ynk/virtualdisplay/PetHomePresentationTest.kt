@@ -183,7 +183,7 @@ class PetHomePresentationTest {
         val legacy = com.ynk.virtualdisplay.automation.PetRuntime.Snapshot()
         val view = ManagedRuntimePresentation.of(state, legacy, wall, wall)
         val pill = StatusPillPresentation.of(view, legacyActive = false)
-        assertEquals("空闲", pill.text)
+        assertEquals("蟹在歇着", pill.text)
         assertEquals(StatusPillTone.NEUTRAL, pill.tone)
     }
 

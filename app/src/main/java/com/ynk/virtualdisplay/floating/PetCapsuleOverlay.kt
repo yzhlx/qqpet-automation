@@ -74,7 +74,7 @@ object PetCapsuleOverlay {
         CapsuleUiModel(
             visible = false,
             visual = CapsuleVisualState.STOPPED,
-            title = "QQ宠物托管",
+            title = "蟹啦",
             statusText = "未开始",
             durationText = "-",
             flowText = "-",

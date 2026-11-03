@@ -56,7 +56,7 @@ fun FeedbackDialog(onDismiss: () -> Unit) {
     AlertDialog(
         onDismissRequest = onDismiss,
         containerColor = PetTokens.Surface,
-        title = { Text("问题反馈") },
+        title = { Text("跟蟹说说哪里不对") },
         text = {
             Column {
                 OutlinedTextField(

@@ -7,6 +7,7 @@ import android.net.Uri
 import android.os.Build
 import android.os.PowerManager
 import android.provider.Settings
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -19,12 +20,15 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.app.NotificationManagerCompat
+import com.ynk.virtualdisplay.R
 import com.ynk.virtualdisplay.data.model.ShizukuState
 import com.ynk.virtualdisplay.floating.OverlayPermission
 import com.ynk.virtualdisplay.ui.theme.PetTokens
@@ -98,6 +102,7 @@ private data class GuidePage(
     val action: String? = null,
     val secondary: String? = null,
     val waiting: String? = null,
+    val crab: Int? = null,
 )
 
 /** Start-Shizuku guide: the phone's current state decides which sub-step is shown, never a counter. */
@@ -154,11 +159,12 @@ private fun startShizukuPage(facts: OnboardingFacts, completedBefore: Boolean): 
 
 private fun pageFor(step: OnboardingStep, state: ShizukuState, completedBefore: Boolean, facts: OnboardingFacts) = when (step) {
     OnboardingStep.WELCOME -> GuidePage(
-        title = "欢迎使用宠物托管",
-        intro = "它会替你照看 QQ 宠物：打工、上课、喂食。开始前需要在手机上打开几个开关，全程约 5 分钟，不用连电脑，也不需要 root。",
+        title = "你好，我是蟹啦",
+        intro = "我会替你照看 QQ 宠物：打工、上课、喂食。开始前需要在手机上打开几个开关，全程约 5 分钟，不用连电脑，也不需要 root。",
         steps = listOf("装一个叫 Shizuku 的小工具", "启动它，并允许本应用使用", "打开悬浮窗、通知和后台运行"),
         note = "每一步都会告诉你点哪里，做完这里会自动进入下一步。",
         action = "开始",
+        crab = R.drawable.crab_wave,
     )
     OnboardingStep.INSTALL_SHIZUKU -> GuidePage(
         title = "安装 Shizuku",
@@ -204,6 +210,7 @@ private fun pageFor(step: OnboardingStep, state: ShizukuState, completedBefore: 
         intro = "开始托管前，再确认这三件事：",
         steps = listOf("手机上已安装 QQ，并登录了要托管的账号", "托管时不要锁屏，否则任务会安全停止", "时间较长的任务，建议插上充电器并把自动息屏调长"),
         action = "开始使用",
+        crab = R.drawable.crab_hug,
     )
 }
 
@@ -272,6 +279,10 @@ fun OnboardingScreen(
         if (index >= 0 && !completedBefore) StepProgress(index, OnboardingFlow.COUNTED.size)
         Column(Modifier.weight(1f).verticalScroll(rememberScrollState())) {
             Spacer(Modifier.height(24.dp))
+            page.crab?.let {
+                Image(painterResource(it), contentDescription = null, modifier = Modifier.size(96.dp), contentScale = ContentScale.Fit)
+                Spacer(Modifier.height(8.dp))
+            }
             Text(page.title, fontSize = 27.sp, lineHeight = 34.sp, fontWeight = FontWeight.Bold, color = PetTokens.Ink)
             Spacer(Modifier.height(10.dp))
             Text(page.intro, fontSize = 16.sp, lineHeight = 24.sp, color = PetTokens.Ink2)

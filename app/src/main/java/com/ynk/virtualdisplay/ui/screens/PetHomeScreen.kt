@@ -179,11 +179,14 @@ fun PetHomeScreen(
 
     Column(Modifier.fillMaxSize()) {
         if (runtime.running) {
-            PetTitleBar("宠物托管", crab = R.drawable.crab_peek)
+            PetTitleBar(
+                "蟹在忙",
+                crab = if (pill.tone == StatusPillTone.ATTENTION) R.drawable.crab_shell else R.drawable.crab_peek,
+            )
         } else {
             PetTitleBar(
-                "养宠自动化",
-                subtitle = "一只厚礼蟹 · 宠物托管助手",
+                "蟹啦",
+                subtitle = "你的 QQ 宠物托管助手",
                 crab = when {
                     !controls.startEnabled -> R.drawable.crab_clipboard
                     pill.tone == StatusPillTone.SUCCESS -> R.drawable.crab_gift
@@ -318,7 +321,7 @@ fun PetHomeScreen(
             containerColor = PetTokens.Surface,
             titleContentColor = PetTokens.Ink,
             textContentColor = PetTokens.Ink2,
-            title = { Text("停止托管？") },
+            title = { Text("让蟹先歇会儿？") },
             text = { Text("将结束当前批次。已完成的节会写入运行记录，未完成的不会被标记为已完成。") },
             confirmButton = {
                 TextButton(onClick = {
@@ -378,11 +381,11 @@ private fun StartManagedButton(enabled: Boolean, onClick: () -> Unit) {
         val fg = if (enabled) Color.White else PetTokens.Ink3
         PetIcon(PetGlyph.Play, 17.dp, fg)
         Spacer(Modifier.width(8.dp))
-        Text("开始托管", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = fg)
+        Text("蟹啦！", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = fg)
         Spacer(Modifier.width(10.dp))
         Box(Modifier.width(1.dp).height(14.dp).background(fg.copy(alpha = 0.4f)))
         Spacer(Modifier.width(10.dp))
-        Text("执行托管方案", fontSize = 12.sp, color = fg)
+        Text("开始托管", fontSize = 12.sp, color = fg)
     }
 }
 
@@ -626,7 +629,7 @@ private fun HomeLogCard(rows: List<PetLogEntry>, onOpenLogs: () -> Unit) {
         }
         Spacer(Modifier.height(9.dp))
         if (rows.isEmpty()) {
-            PetNote("暂无日志。")
+            PetNote("蟹还没开工，这里空空的。")
         } else {
             rows.takeLast(6).forEach { row -> LogRow(row) }
         }

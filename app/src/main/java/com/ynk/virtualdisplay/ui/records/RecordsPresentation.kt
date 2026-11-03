@@ -70,7 +70,7 @@ object RecordsPresentation {
         reason.startsWith("WORK_", true) -> "打工未完成"
         reason.startsWith("TOWN_EXIT", true) -> "没能回到宠物房间"
         reason.startsWith("PLAN_", true) -> "方案条件不满足"
-        reason.contains("BUDGET", true) -> "达到每日上限"
+        reason.contains("BUDGET", true) -> "今天蟹累了，明天再来"
         else -> "中途停止"
     }
 

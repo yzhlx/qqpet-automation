@@ -87,19 +87,19 @@ data class StatusPill(val text: String, val tone: StatusPillTone)
 
 object StatusPillPresentation {
     /**
-     * Reference labels: 空闲 (nothing running), 托管中 (a live session), 已暂停 (auto-recovery
-     * paused). NOT_STARTED / a settled historical snapshot read as 空闲 on the home screen because
+     * Reference labels: 蟹在歇着 (nothing running), 蟹在忙 (a live session), 已暂停 (auto-recovery
+     * paused). NOT_STARTED / a settled historical snapshot read as 蟹在歇着 on the home screen because
      * no managed batch is running right now; the exact lifecycle text is still available on the card.
      */
     fun of(view: ManagedRuntimeView, legacyActive: Boolean): StatusPill = when {
         !legacyActive && view.lifecycle == ManagedLifecycle.RUNNING -> StatusPill("启动中", StatusPillTone.NEUTRAL)
-        view.lifecycle == ManagedLifecycle.RUNNING -> StatusPill("托管中", StatusPillTone.ACTIVE)
+        view.lifecycle == ManagedLifecycle.RUNNING -> StatusPill("蟹在忙", StatusPillTone.ACTIVE)
         view.lifecycle == ManagedLifecycle.PAUSED -> StatusPill("已暂停", StatusPillTone.ATTENTION)
         view.lifecycle == ManagedLifecycle.RESUMING -> StatusPill("恢复中", StatusPillTone.ATTENTION)
-        view.lifecycle == ManagedLifecycle.COMPLETED -> StatusPill("已完成", StatusPillTone.SUCCESS)
+        view.lifecycle == ManagedLifecycle.COMPLETED -> StatusPill("蟹啦，搞定", StatusPillTone.SUCCESS)
         view.lifecycle == ManagedLifecycle.FAILED -> StatusPill("失败", StatusPillTone.FAILURE)
         view.lifecycle == ManagedLifecycle.STOPPED -> StatusPill("已停止", StatusPillTone.NEUTRAL)
-        else -> StatusPill("空闲", StatusPillTone.NEUTRAL)
+        else -> StatusPill("蟹在歇着", StatusPillTone.NEUTRAL)
     }
 }
 

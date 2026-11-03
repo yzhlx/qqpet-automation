@@ -645,8 +645,8 @@ class PetAutomationService : Service() {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
         return NotificationCompat.Builder(this, CHANNEL_ID)
-            .setSmallIcon(R.mipmap.ic_launcher)
-            .setContentTitle("QQ宠物短课 MVP")
+            .setSmallIcon(R.drawable.ic_stat_crab)
+            .setContentTitle("蟹啦")
             .setContentText(text)
             .setOngoing(true)
             .addAction(0, "停止", stop)
@@ -659,7 +659,7 @@ class PetAutomationService : Service() {
 
     private fun ensureChannel() {
         val nm = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
-        nm.createNotificationChannel(NotificationChannel(CHANNEL_ID, "QQ宠物MVP", NotificationManager.IMPORTANCE_LOW))
+        nm.createNotificationChannel(NotificationChannel(CHANNEL_ID, "托管进度", NotificationManager.IMPORTANCE_LOW))
     }
 
     private fun logLine(message: String) {
