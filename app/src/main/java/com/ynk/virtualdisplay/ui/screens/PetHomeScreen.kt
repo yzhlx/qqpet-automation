@@ -44,6 +44,8 @@ import androidx.core.content.ContextCompat
 import com.ynk.virtualdisplay.automation.CareStep
 import com.ynk.virtualdisplay.automation.CourseCatalogStore
 import com.ynk.virtualdisplay.automation.DailyBudgetStore
+import com.ynk.virtualdisplay.automation.ManualPause
+import com.ynk.virtualdisplay.automation.ManualPauseState
 import com.ynk.virtualdisplay.automation.PetAutomationService
 import com.ynk.virtualdisplay.automation.PetManagedRuntime
 import com.ynk.virtualdisplay.automation.PetProfile
@@ -97,8 +99,8 @@ import java.util.UUID
  *  - screenshots and the last-run summary     : the evidence directory written by the controller
  *  - the log timeline                          : files/pet_mvp.log
  *
- * The control footer exposes ONLY what the automation layer really has: START and STOP. There is no
- * manual pause/resume API, so no pause button is drawn.
+ * The control footer exposes ONLY what the automation layer really has: START, STOP, and a manual
+ * pause that takes effect between actions.
  */
 @Composable
 fun PetHomeScreen(
@@ -110,6 +112,7 @@ fun PetHomeScreen(
     val uiState by viewModel.uiState.collectAsState()
     val runtime by PetRuntime.state.collectAsState()
     val managed by PetManagedRuntime.state.collectAsState()
+    val manualPause by ManualPause.state.collectAsState()
 
     var wallNowMs by remember { mutableStateOf(System.currentTimeMillis()) }
     val healthExpiryAtMs = ManagedRuntimePresentation.nextHealthExpiryAtMs(managed)
@@ -170,7 +173,10 @@ fun PetHomeScreen(
         canStart = canStart,
         profileBlockers = profileErrors,
         displayReady = readyDisplay != null,
+        pausable = managed.pauseBoundariesLeft > 0,
+        manualPause = manualPause,
     )
+    val manualHeld = runtime.running && manualPause == ManualPauseState.HELD
     val progress = RoundProgressPresentation.of(managed.totalRounds, managed.completedRounds)
     val budgetCap = minOf(plan.dailyBudgetMinutes, DailyBudgetStore.HARD_STOP_MINUTES)
 
@@ -221,12 +227,12 @@ fun PetHomeScreen(
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                     PetPill(pill.text, pillBackground(pill.tone), pillForeground(pill.tone))
                     Spacer(Modifier.width(8.dp))
-                    PetNote(subtitleFor(managedView, runtime.running, latest?.record, fmt))
+                    PetNote(subtitleFor(managedView, runtime.running, manualHeld, latest?.record, fmt))
                 }
             }
 
             if (runtime.running) {
-                CurrentTaskCard(managedView, progress)
+                CurrentTaskCard(managedView, progress, manualHeld)
                 HomeLogCard(logRows, onOpenLogs)
             } else {
                 if (!controls.startEnabled || !catalogFresh) {
@@ -268,7 +274,7 @@ fun PetHomeScreen(
             Spacer(Modifier.height(4.dp))
         }
 
-        // ── 底部主控：只有开始 / 停止是真实能力 ──
+        // ── 底部主控：开始、停止，以及在两步之间生效的暂停 ──
         // Opaque background: the scrolled cards above end where this footer begins, so nothing may
         // show through underneath the buttons.
         Column(
@@ -304,12 +310,31 @@ fun PetHomeScreen(
                     }
                 }
             } else {
-                PetFootButton(
-                    text = "停止托管",
-                    tone = PetButtonTone.DANGER,
-                    onClick = { dialog = HomeDialog.ConfirmStop },
-                    modifier = Modifier.fillMaxWidth(),
-                )
+                val pauseHint = controls.manualPauseNote ?: controls.pauseUnavailableReason
+                if (pauseHint != null) {
+                    PetNote(pauseHint)
+                    Spacer(Modifier.height(8.dp))
+                }
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    if (controls.manualPauseAvailable) {
+                        PetFootButton(
+                            text = controls.pauseButtonText,
+                            tone = when {
+                                manualHeld -> PetButtonTone.PRIMARY
+                                controls.resumeEnabled || controls.pauseEnabled -> PetButtonTone.GHOST
+                                else -> PetButtonTone.DISABLED
+                            },
+                            onClick = { if (controls.resumeEnabled) ManualPause.release() else ManualPause.request() },
+                            modifier = Modifier.weight(1f),
+                        )
+                    }
+                    PetFootButton(
+                        text = "停止托管",
+                        tone = PetButtonTone.DANGER,
+                        onClick = { dialog = HomeDialog.ConfirmStop },
+                        modifier = Modifier.weight(1f),
+                    )
+                }
             }
         }
     }
@@ -503,7 +528,7 @@ private fun HealthStatCell(stat: HealthStat, showMeta: Boolean, modifier: Modifi
 }
 
 @Composable
-private fun CurrentTaskCard(view: ManagedRuntimeView, progress: RoundProgress) {
+private fun CurrentTaskCard(view: ManagedRuntimeView, progress: RoundProgress, manualHeld: Boolean) {
     PetCard {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Text(
@@ -521,7 +546,7 @@ private fun CurrentTaskCard(view: ManagedRuntimeView, progress: RoundProgress) {
             PetChip(chipText, chipBg, chipFg)
         }
         Spacer(Modifier.height(5.dp))
-        Text(stepHeroText(view), fontSize = 24.sp, fontWeight = FontWeight.Bold, color = PetTokens.Ink,
+        Text(if (manualHeld) "已暂停，等你点继续" else stepHeroText(view), fontSize = 24.sp, fontWeight = FontWeight.Bold, color = PetTokens.Ink,
             letterSpacing = (-0.3).sp)
         val studying = view.flowText.contains("STUDY", true) || view.flowText.contains("学习", true)
         if (progress.total > 0 && studying) {
@@ -530,7 +555,7 @@ private fun CurrentTaskCard(view: ManagedRuntimeView, progress: RoundProgress) {
             Spacer(Modifier.height(7.dp))
             Text("已完成 ${progress.completed} / 共 ${progress.total} 节", fontSize = 12.5.sp, color = PetTokens.Ink2)
         }
-        val stage = StudyStepTrack.indexOf(view.stepText)
+        val stage = if (manualHeld) null else StudyStepTrack.indexOf(view.stepText)
         if (studying && stage != null) {
             Spacer(Modifier.height(11.dp))
             Row(Modifier.fillMaxWidth()) {
@@ -552,7 +577,7 @@ private fun CurrentTaskCard(view: ManagedRuntimeView, progress: RoundProgress) {
         }
         if (view.lifecycle == ManagedLifecycle.PAUSED || view.lifecycle == ManagedLifecycle.RESUMING) {
             Spacer(Modifier.height(10.dp))
-            PausedBanner(view)
+            PausedBanner(view, manualHeld)
         }
         if (!studying || stage == null) {
             Spacer(Modifier.height(10.dp))
@@ -594,7 +619,7 @@ private fun StageCell(label: String, index: Int, stage: Int, modifier: Modifier 
 }
 
 @Composable
-private fun PausedBanner(view: ManagedRuntimeView) {
+private fun PausedBanner(view: ManagedRuntimeView, manualHeld: Boolean) {
     Row(
         Modifier.fillMaxWidth().background(PetTokens.AmberSoft, RoundedCornerShape(PetTokens.NextRadius))
             .padding(12.dp),
@@ -603,10 +628,11 @@ private fun PausedBanner(view: ManagedRuntimeView) {
         PetIcon(PetGlyph.Locate, 17.dp, PetTokens.AmberStrong)
         Spacer(Modifier.width(9.dp))
         Column {
-            Text("自动暂停", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = PetTokens.AmberHead)
+            Text(if (manualHeld) "你暂停了托管" else "自动暂停", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = PetTokens.AmberHead)
             Spacer(Modifier.height(3.dp))
             Text(
-                "${view.pauseText}。App 正在自动尝试恢复，期间不发送任何输入；" +
+                if (manualHeld) "停在两步之间，不会再点 QQ。点「继续」后先确认 QQ 当前页面再接着做。"
+                else "${view.pauseText}。App 正在自动尝试恢复，期间不发送任何输入；" +
                     "120 秒内无法确认页面会安全停止，不会盲点。",
                 fontSize = 11.5.sp, color = PetTokens.AmberInk, lineHeight = 16.sp,
             )
@@ -702,9 +728,11 @@ private fun stepHeroText(view: ManagedRuntimeView): String = when (view.stepText
 private fun subtitleFor(
     view: ManagedRuntimeView,
     running: Boolean,
+    manualHeld: Boolean,
     record: SessionRunRecord?,
     fmt: (Long) -> String,
 ): String = when {
+    running && manualHeld -> "你暂停了托管 · 已运行 ${view.durationValue}"
     running && (view.lifecycle == ManagedLifecycle.PAUSED || view.lifecycle == ManagedLifecycle.RESUMING) ->
         "${view.pauseText} · 自动恢复中"
     running -> "已运行 ${view.durationValue} · 完成 ${view.completedValue}"

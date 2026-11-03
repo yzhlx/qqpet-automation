@@ -533,6 +533,7 @@ class PetAutomationService : Service() {
             capture.start()
             try {
                 PetCapsuleOverlay.show(this)
+                ManualPause.release()
                 PetRuntime.update {it.copy(running=true,runState=SessionRunState.RUNNING,displayId=displayId,cycles=0,status=modeLabel(mode))}
                 val verdict=controller.run()
                 // Each independent entry has its OWN success verdict; only 托管 counts rounds. A
@@ -613,6 +614,7 @@ class PetAutomationService : Service() {
         PetCapsuleOverlay.hide()
         val reason = stopReason
         logLine("SESSION_STOP $reason")
+        ManualPause.release()
         PetRuntime.update { it.copy(running = false, runState = SessionRunState.STOPPED, status = reason, nextCheckAtMs = null) }
         runCatching { updateNotification(reason) }
         wakeLock?.let { if (it.isHeld) it.release() }
@@ -685,6 +687,7 @@ class PetAutomationService : Service() {
         job?.cancel(); job = null
         wakeLock?.let { if (it.isHeld) it.release() }
         wakeLock = null
+        ManualPause.release()
         PetRuntime.update { it.copy(running = false, runState = SessionRunState.STOPPED, nextCheckAtMs = null) }
         app.releaseDisplayRepository("PetAutomationService")
         scope.cancel()

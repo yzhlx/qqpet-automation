@@ -170,9 +170,34 @@ class PetSessionController(context:Context,capture:HeadlessDisplayCapture,input:
             "pauseReason" to value.pauseReason,"pauseCount" to value.pauseCount,"runtimeMs" to value.runtimeMs,
             "energy" to value.energy.fields(),"cleanliness" to value.cleanliness.fields(),"mood" to value.mood.fields())))
     }
+    /**
+     * The manual pause boundary. Called only where nothing is in flight: no gesture, and no attempt
+     * reserved but not yet booked. QQ may have moved while the session was held, so on continue the
+     * page is re-identified from a fresh frame before any further input.
+     */
+    private suspend fun pausePoint(nextStep:String) {
+        snapshot=snapshot.copy(pauseBoundariesLeft=(snapshot.pauseBoundariesLeft-1).coerceAtLeast(0))
+        val held=ManualPause.hold {
+            snapshot=snapshot.copy(runState=SessionRunState.PAUSED,pauseReason=ManualPause.REASON,
+                pauseCount=snapshot.pauseCount+1,nextStep="点「继续」后：$nextStep")
+            flow.emit("USER_PAUSE_HELD",result=nextStep)
+            publish()
+        }
+        if(!held) return
+        snapshot=snapshot.copy(runState=SessionRunState.RUNNING,pauseReason=null,nextStep=nextStep)
+        flow.emit("USER_PAUSE_RELEASED",result=nextStep)
+        publish()
+        navigation.initialise()
+    }
     suspend fun run():String=coroutineScope {
+        // One boundary before each plan step, and before each lesson of a study step or a round.
+        val boundaries=when {
+            mode==SessionMode.HEALTH_CHECK || mode==SessionMode.WORK -> 0
+            planV2!=null -> planV2.steps.sumOf {if(it is StudyStep) it.rounds else 1}
+            else -> totalRounds
+        }
         snapshot=snapshot.copy(runState=SessionRunState.RUNNING,startedAt=System.currentTimeMillis(),
-            startedElapsedMs=SystemClock.elapsedRealtime(),nextStep="读取健康状态")
+            startedElapsedMs=SystemClock.elapsedRealtime(),nextStep="读取健康状态",pauseBoundariesLeft=boundaries)
         publish()
         val ticker=launch {while(isActive) {delay(1000);publish()}}
         flow.capture.facts.events.append(EventSource.APP_AUTOMATION,EventKind.SESSION_CONFIG,mapOf(
@@ -227,7 +252,7 @@ class PetSessionController(context:Context,capture:HeadlessDisplayCapture,input:
                     else -> SessionRunState.FAILED
                 }
                 snapshot=snapshot.copy(runState=terminal,pauseReason=stopReason,
-                    completedRounds=completed,
+                    completedRounds=completed,pauseBoundariesLeft=0,
                     nextStep=if(terminal==SessionRunState.COMPLETED) "批次完成" else "已安全停止")
                 publish()
                 writeRunRecord(terminal)
@@ -356,8 +381,8 @@ class PetSessionController(context:Context,capture:HeadlessDisplayCapture,input:
                 ResourcePreflight.Ready("device-preflight-${System.currentTimeMillis()}",planSkipWork,false)
             })
         val execution=PlanDeviceExecution(store,checkNotNull(planAttemptBudget),preflight,
-            work={step,ctx -> activePlanContext=ctx;runPlanWork(step)},
-            care={step,ctx -> activePlanContext=ctx;runPlanCare(step)},
+            work={step,ctx -> pausePoint("打工");activePlanContext=ctx;runPlanWork(step)},
+            care={step,ctx -> pausePoint("护理");activePlanContext=ctx;runPlanCare(step)},
             study={step,ctx -> activePlanContext=ctx;runPlanStudy(step)},checkAuthority=authority)
         try {
             val result=execution.run(request,flow.capture.facts.events.sessionId)
@@ -479,6 +504,7 @@ class PetSessionController(context:Context,capture:HeadlessDisplayCapture,input:
         val derived=plan.copy(courseId=step.courseId,rounds=step.rounds)
         var lessons=0
         repeat(step.rounds) {index ->
+            pausePoint("第 ${index+1}/${step.rounds} 节 ${derived.courseName}")
             flow.round=index+1
             flow.state="SELECT_COURSE"
             snapshot=snapshot.copy(currentFlow="STUDY",nextStep="第 ${index+1}/${step.rounds} 节 ${derived.courseName}")
@@ -501,6 +527,7 @@ class PetSessionController(context:Context,capture:HeadlessDisplayCapture,input:
             check(ledger.complete(flow.round)) {"DUPLICATE_ROUND_COMPLETION"}
             lessons++
             completed=ledger.completedCount
+            snapshot=snapshot.copy(completedRounds=completed)
             flow.emit("ROUND_RESULT_CONFIRMED",result="round=${flow.round} completed=$completed")
             if(result.getBoolean("result_page")) navigation.returnHomeFromResult("result") else navigation.initialise()
         }
@@ -529,6 +556,7 @@ class PetSessionController(context:Context,capture:HeadlessDisplayCapture,input:
      */
     private suspend fun runRounds():String=coroutineScope {
             repeat(totalRounds) {index ->
+                pausePoint("第 ${index+1}/$totalRounds 节")
                 flow.round=index+1;flow.state="CHECK_STATE"
                 snapshot=snapshot.copy(round=flow.round,currentFlow="CARE",nextStep="读取体力与清洁")
                 val timing=if(mode.runsStudy) CourseTiming.resolve(plan,catalog,System.currentTimeMillis()) else null

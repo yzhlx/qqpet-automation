@@ -1,6 +1,8 @@
 package com.ynk.virtualdisplay
 
 import com.ynk.virtualdisplay.automation.ManagedRuntimeState
+import com.ynk.virtualdisplay.automation.ManualPause
+import com.ynk.virtualdisplay.automation.ManualPauseState
 import com.ynk.virtualdisplay.automation.ObservationSource
 import com.ynk.virtualdisplay.automation.ObservedValue
 import com.ynk.virtualdisplay.automation.SessionRunState
@@ -27,7 +29,7 @@ import org.junit.Test
 /**
  * Pure JVM coverage for the v0.1 presentation rules. These tests exist to pin down the honesty
  * contract of the product UI: a missing reading can never become a number, a sent input can never
- * become a confirmed effect, and the pause control can never become operable.
+ * become a confirmed effect, and the pause control is only operable where a pause can take effect.
  */
 class PetHomePresentationTest {
 
@@ -108,15 +110,67 @@ class PetHomePresentationTest {
     // --- controls ------------------------------------------------------------------------------
 
     @Test
-    fun `pause is never operable in v0_1`() {
+    fun `a single-action session offers no pause button`() {
         val controls = ManagedControlsPresentation.of(
-            legacyActive = true, runState = SessionRunState.RUNNING, canStart = true,
+            legacyActive = true, runState = SessionRunState.RUNNING, canStart = true, pausable = false,
         )
         assertFalse(controls.pauseEnabled)
         assertFalse(controls.manualPauseAvailable)
         assertFalse(controls.showStartPrimary)
         assertTrue(controls.stopEnabled)
-        assertTrue(controls.pauseUnavailableReason.contains("未开放手动暂停"))
+        assertNull(controls.pauseUnavailableReason)
+    }
+
+    @Test
+    fun `manual pause moves from pause to withdraw to continue`() {
+        fun at(state: ManualPauseState, runState: SessionRunState = SessionRunState.RUNNING) =
+            ManagedControlsPresentation.of(
+                legacyActive = true, runState = runState, canStart = false, pausable = true, manualPause = state,
+            )
+        val idle = at(ManualPauseState.NONE)
+        assertTrue(idle.pauseEnabled)
+        assertFalse(idle.resumeEnabled)
+        assertEquals("暂停", idle.pauseButtonText)
+        assertNull(idle.manualPauseNote)
+
+        val requested = at(ManualPauseState.REQUESTED)
+        assertFalse(requested.pauseEnabled)
+        assertTrue(requested.resumeEnabled)
+        assertEquals("取消暂停", requested.pauseButtonText)
+        assertTrue(requested.manualPauseNote!!.contains("不会被打断"))
+
+        val held = at(ManualPauseState.HELD, SessionRunState.PAUSED)
+        assertTrue(held.resumeEnabled)
+        assertEquals("继续", held.pauseButtonText)
+        assertFalse(held.automaticRecoveryActive)
+        assertNull(held.manualPauseNote)
+    }
+
+    @Test
+    fun `a held pause keeps its continue button after the last boundary passed`() {
+        val held = ManagedControlsPresentation.of(
+            legacyActive = true, runState = SessionRunState.PAUSED, canStart = false, pausable = false,
+            manualPause = ManualPauseState.HELD,
+        )
+        assertTrue(held.manualPauseAvailable)
+        assertTrue(held.resumeEnabled)
+        assertEquals("继续", held.pauseButtonText)
+    }
+
+    @Test
+    fun `pause cannot be pressed while automatic recovery owns the session`() {
+        val recovering = ManagedControlsPresentation.of(
+            legacyActive = true, runState = SessionRunState.RESUMING, canStart = false, pausable = true,
+        )
+        assertTrue(recovering.manualPauseAvailable)
+        assertFalse(recovering.pauseEnabled)
+        assertTrue(recovering.automaticRecoveryActive)
+        assertTrue(recovering.pauseUnavailableReason!!.contains("自动恢复"))
+    }
+
+    @Test
+    fun `a manual pause reads as the user's own pause, not a failure`() {
+        assertEquals("你手动暂停", RecordsPresentation.stopReasonText(ManualPause.REASON))
     }
 
     @Test

@@ -64,6 +64,7 @@ object RecordsPresentation {
 
     /** The raw code stays in the run's log; 记录 only says what happened in words. */
     fun stopReasonText(reason: String): String = when {
+        reason == com.ynk.virtualdisplay.automation.ManualPause.REASON -> "你手动暂停"
         reason.contains("USER_STOP", true) || reason == "用户停止" -> "用户停止"
         reason.contains("PAGE_MISMATCH", true) -> "页面对不上"
         reason.startsWith("WORK_NOT_STARTED", true) -> "条件不够，没有开始打工"
