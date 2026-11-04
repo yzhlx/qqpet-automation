@@ -15,6 +15,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.ynk.virtualdisplay.BuildConfig
 import com.ynk.virtualdisplay.R
 import com.ynk.virtualdisplay.ui.kit.*
 import com.ynk.virtualdisplay.ui.main.PetTitleBar
@@ -150,6 +151,8 @@ fun PetUserManualScreen(
                             "6 位配对码显示在系统的「使用配对码配对设备」弹窗里，下拉通知栏把数字填入 Shizuku 的配对通知。" +
                             "看到「配对成功」只代表配对完成，还要回 Shizuku 点「启动」，显示「已启动」才算可用。",
                     )
+                    ManualPairingFigure()
+                    Spacer(Modifier.height(6.dp))
                     ManualStepItem(
                         step = "3",
                         title = "手机没有无线调试？（Android 10 或无 Wi-Fi）",
@@ -420,8 +423,92 @@ fun PetUserManualScreen(
                 }
             }
 
+            // 攻略版本与更新入口
+            PetCard {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    PetIcon(PetGlyph.Info, 18.dp)
+                    Spacer(Modifier.width(8.dp))
+                    PetSection("攻略版本与更新")
+                }
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    "当前版本：" + BuildConfig.VERSION_NAME + " · " + BuildConfig.GIT_HASH.take(7),
+                    fontSize = 12.sp,
+                    color = PetTokens.Ink2,
+                )
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    "文字与示意图随应用版本更新，可直接查看，不需要先看视频。系统升级后菜单名称、厂商路径或按钮位置可能变化，以手机实际显示为准。",
+                    fontSize = 12.sp,
+                    lineHeight = 18.sp,
+                    color = PetTokens.Ink2,
+                )
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    "如果页面与攻略不一致，可在设置中点击「检查运行环境」重新检测。",
+                    fontSize = 12.sp,
+                    lineHeight = 18.sp,
+                    color = PetTokens.Ink2,
+                )
+            }
+
             Spacer(Modifier.height(20.dp))
         }
+    }
+}
+
+
+@Composable
+private fun ManualPairingFigure() {
+    Column(Modifier.fillMaxWidth()) {
+        Row(
+            Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            ManualFigureStep("1", "系统设置", "无线调试", Modifier.weight(1f))
+            Text("→", fontSize = 14.sp, color = PetTokens.Ink3)
+            ManualFigureStep("2", "配对弹窗", "填入 6 位码", Modifier.weight(1f))
+            Text("→", fontSize = 14.sp, color = PetTokens.Ink3)
+            ManualFigureStep("3", "Shizuku", "点「启动」", Modifier.weight(1f))
+        }
+        Spacer(Modifier.height(6.dp))
+        Text(
+            "示意图，不依赖视频。不同品牌与系统版本的菜单名称可能不同，以手机实际页面为准。",
+            fontSize = 11.sp,
+            lineHeight = 16.sp,
+            color = PetTokens.Ink3,
+        )
+    }
+}
+
+@Composable
+private fun ManualFigureStep(
+    step: String,
+    title: String,
+    action: String,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier
+            .clip(RoundedCornerShape(10.dp))
+            .background(PetTokens.Surface)
+            .padding(horizontal = 8.dp, vertical = 8.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Text(
+            step,
+            fontSize = 10.sp,
+            fontWeight = FontWeight.Bold,
+            color = PetTokens.BlueInk,
+            modifier = Modifier
+                .clip(RoundedCornerShape(4.dp))
+                .background(PetTokens.BlueSoft)
+                .padding(horizontal = 5.dp, vertical = 1.dp),
+        )
+        Spacer(Modifier.height(4.dp))
+        Text(title, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = PetTokens.Ink)
+        Text(action, fontSize = 10.5.sp, lineHeight = 14.sp, color = PetTokens.BlueInk)
     }
 }
 
