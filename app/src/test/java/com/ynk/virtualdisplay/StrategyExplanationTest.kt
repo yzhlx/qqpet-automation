@@ -12,6 +12,7 @@ import com.ynk.virtualdisplay.automation.RunState
 import com.ynk.virtualdisplay.automation.SkipReason
 import com.ynk.virtualdisplay.automation.StepExecution
 import com.ynk.virtualdisplay.automation.StepState
+import com.ynk.virtualdisplay.automation.StepTransfer
 import com.ynk.virtualdisplay.automation.StrategyExplanation
 import com.ynk.virtualdisplay.automation.StudyStep
 import com.ynk.virtualdisplay.automation.WorkStep
@@ -102,6 +103,19 @@ class StrategyExplanationTest {
         assertEquals(StrategyExplanation.Outcome.NOT_EXECUTED, actions[0].outcome)
         assertEquals("USER_STOP", actions[0].reason)
         assertEquals(StrategyExplanation.Outcome.NOT_EXECUTED, actions[1].outcome)
+    }
+
+    @Test fun aTransferredFailureNamesTheActionTheRoundMovedOnTo() {
+        val snapshot = RunSnapshot("run", request(plan(work, care)), RunState.FAILED,
+            steps = listOf(
+                execution(0, work, StepState.BLOCKED, "WORK_ENERGY_INSUFFICIENT"),
+                execution(1, care, StepState.COMPLETED)),
+            transfers = listOf(StepTransfer("run", "w", PlanStepType.WORK, StepState.BLOCKED,
+                "WORK_ENERGY_INSUFFICIENT", "c", PlanStepType.CARE, "TRANSFER_AFTER_WORK")))
+        val actions = StrategyExplanation.actionsOf(plan(work, care), snapshot)
+        assertEquals(StrategyExplanation.Outcome.BLOCKED, actions[0].outcome)
+        assertEquals("护理", actions[0].transferredTo)
+        assertNull(actions[1].transferredTo)
     }
 
     @Test fun selectedActionsComeFirstInExecutionOrderAndUnselectedOnesLast() {

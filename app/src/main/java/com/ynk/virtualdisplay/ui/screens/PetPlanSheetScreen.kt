@@ -111,6 +111,7 @@ fun PetPlanSheetScreen(onClose: () -> Unit, onStarted: () -> Unit, displayId: In
     var stepIntervalValue by remember { mutableStateOf(10) }
     var failureCooldownEnabled by remember { mutableStateOf(false) }
     var failureCooldownValue by remember { mutableStateOf(30) }
+    var transferOnBlock by remember { mutableStateOf(false) }
     var adventureMode by remember { mutableStateOf(com.ynk.virtualdisplay.automation.AdventureMode.NEARBY_WALK) }
     var adventureRounds by remember { mutableStateOf(1) }
     var adventureMaxDaily by remember { mutableStateOf(5) }
@@ -160,6 +161,7 @@ fun PetPlanSheetScreen(onClose: () -> Unit, onStarted: () -> Unit, displayId: In
             stepIntervalValue = stored.stepIntervalMinutes ?: 10
             failureCooldownEnabled = stored.failureCooldownMinutes != null
             failureCooldownValue = stored.failureCooldownMinutes ?: 30
+            transferOnBlock = stored.transferOnBlock
             if (adventure != null) {
                 adventureMode = adventure.mode
                 adventureRounds = adventure.rounds
@@ -191,6 +193,8 @@ fun PetPlanSheetScreen(onClose: () -> Unit, onStarted: () -> Unit, displayId: In
     val fresh = catalog?.isUsable(System.currentTimeMillis()) == true
     val busy = loading || saving
     val selectedCourse = unlocked.firstOrNull { it.id == plan.courseId }
+    val selectedActionCount = listOf(selectedSignIn, selectedMailbox, selectedLuckyBag,
+        selectedWork, selectedCare, selectedStudy, selectedAdventure).count { it }
     val validationMessage = when {
         loading -> "正在读取方案…"
         !selectedSignIn && !selectedMailbox && !selectedLuckyBag && !selectedWork && !selectedCare && !selectedStudy && !selectedAdventure -> "请选择至少一个动作。"
@@ -224,7 +228,8 @@ fun PetPlanSheetScreen(onClose: () -> Unit, onStarted: () -> Unit, displayId: In
                     minCoinFloor = if (coinFloorEnabled) coinFloorValue else null,
                     maxDailyNetSpend = if (dailySpendCapEnabled) dailySpendCapValue else null,
                     stepIntervalMinutes = if (stepIntervalEnabled) stepIntervalValue else null,
-                    failureCooldownMinutes = if (failureCooldownEnabled) failureCooldownValue else null)
+                    failureCooldownMinutes = if (failureCooldownEnabled) failureCooldownValue else null,
+                    transferOnBlock = transferOnBlock)
                 PlanValidator.validate(snapshot, verified.map { it.id }.toSet())
                 withContext(Dispatchers.IO) { PlanV2Store(context).save(snapshot) }
                 didSave = true
@@ -313,7 +318,7 @@ fun PetPlanSheetScreen(onClose: () -> Unit, onStarted: () -> Unit, displayId: In
                     Row(Modifier.fillMaxWidth().padding(top = 6.dp), verticalAlignment = Alignment.CenterVertically) {
                         Column(Modifier.weight(1f)) {
                             Text("仅金币不足时打工", fontSize = 14.sp, color = PetTokens.Ink)
-                            PetNote("最多一班")
+                            PetNote("最多一班 · 打开表示金币够时先学习")
                         }
                         Switch(checked = plan.workBeforeStudy, enabled = !busy,
                             onCheckedChange = { plan = plan.copy(workBeforeStudy = it); changed() },
@@ -514,6 +519,26 @@ fun PetPlanSheetScreen(onClose: () -> Unit, onStarted: () -> Unit, displayId: In
                         ParamRow("冷却（分）", PetGlyph.Clock, failureCooldownValue, 1..240, 5, !busy) {
                             failureCooldownValue = it; changed()
                         }
+                    }
+                }
+                if (selectedActionCount >= 2) PetCard {
+                    PetSection("优先与转移（STR-01/02）")
+                    Spacer(Modifier.height(8.dp))
+                    PetNote("「仅金币不足时打工」打开是学习优先（金币够时先学习），关闭是打工优先（先打工）。")
+                    Spacer(Modifier.height(6.dp))
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
+                            Text("受阻时按规则转移", fontSize = 14.sp, color = PetTokens.Ink)
+                            PetNote("某个动作受阻时继续做后面的动作，每轮最多转移一次")
+                        }
+                        Switch(checked = transferOnBlock, enabled = !busy,
+                            onCheckedChange = { transferOnBlock = it; changed() },
+                            colors = SwitchDefaults.colors(
+                                checkedTrackColor = PetTokens.Blue,
+                                uncheckedTrackColor = PetTokens.GraySoft,
+                                uncheckedThumbColor = PetTokens.Chevron,
+                                uncheckedBorderColor = PetTokens.Chevron,
+                            ))
                     }
                 }
                 if (selectedCare) {

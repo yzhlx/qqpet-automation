@@ -53,6 +53,23 @@ class StrategyPresentationTest {
         assertEquals(StrategyLineTone.NOT_DONE, lines[0].tone)
     }
 
+    @Test fun aBlockedActionSaysWhereTheRoundWentNext() {
+        val lines = StrategyPresentation.lines(listOf(
+            StrategyExplanation.Action("打工", StrategyExplanation.Outcome.BLOCKED,
+                "WORK_ENERGY_INSUFFICIENT", "护理")))
+        assertTrue(lines[0].text.contains("体力不足"))
+        assertTrue(lines[0].text.contains("已转到护理"))
+        assertEquals(StrategyLineTone.NOT_DONE, lines[0].tone)
+    }
+
+    @Test fun theSummaryNamesWhatWasBlockedAndWhatStillRan() {
+        val summary = StrategyPresentation.summary(listOf(
+            action("打工", StrategyExplanation.Outcome.BLOCKED, "WORK_ENERGY_INSUFFICIENT"),
+            action("护理", StrategyExplanation.Outcome.COMPLETED)))
+        assertTrue(summary.contains("受阻：打工"))
+        assertTrue(summary.contains("执行：护理"))
+    }
+
     @Test fun emptyActionsProduceAnHonestPlaceholder() {
         assertEquals("本轮没有可展示的策略说明", StrategyPresentation.summary(emptyList()))
         assertTrue(StrategyPresentation.lines(emptyList()).isEmpty())

@@ -68,6 +68,14 @@ class PlanV2Test {
         try { (p.steps as MutableList).clear(); fail("Mutable snapshot") } catch (_: UnsupportedOperationException) { }
         assertEquals(p, p.copy())
     }
+    @Test fun theTransferOptionIsPartOfThePlanIdentityAndIsOffByDefault() {
+        val p = plan()
+        assertFalse(p.transferOnBlock)
+        assertEquals(p, p.copy())
+        assertNotEquals(p, p.copy(transferOnBlock = true))
+        assertEquals(p.hashCode(), p.copy().hashCode())
+        assertNotEquals(p.hashCode(), p.copy(transferOnBlock = true).hashCode())
+    }
     @Test fun legacyProfilePreservesItsSourceWithoutChangingNewActionTypes() {
         val p = plan().copy(executionProfile = ExecutionProfile.LEGACY_MANAGED, legacySource = "{old}")
         assertEquals("{old}", p.legacySource)

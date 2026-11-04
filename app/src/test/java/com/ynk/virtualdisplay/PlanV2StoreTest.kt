@@ -211,6 +211,22 @@ class PlanV2StoreTest {
         assertFalse(PlanV2JsonCodec.encode(off).contains("maxDailyNetSpend"))
     }
 
+    @Test fun theTransferOptionRoundtripsAndIsAbsentWhenOff() {
+        val file = File(temporary.root, PlanV2Store.FILE_NAME)
+        val on = plan().copy(transferOnBlock = true)
+        PlanV2Store(file).save(on)
+        val loaded = PlanV2Store(file).load()
+        assertNotNull(loaded)
+        assertTrue(loaded!!.transferOnBlock)
+
+        // 默认关闭：字段不写进 JSON，读回仍然是关闭。
+        val off = on.copy(transferOnBlock = false)
+        PlanV2Store(file).save(off)
+        val loadedOff = PlanV2Store(file).load()
+        assertFalse(loadedOff!!.transferOnBlock)
+        assertFalse(PlanV2JsonCodec.encode(off).contains("transferOnBlock"))
+    }
+
     @Test fun luckyBagStepRoundtripsWithLimitsAndInterval() {
         val file = File(temporary.root, PlanV2Store.FILE_NAME)
         val p = plan(listOf(LuckyBagStep("lb-1", 10, 45)))

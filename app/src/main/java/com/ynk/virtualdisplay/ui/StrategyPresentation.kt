@@ -33,10 +33,16 @@ object StrategyPresentation {
     fun summary(actions: List<StrategyExplanation.Action>): String {
         val done = actions.filter { it.outcome == StrategyExplanation.Outcome.COMPLETED }.map { it.label }
         val skipped = actions.filter { it.outcome == StrategyExplanation.Outcome.SKIPPED }.map { it.label }
+        val blocked = actions.filter {
+            it.outcome == StrategyExplanation.Outcome.BLOCKED ||
+                it.outcome == StrategyExplanation.Outcome.FAILED ||
+                it.outcome == StrategyExplanation.Outcome.UNCONFIRMED
+        }.map { it.label }
         val notRun = actions.filter { it.outcome == StrategyExplanation.Outcome.NOT_EXECUTED }.map { it.label }
         val parts = mutableListOf<String>()
         if (done.isNotEmpty()) parts.add("执行：" + done.joinToString("、"))
         if (skipped.isNotEmpty()) parts.add("跳过：" + skipped.joinToString("、"))
+        if (blocked.isNotEmpty()) parts.add("受阻：" + blocked.joinToString("、"))
         if (notRun.isNotEmpty()) parts.add("未执行：" + notRun.joinToString("、"))
         return if (parts.isEmpty()) "本轮没有可展示的策略说明" else parts.joinToString(" · ")
     }
@@ -44,9 +50,9 @@ object StrategyPresentation {
     private fun sentence(action: StrategyExplanation.Action): String = when (action.outcome) {
         StrategyExplanation.Outcome.COMPLETED -> action.label + "：本轮已执行完成"
         StrategyExplanation.Outcome.SKIPPED -> action.label + "：跳过（" + skipText(action.reason) + "）"
-        StrategyExplanation.Outcome.BLOCKED -> action.label + "：被安全阻断（" + reasonText(action.reason) + "）"
-        StrategyExplanation.Outcome.FAILED -> action.label + "：执行失败（" + reasonText(action.reason) + "）"
-        StrategyExplanation.Outcome.UNCONFIRMED -> action.label + "：结果无法确认（" + reasonText(action.reason) + "）"
+        StrategyExplanation.Outcome.BLOCKED -> action.label + "：被安全阻断（" + reasonText(action.reason) + "）" + transferText(action)
+        StrategyExplanation.Outcome.FAILED -> action.label + "：执行失败（" + reasonText(action.reason) + "）" + transferText(action)
+        StrategyExplanation.Outcome.UNCONFIRMED -> action.label + "：结果无法确认（" + reasonText(action.reason) + "）" + transferText(action)
         StrategyExplanation.Outcome.NOT_SELECTED -> action.label + "：本方案未勾选"
         StrategyExplanation.Outcome.NOT_EXECUTED -> action.label + "：本轮没有执行（" + reasonText(action.reason) + "）"
     }
@@ -59,6 +65,10 @@ object StrategyPresentation {
         null -> "没有记录原因"
         else -> reason
     }
+
+    /** STR-01/STR-02：本轮因为这个动作确定失败而改做了别的动作。 */
+    private fun transferText(action: StrategyExplanation.Action): String =
+        if (action.transferredTo == null) "" else "，已转到" + action.transferredTo
 
     /** 认不出来的原因码原样显示，不编造解释。 */
     private fun reasonText(reason: String?): String {

@@ -6,7 +6,8 @@ package com.ynk.virtualdisplay.automation
  */
 internal object PlanRunJsonCodec {
     private fun obj(vararg pairs: Pair<String, Any?>) = linkedMapOf(*pairs)
-    private fun plan(p: PlanV2): Map<String, Any?> = obj(
+    private fun plan(p: PlanV2): Map<String, Any?> {
+        val fields = obj(
         "schemaVersion" to p.schemaVersion, "planId" to p.planId, "name" to p.name,
         "dailyBudgetMinutes" to p.dailyBudgetMinutes, "executionProfile" to p.executionProfile.name,
         "legacySource" to p.legacySource, "minCoinFloor" to p.minCoinFloor, "maxDailyNetSpend" to p.maxDailyNetSpend,
@@ -19,11 +20,18 @@ internal object PlanRunJsonCodec {
                 is MailboxStep -> { }
                 is LuckyBagStep -> fields.putAll(obj("maxDailyCount" to s.maxDailyCount, "scanIntervalMinutes" to s.scanIntervalMinutes))
                 is CareStep -> fields.putAll(obj("energyThreshold" to s.energyThreshold, "cleanlinessThreshold" to s.cleanlinessThreshold))
-                is StudyStep -> fields.putAll(obj("courseId" to s.courseId, "rounds" to s.rounds))
+                is StudyStep -> {
+                    fields.putAll(obj("courseId" to s.courseId, "rounds" to s.rounds))
+                    if (s.targetAttribute != null) fields["targetAttribute"] = s.targetAttribute
+                }
                 is AdventureStep -> fields.putAll(obj("mode" to s.mode.name, "rounds" to s.rounds, "maxDailyRounds" to s.maxDailyRounds))
             }
             fields
         })
+        // 只在开启时写入这个键：旧文档没有它，解码后仍是「不转移」。
+        if (p.transferOnBlock) fields["transferOnBlock"] = true
+        return fields
+    }
     private fun request(r: RunRequest) = obj("requestId" to r.requestId, "planSnapshot" to plan(r.planSnapshot),
         "deviceSerial" to r.deviceSerial, "displayId" to r.displayId, "origin" to r.origin.name, "createdAtMs" to r.createdAtMs)
     fun sameRequest(a: RunRequest, b: RunRequest) = request(a) == request(b)
@@ -40,7 +48,11 @@ internal object PlanRunJsonCodec {
             "startedAtMs" to s.startedAtMs, "endedAtMs" to s.endedAtMs, "stopReason" to s.stopReason,
             "steps" to s.steps.map { e -> obj("runId" to e.runId, "stepId" to e.stepId, "index" to e.index,
                 "type" to e.type.name, "state" to e.state.name, "reason" to e.reason,
-                "startedAtMs" to e.startedAtMs, "endedAtMs" to e.endedAtMs, "evidenceIds" to e.evidenceIds) }),
+                "startedAtMs" to e.startedAtMs, "endedAtMs" to e.endedAtMs, "evidenceIds" to e.evidenceIds) },
+            "transfers" to s.transfers.map { t -> obj("stoppedStepId" to t.stoppedStepId,
+                "stoppedType" to t.stoppedType.name, "stoppedState" to t.stoppedState.name,
+                "stoppedReason" to t.stoppedReason, "resumedStepId" to t.resumedStepId,
+                "resumedType" to t.resumedType.name, "rule" to t.rule) }),
             "attempts" to record.attempts.map { a -> obj(
                 "runId" to a.attemptId.runId, "stepId" to a.attemptId.stepId, "iteration" to a.attemptId.iteration,
                 "durationMinutes" to a.durationMinutes, "state" to a.state.name, "inputPending" to a.inputPending,
@@ -64,24 +76,32 @@ internal object PlanRunJsonCodec {
                     PlanStepType.LUCKY_BAG -> LuckyBagStep(id, if (step.containsKey("maxDailyCount")) step.int("maxDailyCount") else 5, if (step.containsKey("scanIntervalMinutes")) step.int("scanIntervalMinutes") else 30)
                     PlanStepType.WORK -> WorkStep(id, step.string("workOptionId"), enumValueOf(step.string("trigger")), step.int("shifts"))
                     PlanStepType.CARE -> CareStep(id, step.int("energyThreshold"), step.int("cleanlinessThreshold"))
-                    PlanStepType.STUDY -> StudyStep(id, step.string("courseId"), step.int("rounds"))
+                    PlanStepType.STUDY -> StudyStep(id, step.string("courseId"), step.int("rounds"),
+                        if (step.containsKey("targetAttribute")) step.string("targetAttribute") else null)
                     PlanStepType.ADVENTURE -> AdventureStep(id, if (step.containsKey("mode")) enumValueOf<AdventureMode>(step.string("mode")) else AdventureMode.NEARBY_WALK, step.int("rounds"), if (step.containsKey("maxDailyRounds")) step.nullInt("maxDailyRounds") else null)
                 }
             }, enumValueOf(p.string("executionProfile")), p.nullString("legacySource"),
             if (p.containsKey("minCoinFloor")) p.nullInt("minCoinFloor") else null,
             if (p.containsKey("maxDailyNetSpend")) p.nullInt("maxDailyNetSpend") else null,
             if (p.containsKey("stepIntervalMinutes")) p.nullInt("stepIntervalMinutes") else null,
-            if (p.containsKey("failureCooldownMinutes")) p.nullInt("failureCooldownMinutes") else null)
+            if (p.containsKey("failureCooldownMinutes")) p.nullInt("failureCooldownMinutes") else null,
+            if (p.containsKey("transferOnBlock")) p.boolean("transferOnBlock") else false)
         val request = RunRequest(r.string("requestId"), plan, r.string("deviceSerial"), r.int("displayId"),
             enumValueOf(r.string("origin")), r.long("createdAtMs"))
         val counts = s.value("counts").objectValue()
+        val transfers = if (s.containsKey("transfers")) s.list("transfers").map { item ->
+            val t = item.objectValue()
+            StepTransfer(s.string("runId"), t.string("stoppedStepId"), enumValueOf(t.string("stoppedType")),
+                enumValueOf(t.string("stoppedState")), t.string("stoppedReason"), t.string("resumedStepId"),
+                enumValueOf(t.string("resumedType")), t.string("rule"))
+        } else emptyList()
         val snapshot = RunSnapshot(s.string("runId"), request, enumValueOf(s.string("state")), s.list("steps").map {
             val e = it.objectValue()
             StepExecution(e.string("runId"), e.string("stepId"), e.int("index"), enumValueOf(e.string("type")),
                 enumValueOf(e.string("state")), e.nullString("reason"), e.nullLong("startedAtMs"), e.nullLong("endedAtMs"),
                 e.list("evidenceIds").map { id -> id as? String ?: error("RUN_JSON_STRING_REQUIRED") })
         }, RunCounts(counts.int("workShiftsCompleted"), counts.int("careCompleted"), counts.int("studyRoundsCompleted"), if (counts.containsKey("adventureCompleted")) counts.int("adventureCompleted") else 0, if (counts.containsKey("signInCompleted")) counts.int("signInCompleted") else 0, if (counts.containsKey("mailboxCompleted")) counts.int("mailboxCompleted") else 0, if (counts.containsKey("luckyBagCompleted")) counts.int("luckyBagCompleted") else 0),
-            s.nullLong("startedAtMs"), s.nullLong("endedAtMs"), s.nullString("stopReason"))
+            s.nullLong("startedAtMs"), s.nullLong("endedAtMs"), s.nullString("stopReason"), transfers)
         val reasons = linkedMapOf<String, String>()
         val attempts = root.list("attempts").map {
             val a = it.objectValue()
@@ -106,6 +126,7 @@ internal object PlanRunJsonCodec {
     private fun Map<String, Any?>.nullLong(k: String): Long? = value(k)?.let { it as? Long ?: error("RUN_JSON_INTEGER_REQUIRED:$k") }
     private fun Map<String, Any?>.nullInt(k: String): Int? = nullLong(k)?.toInt()
     private fun Map<String, Any?>.int(k: String): Int = long(k).also { require(it in Int.MIN_VALUE..Int.MAX_VALUE) { "RUN_JSON_INTEGER_RANGE:$k" } }.toInt()
+    private fun Map<String, Any?>.boolean(k: String): Boolean = value(k) as? Boolean ?: error("RUN_JSON_BOOLEAN_REQUIRED")
     private fun Map<String, Any?>.list(k: String) = value(k) as? List<*> ?: error("RUN_JSON_ARRAY_REQUIRED:$k")
 
     private object Json {

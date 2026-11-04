@@ -319,3 +319,20 @@
 - 验证结果：全量单元测试 101 套件 / 954 项 100% PASS（0 failures, 0 errors, 3 skipped）；assembleDebug 构建通过（APK 45.9MB）；ADB 覆盖安装 DKS9K23420020242 成功，App 启动无崩溃；真机插桩测试 3 项 PASS（0 failures, 0 errors）。主页与历史卡片上的策略说明尚未在真机上跑过一轮真实方案，待验收。
 - 提交与推送：feat(plan): 策略解释，展示本轮选择与排除原因 (STR-16)，推送 backup/feat/onboarding-troubleshooting-p0，更新 PR #4。
 - 下一步：第三阶段剩余 STR-08/09 属性目标与均衡目标（StudyStep.targetAttribute 已存在），或 STR-01/02 学习优先与打工优先模式。
+
+## 学习优先与打工优先的受阻转移（2026-11-03，feat/onboarding-troubleshooting-p0）
+- 目标：STR-01/STR-02 学习优先、打工优先模式。核实结论：优先本身早已具备（WorkTrigger.ALWAYS=打工优先、IF_FUNDS_SHORT=学习优先，方案页开关「仅金币不足时打工」），真正缺的是验收条款里的「无法继续时按规则选择替代任务 / 资源不足或疲劳时按规则转移」——原实现是 stop-on-failure，任何一步受阻就结束整轮，后面的动作全部不执行，用户等于白等一轮。
+- 改动：
+  - StepTransferPolicy（新增，automation 层纯函数，JVM 可测）：受阻后要不要转移、转到哪一步，只看四件事——用户是否打开开关、受阻结果是否「确定失败」（BLOCKED/FAILED）、方案里后面还剩什么动作、本轮已转移几次。结果无法确认（UNCONFIRMED）或用户主动停掉（CANCELLED）绝不转移：那种情况下动作可能已在游戏里发生，再往下做可能重复扣费或重复领取。每轮最多转移一次，第二次受阻就停下，避免连环空转。转移目标就是方案里下一个动作——用户自己排的顺序就是规则。
+  - PlanV2 顶层新增 transferOnBlock（默认关闭，新玩法不默认执行），同步 copy/equals/hashCode；PlanV2JsonCodec 与 PlanRunJsonCodec 双路编解码支持，关闭时不写入 JSON。
+  - RunSnapshot 新增 transfers 记录（谁受阻、什么结果、为什么、转到了哪个动作），并把「停住的步骤之后不许再执行」的约束改成「登记过转移才允许」：执行顺序不被悄悄破坏，转移事实可核对、可持久化。
+  - PlanRunner：步骤受阻时按规则转移并继续执行后面的动作；发生过转移的轮次终态为 FAILED（第一个动作确实没做成），没有失败的轮次仍是 COMPLETED。
+  - StrategyExplanation / StrategyPresentation：受阻的动作会写明「已转到XX」；策略摘要新增「受阻：」分组，不再只报执行与跳过。
+  - PetPlanSheetScreen：新增「优先与转移（STR-01/02）」卡片，说明学习优先与打工优先的区别，并提供「受阻时按规则转移」开关（默认关，勾选两个及以上动作时显示）。
+  - 使用攻略「配置托管方案」补充第 7 条「优先模式与受阻转移」。
+  - 顺带修掉两个既有缺陷：PlanRunJsonCodec 之前不保存 StudyStep.targetAttribute（属性目标会在运行记录里丢失），PlanV2.hashCode 之前漏算 failureCooldownMinutes。
+  - 单元测试：新增 StepTransferPolicyTest（6 项）、PlanRunnerTransferTest（6 项）；另补 StrategyExplanationTest、StrategyPresentationTest、PlanV2Test、PlanV2StoreTest 共 5 项。
+- 验证结果：全量单元测试 103 套件 / 971 项 100% PASS（0 failures, 0 errors, 3 skipped）；assembleDebug 构建通过（APK 49.1MB）；ADB 覆盖安装 DKS9K23420020242 成功，App 启动无崩溃；真机确认方案页出现「优先与转移（STR-01/02）」卡片、开关可打开并写入 plan-v2.json（transferOnBlock:true），重新进入方案页开关恢复为开启。
+- 待验收：真实跑一轮「打工受阻 → 转护理/学习」的真机场景尚未执行（需要体力不足或金币不够的实际局面），该行为目前只有 JVM 测试覆盖。
+- 提交与推送：feat(plan): 学习优先与打工优先，受阻时按规则转移 (STR-01/02)，推送 backup/feat/onboarding-troubleshooting-p0，更新 PR #4。
+- 下一步：第三阶段 STR-08 属性目标（今日停止线）与 STR-09 均衡属性目标（轮换力量/智力/魅力并记录每项变化）；需先核实属性数值能否读取，目前打工详情页只读到属性名，读不到数值。

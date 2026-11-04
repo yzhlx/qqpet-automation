@@ -125,6 +125,33 @@ data class ActivityAttempt(
     }
 }
 
+/**
+ * 一次转移的记录：某个动作确定失败之后，本轮改做了哪个后面的动作。
+ *
+ * 它让「停住的步骤后面还有步骤执行」成为可核对的事实，而不是执行顺序被破坏：
+ * 没有这条记录，运行快照不允许在停住的步骤之后执行任何动作。
+ */
+class StepTransfer(
+    val runId: String,
+    val stoppedStepId: String,
+    val stoppedType: PlanStepType,
+    val stoppedState: StepState,
+    val stoppedReason: String,
+    val resumedStepId: String,
+    val resumedType: PlanStepType,
+    val rule: String,
+) {
+    init {
+        require(runId.isNotBlank() && stoppedStepId.isNotBlank() && resumedStepId.isNotBlank()) { "TRANSFER_ID_BLANK" }
+        require(stoppedStepId != resumedStepId) { "TRANSFER_SAME_STEP" }
+        require(stoppedState == StepState.BLOCKED || stoppedState == StepState.FAILED) {
+            "TRANSFER_STATE_INVALID:" + stoppedState.name
+        }
+        require(stoppedReason.isNotBlank()) { "TRANSFER_REASON_BLANK" }
+        require(rule.isNotBlank()) { "TRANSFER_RULE_BLANK" }
+    }
+}
+
 /** Full immutable snapshot; no execution record may be fabricated for an unselected action. */
 class RunSnapshot(
     val runId: String,
@@ -137,8 +164,11 @@ class RunSnapshot(
     val startedAtMs: Long? = null,
     val endedAtMs: Long? = null,
     val stopReason: String? = null,
+    transfers: List<StepTransfer> = emptyList(),
 ) {
     val steps: List<StepExecution> = Collections.unmodifiableList(steps.toList())
+    /** STR-01/STR-02: 本轮发生过的转移，按发生顺序。 */
+    val transfers: List<StepTransfer> = Collections.unmodifiableList(transfers.toList())
     init {
         require(runId.isNotBlank()) { "RUN_ID_BLANK" }
         validateTimes(startedAtMs, endedAtMs, "RUN")
@@ -148,9 +178,25 @@ class RunSnapshot(
             require(step.runId == runId && step.index == index && step.stepId == selected[index].stepId &&
                 step.type == selected[index].type) { "RUN_STEP_IDENTITY_MISMATCH:$index" }
         }
-        val failedIndex = this.steps.indexOfFirst { it.state in setOf(StepState.BLOCKED, StepState.FAILED, StepState.UNCONFIRMED, StepState.CANCELLED) }
-        require(failedIndex < 0 || this.steps.drop(failedIndex + 1).all { it.state == StepState.PENDING }) {
-            "RUN_EXECUTED_AFTER_STOPPED_STEP"
+        // 一个动作停住之后，只有登记过转移才允许后面的动作继续执行。
+        this.steps.forEachIndexed { index, step ->
+            if (step.state !in setOf(StepState.BLOCKED, StepState.FAILED, StepState.UNCONFIRMED, StepState.CANCELLED)) {
+                return@forEachIndexed
+            }
+            val later = this.steps.drop(index + 1)
+            val transferred = this.transfers.any { it.stoppedStepId == step.stepId }
+            require(transferred || later.all { it.state == StepState.PENDING }) {
+                "RUN_EXECUTED_AFTER_STOPPED_STEP"
+            }
+        }
+        this.transfers.forEach { transfer ->
+            require(transfer.runId == runId) { "TRANSFER_RUN_MISMATCH" }
+            val stopped = this.steps.firstOrNull { it.stepId == transfer.stoppedStepId }
+                ?: error("TRANSFER_STOPPED_STEP_UNKNOWN")
+            val resumed = this.steps.firstOrNull { it.stepId == transfer.resumedStepId }
+                ?: error("TRANSFER_RESUMED_STEP_UNKNOWN")
+            require(stopped.state == transfer.stoppedState) { "TRANSFER_STOPPED_STATE_MISMATCH" }
+            require(resumed.index > stopped.index) { "TRANSFER_ORDER_INVALID" }
         }
         require(state != RunState.COMPLETED || this.steps.all { it.state == StepState.COMPLETED || it.state == StepState.SKIPPED }) {
             "RUN_COMPLETED_WITH_UNFINISHED_STEPS"
@@ -165,7 +211,8 @@ class RunSnapshot(
         runId: String = this.runId, request: RunRequest = this.request, state: RunState = this.state,
         steps: List<StepExecution> = this.steps, counts: RunCounts = this.counts,
         startedAtMs: Long? = this.startedAtMs, endedAtMs: Long? = this.endedAtMs, stopReason: String? = this.stopReason,
-    ) = RunSnapshot(runId, request, state, steps, counts, startedAtMs, endedAtMs, stopReason)
+        transfers: List<StepTransfer> = this.transfers,
+    ) = RunSnapshot(runId, request, state, steps, counts, startedAtMs, endedAtMs, stopReason, transfers)
 }
 
 private fun validateTimes(start: Long?, end: Long?, label: String) {

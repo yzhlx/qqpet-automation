@@ -121,14 +121,39 @@ val ctx = ExecutingContext(store, runId, plan, step, index, nowMs)
             // Counts come from the persisted attempts the executor recorded, never from step states.
             val counts = store.countsOf(runId, plan)
             val terminal = stepState !in setOf(StepState.COMPLETED, StepState.SKIPPED)
+            if (!terminal) {
+                snapshot = snapshot.copy(steps = updated, counts = counts, state = RunState.RUNNING)
+                store.save(snapshot)
+                continue
+            }
+            // STR-01/STR-02: 第一次「确定失败」可以按规则转到后面的动作，而不是让整轮停下。
+            // 转移会被登记下来，「停住的步骤之后还有步骤执行」因此仍然是可核对的事实。
+            val decision = StepTransferPolicy.decide(
+                enabled = plan.transferOnBlock,
+                stoppedState = stepState,
+                stoppedType = step.type,
+                remainingTypes = plan.steps.drop(index + 1).map { it.type },
+                transfersUsed = snapshot.transfers.size)
+            if (decision is StepTransferPolicy.Decision.Transfer) {
+                val resumed = plan.steps[index + 1]
+                val transfer = StepTransfer(runId = runId, stoppedStepId = step.stepId,
+                    stoppedType = step.type, stoppedState = stepState,
+                    stoppedReason = reason ?: decision.rule, resumedStepId = resumed.stepId,
+                    resumedType = resumed.type, rule = decision.rule)
+                snapshot = snapshot.copy(steps = updated, counts = counts, state = RunState.RUNNING,
+                    transfers = snapshot.transfers + transfer, stopReason = transfer.stoppedReason)
+                store.save(snapshot)
+                continue
+            }
             snapshot = snapshot.copy(steps = updated, counts = counts,
-                state = if (terminal) terminalState(stepState) else RunState.RUNNING,
-                stopReason = if (terminal) reason else snapshot.stopReason,
-                endedAtMs = if (terminal) nowMs() else snapshot.endedAtMs)
+                state = terminalState(stepState), stopReason = reason, endedAtMs = nowMs())
             store.save(snapshot)
-            if (terminal) return snapshot
+            return snapshot
         }
-        snapshot = snapshot.copy(state = RunState.COMPLETED, endedAtMs = nowMs())
+        // 发生过转移的轮次不算干净成功：第一个动作确实没有做成。
+        snapshot = snapshot.copy(
+            state = if (snapshot.transfers.isEmpty()) RunState.COMPLETED else RunState.FAILED,
+            endedAtMs = nowMs())
         store.save(snapshot)
         return snapshot
     }

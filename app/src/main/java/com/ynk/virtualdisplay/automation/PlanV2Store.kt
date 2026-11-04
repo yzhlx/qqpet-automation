@@ -21,6 +21,7 @@ object PlanV2JsonCodec {
         plan.maxDailyNetSpend?.let { root["maxDailyNetSpend"] = it }
         plan.stepIntervalMinutes?.let { root["stepIntervalMinutes"] = it }
         plan.failureCooldownMinutes?.let { root["failureCooldownMinutes"] = it }
+        if (plan.transferOnBlock) root["transferOnBlock"] = true
         root["steps"] = plan.steps.map { step ->
             linkedMapOf<String, Any?>("stepId" to step.stepId, "type" to step.type.name).apply {
                 when (step) {
@@ -52,7 +53,7 @@ object PlanV2JsonCodec {
         require(text.length <= MAX_DOCUMENT_SIZE) { "PLAN_JSON_TOO_LARGE" }
         val root = Json.parse(text).objectValue()
         root.only("schemaVersion", "planId", "name", "dailyBudgetMinutes", "executionProfile", "legacySource", "steps",
-            "minCoinFloor", "maxDailyNetSpend", "stepIntervalMinutes", "failureCooldownMinutes")
+            "minCoinFloor", "maxDailyNetSpend", "stepIntervalMinutes", "failureCooldownMinutes", "transferOnBlock")
         require(root.int("schemaVersion") == 2) { "PLAN_SCHEMA_UNSUPPORTED" }
         val steps = root.list("steps").map { item ->
             val step = item.objectValue()
@@ -96,9 +97,10 @@ object PlanV2JsonCodec {
         val maxDailyNetSpend = if (root.containsKey("maxDailyNetSpend")) root.int("maxDailyNetSpend") else null
         val stepInterval = if (root.containsKey("stepIntervalMinutes")) root.int("stepIntervalMinutes") else null
         val failureCooldown = if (root.containsKey("failureCooldownMinutes")) root.int("failureCooldownMinutes") else null
+        val transferOnBlock = if (root.containsKey("transferOnBlock")) root.boolean("transferOnBlock") else false
         return PlanV2(2, root.string("planId"), root.string("name"), root.int("dailyBudgetMinutes"), steps,
             enumValueOf(root.string("executionProfile")), root.optionalString("legacySource"),
-            minCoinFloor, maxDailyNetSpend, stepInterval, failureCooldown)
+            minCoinFloor, maxDailyNetSpend, stepInterval, failureCooldown, transferOnBlock)
     }
 
     @Suppress("UNCHECKED_CAST")
@@ -122,6 +124,8 @@ object PlanV2JsonCodec {
     }
     private fun Map<String, Any?>.list(key: String): List<*> = value(key) as? List<*>
         ?: throw IllegalArgumentException("PLAN_JSON_ARRAY_REQUIRED:$key")
+    private fun Map<String, Any?>.boolean(key: String): Boolean = value(key) as? Boolean
+        ?: throw IllegalArgumentException("PLAN_JSON_BOOLEAN_REQUIRED:$key")
 
     private const val MAX_DOCUMENT_SIZE = 1_048_576
 

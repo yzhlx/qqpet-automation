@@ -118,6 +118,8 @@ class PlanV2(
     val stepIntervalMinutes: Int? = null,
     /** 方案级失败后冷却（分钟）；冷却期内拒绝重开同一方案 (STR-15)。 */
     val failureCooldownMinutes: Int? = null,
+    /** 受阻时按规则转移到后面的动作 (STR-01/STR-02)；false 表示受阻就让本轮停下。 */
+    val transferOnBlock: Boolean = false,
 ) {
     val steps: List<PlanStep> = Collections.unmodifiableList(steps.toList())
 
@@ -155,15 +157,17 @@ class PlanV2(
         maxDailyNetSpend: Int? = this.maxDailyNetSpend,
         stepIntervalMinutes: Int? = this.stepIntervalMinutes,
         failureCooldownMinutes: Int? = this.failureCooldownMinutes,
+        transferOnBlock: Boolean = this.transferOnBlock,
     ) = PlanV2(schemaVersion, planId, name, dailyBudgetMinutes, steps, executionProfile, legacySource,
-        minCoinFloor, maxDailyNetSpend, stepIntervalMinutes, failureCooldownMinutes)
+        minCoinFloor, maxDailyNetSpend, stepIntervalMinutes, failureCooldownMinutes, transferOnBlock)
 
     override fun equals(other: Any?): Boolean = other is PlanV2 &&
         schemaVersion == other.schemaVersion && planId == other.planId && name == other.name &&
         dailyBudgetMinutes == other.dailyBudgetMinutes && steps == other.steps &&
         executionProfile == other.executionProfile && legacySource == other.legacySource &&
         minCoinFloor == other.minCoinFloor && maxDailyNetSpend == other.maxDailyNetSpend &&
-        stepIntervalMinutes == other.stepIntervalMinutes && failureCooldownMinutes == other.failureCooldownMinutes
+        stepIntervalMinutes == other.stepIntervalMinutes && failureCooldownMinutes == other.failureCooldownMinutes &&
+        transferOnBlock == other.transferOnBlock
 
     override fun hashCode(): Int {
         var result = schemaVersion
@@ -176,7 +180,8 @@ class PlanV2(
         result = 31 * result + (minCoinFloor ?: 0)
         result = 31 * result + (maxDailyNetSpend ?: 0)
         result = 31 * result + (stepIntervalMinutes ?: 0)
-        return 31 * result + (failureCooldownMinutes ?: 0)
+        result = 31 * result + (failureCooldownMinutes ?: 0)
+        return 31 * result + (if (transferOnBlock) 1 else 0)
     }
 
     override fun toString(): String = "PlanV2(planId=$planId, name=$name, steps=$steps, executionProfile=$executionProfile)"
