@@ -320,6 +320,8 @@ fun PetHomeScreen(
                             }
                         },
                         onOpenPlanSheet = onOpenPlanSheet,
+                        shizukuStopped = uiState.shizukuState is ShizukuState.NotRunning,
+                        onOpenShizuku = { context.openShizuku() },
                     )
                 }
                 TodayProgressCard(budgetUsed, budgetCap)
@@ -558,6 +560,9 @@ private fun SetupChecklistCard(
     catalogReady: Boolean,
     onOpenDisplay: () -> Unit,
     onOpenPlanSheet: () -> Unit,
+    /** Shizuku 服务曾被授权但已停止（如手机重启）；只提示恢复，不算失败。 */
+    shizukuStopped: Boolean = false,
+    onOpenShizuku: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     PetCard(modifier) {
@@ -589,6 +594,24 @@ private fun SetupChecklistCard(
             actionText = "去刷新", onAction = onOpenPlanSheet,
         )
         Spacer(Modifier.height(6.dp))
+        if (shizukuStopped && !shizukuReady) {
+            Row(
+                Modifier.fillMaxWidth()
+                    .clickable { onOpenShizuku() }
+                    .padding(vertical = 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    "Shizuku 已停止：打开 Shizuku 点「启动」即可恢复，无需重新配对；方案与进度已保存。",
+                    fontSize = 12.sp, lineHeight = 18.sp, color = PetTokens.AmberInk,
+                    modifier = Modifier.weight(1f),
+                )
+                Text(
+                    "去恢复", fontSize = 12.5.sp, fontWeight = FontWeight(650), color = PetTokens.Blue,
+                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 4.dp),
+                )
+            }
+        }
         PetNote(
             "完成前下面的按钮保持灰色，这些步骤都不花游戏金币。" +
                 "点「一键创建」会自动建好后台画面并打开宠物界面，不用手动搜索。"

@@ -325,7 +325,8 @@ private fun pageFor(
             "在悬浮窗权限列表里找到蟹啦，打开开关",
             "返回蟹啦",
         ),
-        note = "此权限为推荐项，跳过不影响托管主流程，但离开 App 后看不到进度胶囊。",
+        note = "此权限为推荐项，跳过不影响托管主流程，但离开 App 后看不到进度胶囊。" +
+            "这个开关就是系统设置里的「悬浮窗」。",
         action = "去打开",
         waiting = "打开后会自动继续…",
         appExitTarget = "系统悬浮窗设置",
@@ -339,7 +340,7 @@ private fun pageFor(
             "打开「允许通知」开关",
             "返回蟹啦",
         ),
-        note = "此权限为推荐项，跳过不影响托管主流程。",
+        note = "此权限为推荐项，跳过不影响托管主流程。这个开关就是系统设置里的「通知」。",
         action = "去打开",
         waiting = "打开后会自动继续…",
         appExitTarget = "通知管理设置",
@@ -347,13 +348,14 @@ private fun pageFor(
     )
     OnboardingStep.BACKGROUND -> GuidePage(
         title = "允许后台运行",
-        intro = "手机为省电可能会在息屏或切后台时杀掉进程。允许后可降低任务被系统强制中断的概率。",
+        intro = "手机为省电可能会在息屏或切后台时杀掉进程。允许后可降低任务被系统强制中断的概率，" +
+            "但不能保证任务一定完整跑完。这个开关就是系统弹窗里的「电池优化」。",
         steps = listOf(
             "点下面的按钮",
             "在电池优化弹窗中选择「允许」或「无限制」",
+            "华为 / 小米等机型遇到托管中途被系统终止时，再到「应用启动管理」中设为允许自启动和后台活动；正常使用时不用改",
         ),
-        note = "华为 / 小米等机型还建议在「应用启动管理」中设为允许自启动和后台活动。",
-        action = "去允许",
+        note = "",
         waiting = "允许后会自动继续…",
         appExitTarget = "电池优化弹窗",
         appExitAction = "选择无限制或忽略电池优化",
@@ -654,7 +656,7 @@ Text("本次动作：" + page.appExitAction + "。\n完成后请通过多任务�
     }
 }
 
-private fun Context.openShizuku() {
+fun Context.openShizuku() {
     val launch = packageManager.getLaunchIntentForPackage(SHIZUKU_PACKAGE)
     open(launch ?: Intent(Intent.ACTION_VIEW, Uri.parse(SHIZUKU_RELEASES)))
 }
