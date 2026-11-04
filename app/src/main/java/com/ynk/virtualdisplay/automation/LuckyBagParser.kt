@@ -143,4 +143,8 @@ object LuckyBagParser {
         val summary = lines.firstOrNull { l -> LUCKY_BAG_DIALOG_KEYWORDS.any { l.text.contains(it) } }?.text ?: "福袋开启完成"
         return LuckyBagRewardResult(summary = summary, coinAward = coins, items = items)
     }
+
+    /** SOC-05：读到金币、道具或已达今日上限，才算这次福袋有结果；读不到就是未知。 */
+    fun claimConfirmed(lines: List<TextLine>, reward: LuckyBagRewardResult): Boolean =
+        reward.coinAward != null || reward.items.isNotEmpty() || isLimitReached(lines)
 }

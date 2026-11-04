@@ -77,4 +77,15 @@ class MailboxParserTest {
         assertEquals(200, reward.coinAward)
         assertTrue(reward.items.any { it.contains("饼干") })
     }
+
+    /** SOC-04：信箱既没变空、也没读到奖励时，这次领取仍是未知。 */
+    @Test
+    fun claimConfirmedRequiresEmptyBoxOrReward() {
+        val untouched = listOf(line("信箱", 200, 300, 500, 350))
+        assertFalse(MailboxParser.claimConfirmed(untouched, MailboxParser.parseMailboxReward(untouched)))
+        val emptied = listOf(line("暂无邮件", 200, 300, 500, 350))
+        assertTrue(MailboxParser.claimConfirmed(emptied, MailboxParser.parseMailboxReward(emptied)))
+        val rewarded = listOf(line("获得金币+200", 200, 300, 500, 350))
+        assertTrue(MailboxParser.claimConfirmed(rewarded, MailboxParser.parseMailboxReward(rewarded)))
+    }
 }

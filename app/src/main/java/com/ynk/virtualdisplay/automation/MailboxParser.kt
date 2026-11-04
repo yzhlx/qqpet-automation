@@ -126,4 +126,8 @@ object MailboxParser {
         val summary = lines.firstOrNull { l -> MAILBOX_DIALOG_KEYWORDS.any { l.text.contains(it) } }?.text ?: "信箱奖励领取完成"
         return MailboxRewardResult(summary = summary, coinAward = coins, items = items)
     }
+
+    /** SOC-04：信箱变空或读到金币/道具，才算真的领到；读不到就是未知。 */
+    fun claimConfirmed(lines: List<TextLine>, reward: MailboxRewardResult): Boolean =
+        isEmptyMailbox(lines) || reward.coinAward != null || reward.items.isNotEmpty()
 }

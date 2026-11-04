@@ -10,6 +10,8 @@ sealed interface LuckyBagOutcome {
     data class Skipped(val reason: String) : LuckyBagOutcome
     data class Blocked(val reason: String) : LuckyBagOutcome
     data class Failed(val reason: String) : LuckyBagOutcome
+    /** 开了福袋，但页面上读不到奖励也没有上限提示：未知，不能算开成功。 */
+    data class Unconfirmed(val reason: String) : LuckyBagOutcome
 }
 
 class PetLuckyBagFlow(
@@ -85,24 +87,31 @@ class PetLuckyBagFlow(
         emit("lucky-bag-claim-tap", result = "x=${claimPoint.x.toInt()},y=${claimPoint.y.toInt()}")
         tap(claimPoint, pageSettleMs)
 
-        // 10. 读取结算奖励
+        // 10. 读奖励；读不到任何证据就是未知，不能当开成功。
         val rewardLines = lineReader()
         val reward = LuckyBagParser.parseLuckyBagReward(rewardLines)
+        val confirmed = LuckyBagParser.claimConfirmed(rewardLines, reward)
 
         // 11. 安全关闭弹窗回房
         safeDismiss(rewardLines)
+        if (!confirmed) {
+            phase = "UNCONFIRMED"
+            emit("lucky-bag-claim-unconfirmed")
+            return@with LuckyBagOutcome.Unconfirmed("LUCKY_BAG_CLAIM_UNCONFIRMED")
+        }
         phase = "COMPLETED"
         emit("lucky-bag-completed", result = "coins=${reward.coinAward ?: 0},items=${reward.items.size}")
         return@with LuckyBagOutcome.Completed(reward)
     }
 
+    /** 有「关闭／确定」才点；找不到就如实记下没关掉，不猜坐标。 */
     private suspend fun safeDismiss(lines: List<TextLine>) {
         val dismissPoint = LuckyBagParser.locateDismissButton(lines)
-        if (dismissPoint != null) {
-            tap(dismissPoint, pageSettleMs)
-        } else {
-            flow.input.tap(650f, 180f)
-            delay(pageSettleMs)
+        if (dismissPoint == null) {
+            flow.emit("lucky-bag-close-unconfirmed")
+            return
         }
+        tap(dismissPoint, pageSettleMs)
+        delay(pageSettleMs)
     }
 }

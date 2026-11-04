@@ -93,4 +93,15 @@ class SignInParserTest {
         assertEquals(150, res.coinAward)
         assertTrue(res.items.any { it.contains("香皂") })
     }
+
+    /** SOC-03：页面上读不到领取证据时，不能把这次签到算成成功。 */
+    @Test
+    fun claimConfirmedRequiresEvidenceThatTheClaimLanded() {
+        val silent = listOf(line("签到", 200, 300, 500, 350))
+        assertFalse(SignInParser.claimConfirmed(silent, SignInParser.parseSignInReward(silent)))
+        val rewarded = listOf(line("获得金币+50", 200, 300, 500, 350))
+        assertTrue(SignInParser.claimConfirmed(rewarded, SignInParser.parseSignInReward(rewarded)))
+        val already = listOf(line("今日已签", 200, 300, 500, 350))
+        assertTrue(SignInParser.claimConfirmed(already, SignInParser.parseSignInReward(already)))
+    }
 }

@@ -9,6 +9,8 @@ sealed interface SignInOutcome {
     data class Skipped(val reason: String) : SignInOutcome
     data class Blocked(val reason: String) : SignInOutcome
     data class Failed(val reason: String) : SignInOutcome
+    /** 点了领取，但页面上读不到任何结果：未知，不能算领到。 */
+    data class Unconfirmed(val reason: String) : SignInOutcome
 }
 
 class PetSignInFlow(
@@ -52,40 +54,53 @@ class PetSignInFlow(
         val dialogLines = lineReader()
         if (SignInParser.isAlreadySignedIn(dialogLines)) {
             phase = "ALREADY_DONE"
-            val dismiss = SignInParser.locateDismissButton(dialogLines) ?: PointF(640f, 360f)
-            tap(dismiss, pageSettleMs)
+            dismissIfLocated(dialogLines)
             emit("sign-in-dialog-already-done")
             return@with SignInOutcome.AlreadyDone
         }
 
         if (!SignInParser.isSignInDialog(dialogLines)) {
             phase = "SKIPPED"
-            val dismiss = SignInParser.locateDismissButton(dialogLines) ?: PointF(640f, 360f)
-            tap(dismiss, pageSettleMs)
+            dismissIfLocated(dialogLines)
             emit("sign-in-dialog-unconfirmed")
             return@with SignInOutcome.Skipped("SIGN_IN_DIALOG_NOT_CONFIRMED")
         }
 
-        // 6. 定位并点击领取/签到按钮
+        // 6. 没有领取按钮就什么都没点：什么也没发生，不能报成功。
         val claimButton = SignInParser.locateClaimButton(dialogLines)
-        if (claimButton != null) {
-            phase = "CLAIMING"
-            onBeforeClaim()
-            tap(claimButton, pageSettleMs)
-            delay(pageSettleMs)
+        if (claimButton == null) {
+            phase = "SKIPPED"
+            dismissIfLocated(dialogLines)
+            emit("sign-in-claim-missing")
+            return@with SignInOutcome.Skipped("SIGN_IN_CLAIM_BUTTON_NOT_FOUND")
         }
 
-        // 7. 读取并确认奖励
+        phase = "CLAIMING"
+        onBeforeClaim()
+        tap(claimButton, pageSettleMs)
+        delay(pageSettleMs)
+
+        // 7. 读奖励；页面上没有领取证据就是未知，交回计划记成待确认。
         val rewardLines = lineReader()
         val reward = SignInParser.parseSignInReward(rewardLines)
         emit("sign-in-reward", result = "coins=" + (reward.coinAward ?: 0) + ";items=" + reward.items.joinToString(","))
-
-        // 8. 关闭弹窗回到房间
-        val dismissButton = SignInParser.locateDismissButton(rewardLines) ?: PointF(640f, 360f)
-        tap(dismissButton, pageSettleMs)
-        delay(pageSettleMs)
+        val confirmed = SignInParser.claimConfirmed(rewardLines, reward)
+        dismissIfLocated(rewardLines)
+        if (!confirmed) {
+            phase = "UNCONFIRMED"
+            emit("sign-in-claim-unconfirmed")
+            return@with SignInOutcome.Unconfirmed("SIGN_IN_CLAIM_UNCONFIRMED")
+        }
 
         phase = "COMPLETED"
         return@with SignInOutcome.Completed(reward)
+    }
+
+    /** 有「关闭／我知道了」才点；找不到就不猜坐标，交给上层按未知处理。 */
+    private suspend fun dismissIfLocated(lines: List<TextLine>): Boolean {
+        val point = SignInParser.locateDismissButton(lines) ?: return false
+        tap(point, pageSettleMs)
+        delay(pageSettleMs)
+        return true
     }
 }

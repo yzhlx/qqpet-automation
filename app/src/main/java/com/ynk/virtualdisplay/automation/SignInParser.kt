@@ -99,4 +99,11 @@ object SignInParser {
         val summary = lines.firstOrNull { l -> SIGN_IN_DIALOG_KEYWORDS.any { l.text.contains(it) } }?.text ?: "签到完成"
         return SignInRewardResult(summary = summary, coinAward = coins, items = items)
     }
+
+    /**
+     * SOC-03：点击之后页面上有没有证据说明真的领到了。
+     * 读到金币、道具，或页面变成已领取/明日再来，才算完成；读不到就是未知，不能当成功。
+     */
+    fun claimConfirmed(lines: List<TextLine>, reward: SignInRewardResult): Boolean =
+        reward.coinAward != null || reward.items.isNotEmpty() || isAlreadySignedIn(lines)
 }

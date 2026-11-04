@@ -134,4 +134,15 @@ class LuckyBagParserTest {
         assertEquals(1, reward.items.size)
         assertTrue(reward.items[0].contains("饼干"))
     }
+
+    /** SOC-05：只有读到奖励或今日上限，才算这次福袋有结果。 */
+    @Test
+    fun claimConfirmedRequiresRewardOrLimit() {
+        val silent = listOf(line("幸运福袋", 200, 300, 500, 350))
+        assertFalse(LuckyBagParser.claimConfirmed(silent, LuckyBagParser.parseLuckyBagReward(silent)))
+        val rewarded = listOf(line("获得金币+88", 200, 300, 500, 350))
+        assertTrue(LuckyBagParser.claimConfirmed(rewarded, LuckyBagParser.parseLuckyBagReward(rewarded)))
+        val limit = listOf(line("今日已满", 200, 300, 500, 350))
+        assertTrue(LuckyBagParser.claimConfirmed(limit, LuckyBagParser.parseLuckyBagReward(limit)))
+    }
 }

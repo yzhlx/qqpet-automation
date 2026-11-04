@@ -511,3 +511,25 @@
   backup/feat/onboarding-troubleshooting-p0，更新 PR #4。
 - 下一步：第三部分剩余「实时状态、暂停继续、停止、记录和设置持久化持续回归（CORE-02/16~19）」；
   第四阶段好友互动（SOC-06~15）需要页面证据，Shizuku 未连接前无法核实，先不做。
+
+## 2026-11-04 记录页每日领取计数 / 每日领取流程安全停止
+
+- 交付内容：
+  - 记录页「今天」卡片在四格计数下新增一行领取数：签到 X 次 · 信箱 X 次 · 福袋 X 个；
+    全部为 0 时不显示，避免被读成失败（RecordsPresentation.dailyRewardsText）。
+  - 每日签到 / 信箱 / 福袋不再猜坐标关弹窗：找不到「关闭／我知道了」就什么都不点，
+    并写明 *-close-unconfirmed；原固定点 (640,360)/(650,180) 的兜底已删除。
+  - 领取结果必须有页面证据：SignInParser/MailboxParser/LuckyBagParser.claimConfirmed
+    只认金币、道具、已领取、信箱变空或今日上限；读不到时流程返回 Unconfirmed，
+    由计划记成待确认动作，不再记成完成。
+  - 签到「没有领取按钮」原来仍返回 Completed，现改为 Skipped("SIGN_IN_CLAIM_BUTTON_NOT_FOUND")。
+- 验证结果：
+  - 全量单元测试：113 套件 / 1048 项 100% PASS（0 failures, 0 errors, 3 skipped），
+    新增 3 项 claimConfirmed 测试。
+  - assembleDebug 构建成功，APK 覆盖安装到设备 DKS9K23420020242（install: Success），启动正常。
+  - 真机（记录页）：用测试记录验证「今天」卡片显示「签到 2 次 · 信箱 1 次 · 福袋 3 个」；
+    验证后已删除测试目录，设备恢复原状。
+- 待验收：
+  - 每日签到 / 信箱 / 福袋的真实领取分支需要 Shizuku 连接后才能点出；本次只到编译、单测与启动。
+- 提交与推送：feat(records) 记录页每日领取计数；feat(daily) 领取流程未知结果不再盲点或报成功。
+- 下一步：第一部分「差距台账」按清单编号标注真实状态；第三部分 CORE-02/16~19 的实时状态与持久化回归。

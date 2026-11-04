@@ -784,6 +784,11 @@ class PetSessionController(context:Context,capture:HeadlessDisplayCapture,input:
                 flow.emit("plan-sign-in-failed", result = outcome.reason)
                 StepOutcome.Failed(outcome.reason)
             }
+            is SignInOutcome.Unconfirmed -> {
+                ctx.unconfirmed(1, outcome.reason)
+                flow.emit("plan-sign-in-unconfirmed", result = outcome.reason)
+                StepOutcome.Unconfirmed(outcome.reason)
+            }
         }
     }
 
@@ -836,6 +841,11 @@ class PetSessionController(context:Context,capture:HeadlessDisplayCapture,input:
                 ctx.unconfirmed(1, outcome.reason)
                 flow.emit("plan-mailbox-failed", result = outcome.reason)
                 StepOutcome.Failed(outcome.reason)
+            }
+            is MailboxOutcome.Unconfirmed -> {
+                ctx.unconfirmed(1, outcome.reason)
+                flow.emit("plan-mailbox-unconfirmed", result = outcome.reason)
+                StepOutcome.Unconfirmed(outcome.reason)
             }
         }
     }
@@ -955,6 +965,12 @@ class PetSessionController(context:Context,capture:HeadlessDisplayCapture,input:
             is LuckyBagOutcome.Failed -> {
                 flow.emit("plan-lucky-bag-failed-nonfatal", result = outcome.reason)
                 StepOutcome.Skipped(SkipReason.UNAVAILABLE)
+            }
+            is LuckyBagOutcome.Unconfirmed -> {
+                lastLuckyBagCheckMs = System.currentTimeMillis()
+                ctx.unconfirmed(1, outcome.reason)
+                flow.emit("plan-lucky-bag-unconfirmed", result = outcome.reason)
+                StepOutcome.Unconfirmed(outcome.reason)
             }
         }
     }
