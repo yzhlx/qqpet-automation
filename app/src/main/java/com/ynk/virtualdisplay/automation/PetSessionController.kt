@@ -6,6 +6,7 @@ import kotlinx.coroutines.*
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
+import java.time.LocalTime
 
 /**
  * Whether the session must run a work shift before the first lesson.
@@ -39,6 +40,13 @@ object CareFundsEstimate {
 /** Interpolated MOVE points per fling; QQ scroll strips ignore two-point drags (device-measured). */
 private const val FLING_STEPS = 6
 
+/** 夜间暂停时运行状态里写的暂停原因。 */
+private const val QUIET_WINDOW_REASON="QUIET_WINDOW"
+/** 夜间暂停期间每隔多久重新读一次窗口设置。 */
+private const val QUIET_POLL_MS=30_000L
+/** 夜间暂停最多连续停多久；超过就安全结束本次托管，不无限占着任务。 */
+private const val MAX_QUIET_HOLD_MS=24L*60L*60L*1000L
+
 /** Finite main-source controller. No dependency on PetExperimentalSession or test APIs. */
 class PetSessionController(context:Context,capture:HeadlessDisplayCapture,input:PetInputController,
     private val evidence:File,private val guard:()->Unit,
@@ -69,6 +77,8 @@ class PetSessionController(context:Context,capture:HeadlessDisplayCapture,input:
     /** STR-09：本次会话每个属性的学习事实（上了几节、页面上写明加多少）。 */
     private val studyAttributeFacts=mutableMapOf<String,StudyAttributeFact>()
     private var planSkipWork=false
+    /** STR-17：夜间暂停窗口。懒加载，只有真的走到边界时才读设置。 */
+    private val quietWindowStore by lazy { QuietWindowStore(context) }
     /** STR-08：本次方案今天还能上几节；预检算好后学习步骤按它开课。 */
     private var planStudyAllowedRounds=0
     var planRunSnapshot:RunSnapshot?=null;private set
@@ -192,9 +202,42 @@ class PetSessionController(context:Context,capture:HeadlessDisplayCapture,input:
             flow.emit("USER_PAUSE_HELD",result=nextStep)
             publish()
         }
-        if(!held) return
+        if(held) {
+            snapshot=snapshot.copy(runState=SessionRunState.RUNNING,pauseReason=null,nextStep=nextStep)
+            flow.emit("USER_PAUSE_RELEASED",result=nextStep)
+            publish()
+            navigation.initialise()
+        }
+        holdForQuietWindow(nextStep)
+    }
+
+    /**
+     * STR-17 夜间暂停窗口：走到窗口里就在这个边界停住，到点重新确认画面再继续。
+     *
+     * 停住期间用户随时可以停止（停止会取消这个协程）。窗口每 30 秒重新读一次，用户改设置
+     * 或关掉窗口最多半分钟就生效，不用等这一轮跑完。
+     */
+    private suspend fun holdForQuietWindow(nextStep:String) {
+        var window=quietWindowStore.load()
+        if(!window.enabled) return
+        if(!QuietWindowPolicy.isQuiet(QuietWindowPolicy.nowMinute(LocalTime.now()),window)) return
+        snapshot=snapshot.copy(runState=SessionRunState.PAUSED,pauseReason=QUIET_WINDOW_REASON,
+            pauseCount=snapshot.pauseCount+1,nextStep="夜间暂停中，$nextStep")
+        flow.emit("QUIET_WINDOW_HELD",result=window.startText()+"-"+window.endText())
+        publish()
+        val holdStart=SystemClock.elapsedRealtime()
+        while(true) {
+            delay(QUIET_POLL_MS)
+            window=quietWindowStore.load()
+            if(!window.enabled) break
+            if(!QuietWindowPolicy.isQuiet(QuietWindowPolicy.nowMinute(LocalTime.now()),window)) break
+            if(SystemClock.elapsedRealtime()-holdStart>MAX_QUIET_HOLD_MS) {
+                flow.emit("QUIET_WINDOW_HOLD_TIMEOUT",result=nextStep)
+                error("夜间暂停超过 24 小时，本次托管已结束")
+            }
+        }
         snapshot=snapshot.copy(runState=SessionRunState.RUNNING,pauseReason=null,nextStep=nextStep)
-        flow.emit("USER_PAUSE_RELEASED",result=nextStep)
+        flow.emit("QUIET_WINDOW_RELEASED",result=nextStep)
         publish()
         navigation.initialise()
     }

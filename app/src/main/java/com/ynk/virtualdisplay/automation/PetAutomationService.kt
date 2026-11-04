@@ -24,6 +24,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import java.io.File
 import java.text.SimpleDateFormat
+import java.time.LocalTime
 import java.util.Date
 import java.util.Locale
 import org.json.JSONObject
@@ -723,6 +724,17 @@ class PetAutomationService : Service() {
         val errors = profile.validate(healthGuardInstalled=true)
         if (errors.isNotEmpty()) return stopSession("配置未完成：${errors.joinToString()}")
         if (displayId <= 0) return stopSession("拒绝默认/无效 displayId")
+        // STR-17 夜间暂停窗口：窗口内不开始新的托管。
+        val quietWindow=QuietWindowStore(this).load()
+        val quietDecision=SessionStartGate.evaluate(quietWindow,QuietWindowPolicy.nowMinute(LocalTime.now()),mode)
+        if(quietDecision is SessionStartGate.Decision.Refused) {
+            logLine("SESSION_START_REFUSED QUIET_WINDOW_ACTIVE")
+            val message=quietDecision.message
+            android.os.Handler(android.os.Looper.getMainLooper()).post {
+                android.widget.Toast.makeText(applicationContext,message,android.widget.Toast.LENGTH_LONG).show()
+            }
+            return stopSession(message)
+        }
         // 中断后先确认：上一次的动作结果未知时，不直接再来一次（可能重复扣费或重复领取）。
         val pending=PendingActionGuard.pendingActions(DailyBudgetStore(this).attempts())
         val unconfirmed=requestedStepTypes(mode,selected).flatMap { type ->

@@ -42,6 +42,8 @@ import com.ynk.virtualdisplay.BuildConfig
 import com.ynk.virtualdisplay.automation.DailyBudgetStore
 import com.ynk.virtualdisplay.automation.PetAutomationService
 import com.ynk.virtualdisplay.automation.PetProfile
+import com.ynk.virtualdisplay.automation.QuietWindow
+import com.ynk.virtualdisplay.automation.QuietWindowStore
 import com.ynk.virtualdisplay.data.model.ShizukuState
 import com.ynk.virtualdisplay.floating.OverlayPermission
 import com.ynk.virtualdisplay.ui.data.PetEvidenceRepository
@@ -95,8 +97,19 @@ fun PetSettingsScreen(
     var showFeedback by remember { mutableStateOf(false) }
     var showDiagnostic by remember { mutableStateOf(false) }
     var showAdvanced by remember { mutableStateOf(false) }
+    /** STR-17：夜间暂停窗口。每次回到这一页都重新读一次，托管侧最多半分钟读到改动。 */
+    var quietWindow by remember { mutableStateOf(QuietWindowStore(context).load()) }
+    var showQuietWindow by remember { mutableStateOf(false) }
 
     if (showFeedback) FeedbackDialog(onDismiss = { showFeedback = false })
+    if (showQuietWindow) QuietWindowDialog(initial = quietWindow,
+        onSave = { window ->
+            QuietWindowStore(context).save(window)
+            quietWindow = window
+            showQuietWindow = false
+            android.widget.Toast.makeText(context, "夜间暂停已保存", android.widget.Toast.LENGTH_SHORT).show()
+        },
+        onDismiss = { showQuietWindow = false })
     if (showDiagnostic) DiagnosticDialog(repository = viewModel.repository, shizukuState = uiState.shizukuState, onDismiss = { showDiagnostic = false })
 
     // The display list is only filled by the console, so the page must ask for it itself; otherwise a
@@ -234,6 +247,17 @@ fun PetSettingsScreen(
                     icon = { PetIcon(PetGlyph.Play, 16.dp) },
                     title = "默认运行方案",
                     sub = "选择动作、课程、节数和目标",
+                    showChevron = true,
+                )
+            }
+            Column(Modifier.clickable { showQuietWindow = true }) {
+                PetListRow(
+                    tileBg = PetTokens.VioletSoft,
+                    icon = { PetIcon(PetGlyph.Clock, 17.dp) },
+                    title = "夜间暂停",
+                    sub = if (quietWindow.enabled)
+                        "每天 " + quietWindow.startText() + "–" + quietWindow.endText() + " 不托管"
+                    else "未开启：夜里不会开始新的托管",
                     showChevron = true,
                 )
             }
