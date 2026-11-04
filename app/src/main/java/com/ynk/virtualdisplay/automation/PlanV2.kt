@@ -120,6 +120,8 @@ class PlanV2(
     val failureCooldownMinutes: Int? = null,
     /** 受阻时按规则转移到后面的动作 (STR-01/STR-02)；false 表示受阻就让本轮停下。 */
     val transferOnBlock: Boolean = false,
+    /** 今日学习停止线（节）；null 表示不启用 (STR-08)。 */
+    val dailyStudyRoundCap: Int? = null,
 ) {
     val steps: List<PlanStep> = Collections.unmodifiableList(steps.toList())
 
@@ -143,6 +145,10 @@ class PlanV2(
         if (maxDailyNetSpend != null) require(maxDailyNetSpend in 1..999_999) { "PLAN_MAX_DAILY_NET_SPEND_OUT_OF_RANGE:$maxDailyNetSpend" }
         if (stepIntervalMinutes != null) require(stepIntervalMinutes in 1..120) { "PLAN_STEP_INTERVAL_OUT_OF_RANGE:$stepIntervalMinutes" }
         if (failureCooldownMinutes != null) require(failureCooldownMinutes in 1..240) { "PLAN_FAILURE_COOLDOWN_OUT_OF_RANGE:$failureCooldownMinutes" }
+        if (dailyStudyRoundCap != null) {
+            require(dailyStudyRoundCap in 1..50) { "PLAN_DAILY_STUDY_CAP_OUT_OF_RANGE:$dailyStudyRoundCap" }
+            require(this.steps.any { it is StudyStep }) { "PLAN_DAILY_STUDY_CAP_REQUIRES_STUDY" }
+        }
     }
 
     fun copy(
@@ -158,8 +164,9 @@ class PlanV2(
         stepIntervalMinutes: Int? = this.stepIntervalMinutes,
         failureCooldownMinutes: Int? = this.failureCooldownMinutes,
         transferOnBlock: Boolean = this.transferOnBlock,
+        dailyStudyRoundCap: Int? = this.dailyStudyRoundCap,
     ) = PlanV2(schemaVersion, planId, name, dailyBudgetMinutes, steps, executionProfile, legacySource,
-        minCoinFloor, maxDailyNetSpend, stepIntervalMinutes, failureCooldownMinutes, transferOnBlock)
+        minCoinFloor, maxDailyNetSpend, stepIntervalMinutes, failureCooldownMinutes, transferOnBlock, dailyStudyRoundCap)
 
     override fun equals(other: Any?): Boolean = other is PlanV2 &&
         schemaVersion == other.schemaVersion && planId == other.planId && name == other.name &&
@@ -167,7 +174,7 @@ class PlanV2(
         executionProfile == other.executionProfile && legacySource == other.legacySource &&
         minCoinFloor == other.minCoinFloor && maxDailyNetSpend == other.maxDailyNetSpend &&
         stepIntervalMinutes == other.stepIntervalMinutes && failureCooldownMinutes == other.failureCooldownMinutes &&
-        transferOnBlock == other.transferOnBlock
+        transferOnBlock == other.transferOnBlock && dailyStudyRoundCap == other.dailyStudyRoundCap
 
     override fun hashCode(): Int {
         var result = schemaVersion
@@ -181,7 +188,8 @@ class PlanV2(
         result = 31 * result + (maxDailyNetSpend ?: 0)
         result = 31 * result + (stepIntervalMinutes ?: 0)
         result = 31 * result + (failureCooldownMinutes ?: 0)
-        return 31 * result + (if (transferOnBlock) 1 else 0)
+        result = 31 * result + (if (transferOnBlock) 1 else 0)
+        return 31 * result + (dailyStudyRoundCap ?: 0)
     }
 
     override fun toString(): String = "PlanV2(planId=$planId, name=$name, steps=$steps, executionProfile=$executionProfile)"

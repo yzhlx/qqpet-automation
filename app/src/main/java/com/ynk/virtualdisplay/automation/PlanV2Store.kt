@@ -22,6 +22,7 @@ object PlanV2JsonCodec {
         plan.stepIntervalMinutes?.let { root["stepIntervalMinutes"] = it }
         plan.failureCooldownMinutes?.let { root["failureCooldownMinutes"] = it }
         if (plan.transferOnBlock) root["transferOnBlock"] = true
+        plan.dailyStudyRoundCap?.let { root["dailyStudyRoundCap"] = it }
         root["steps"] = plan.steps.map { step ->
             linkedMapOf<String, Any?>("stepId" to step.stepId, "type" to step.type.name).apply {
                 when (step) {
@@ -53,7 +54,8 @@ object PlanV2JsonCodec {
         require(text.length <= MAX_DOCUMENT_SIZE) { "PLAN_JSON_TOO_LARGE" }
         val root = Json.parse(text).objectValue()
         root.only("schemaVersion", "planId", "name", "dailyBudgetMinutes", "executionProfile", "legacySource", "steps",
-            "minCoinFloor", "maxDailyNetSpend", "stepIntervalMinutes", "failureCooldownMinutes", "transferOnBlock")
+            "minCoinFloor", "maxDailyNetSpend", "stepIntervalMinutes", "failureCooldownMinutes", "transferOnBlock",
+            "dailyStudyRoundCap")
         require(root.int("schemaVersion") == 2) { "PLAN_SCHEMA_UNSUPPORTED" }
         val steps = root.list("steps").map { item ->
             val step = item.objectValue()
@@ -98,9 +100,10 @@ object PlanV2JsonCodec {
         val stepInterval = if (root.containsKey("stepIntervalMinutes")) root.int("stepIntervalMinutes") else null
         val failureCooldown = if (root.containsKey("failureCooldownMinutes")) root.int("failureCooldownMinutes") else null
         val transferOnBlock = if (root.containsKey("transferOnBlock")) root.boolean("transferOnBlock") else false
+        val dailyStudyCap = if (root.containsKey("dailyStudyRoundCap")) root.int("dailyStudyRoundCap") else null
         return PlanV2(2, root.string("planId"), root.string("name"), root.int("dailyBudgetMinutes"), steps,
             enumValueOf(root.string("executionProfile")), root.optionalString("legacySource"),
-            minCoinFloor, maxDailyNetSpend, stepInterval, failureCooldown, transferOnBlock)
+            minCoinFloor, maxDailyNetSpend, stepInterval, failureCooldown, transferOnBlock, dailyStudyCap)
     }
 
     @Suppress("UNCHECKED_CAST")

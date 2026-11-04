@@ -62,9 +62,11 @@ import com.ynk.virtualdisplay.automation.RewardConfidence
 import com.ynk.virtualdisplay.automation.SessionPlan
 import com.ynk.virtualdisplay.automation.SessionPlanStore
 import com.ynk.virtualdisplay.automation.StudyStep
+import com.ynk.virtualdisplay.automation.StudyDailyCapPolicy
 import com.ynk.virtualdisplay.automation.WorkCatalog
 import com.ynk.virtualdisplay.automation.WorkStep
 import com.ynk.virtualdisplay.automation.WorkTrigger
+import com.ynk.virtualdisplay.ui.data.PetEvidenceRepository
 import com.ynk.virtualdisplay.ui.data.SessionStartRequest
 import com.ynk.virtualdisplay.ui.kit.PetButtonTone
 import com.ynk.virtualdisplay.ui.kit.PetCard
@@ -112,6 +114,9 @@ fun PetPlanSheetScreen(onClose: () -> Unit, onStarted: () -> Unit, displayId: In
     var failureCooldownEnabled by remember { mutableStateOf(false) }
     var failureCooldownValue by remember { mutableStateOf(30) }
     var transferOnBlock by remember { mutableStateOf(false) }
+    var studyCapEnabled by remember { mutableStateOf(false) }
+    var studyCapValue by remember { mutableStateOf(5) }
+    var todayStudyRounds by remember { mutableStateOf(0) }
     var adventureMode by remember { mutableStateOf(com.ynk.virtualdisplay.automation.AdventureMode.NEARBY_WALK) }
     var adventureRounds by remember { mutableStateOf(1) }
     var adventureMaxDaily by remember { mutableStateOf(5) }
@@ -162,6 +167,8 @@ fun PetPlanSheetScreen(onClose: () -> Unit, onStarted: () -> Unit, displayId: In
             failureCooldownEnabled = stored.failureCooldownMinutes != null
             failureCooldownValue = stored.failureCooldownMinutes ?: 30
             transferOnBlock = stored.transferOnBlock
+            studyCapEnabled = stored.dailyStudyRoundCap != null
+            studyCapValue = stored.dailyStudyRoundCap ?: 5
             if (adventure != null) {
                 adventureMode = adventure.mode
                 adventureRounds = adventure.rounds
@@ -182,6 +189,9 @@ fun PetPlanSheetScreen(onClose: () -> Unit, onStarted: () -> Unit, displayId: In
             loadNote = if (loaded.third) "已保存的方案无法读取，原文件已保留。请重新选择动作并保存。"
                 else if (loaded.first.isFailure) "原托管参数无法读取，原文件已保留。请重新填写并选择动作。"
                 else "勾选要执行的动作后保存；可以只选一项。"
+        }
+        todayStudyRounds = withContext(Dispatchers.IO) {
+            runCatching { PetEvidenceRepository(context).confirmedStudyRoundsToday() }.getOrDefault(0)
         }
         loading = false
     }
@@ -220,7 +230,9 @@ fun PetPlanSheetScreen(onClose: () -> Unit, onStarted: () -> Unit, displayId: In
                         if (selectedStudy && plan.workBeforeStudy) WorkTrigger.IF_FUNDS_SHORT else WorkTrigger.ALWAYS))
                     if (selectedCare) add(CareStep(stepIds[PlanStepType.CARE] ?: "$planId:care",
                         plan.energyThreshold, plan.cleanlinessThreshold))
-                    if (selectedStudy) add(StudyStep(stepIds[PlanStepType.STUDY] ?: "$planId:study", plan.courseId, plan.rounds, plan.targetAttribute))
+                    if (selectedStudy) add(StudyStep(stepIds[PlanStepType.STUDY] ?: "$planId:study", plan.courseId, plan.rounds,
+                        // 用户没点属性但选的就是该属性的课程时，按课程如实记下属性，运行记录里才分得清学的是什么。
+                        plan.targetAttribute ?: com.ynk.virtualdisplay.automation.StudyAttribute.forCourseId(plan.courseId)?.label))
                     if (selectedAdventure) add(AdventureStep(stepIds[PlanStepType.ADVENTURE] ?: "$planId:adventure", adventureMode, adventureRounds, maxDailyRounds = adventureMaxDaily))
                 }
                 val snapshot = PlanV2(planId = planId, name = name, dailyBudgetMinutes = plan.dailyBudgetMinutes,
@@ -229,7 +241,8 @@ fun PetPlanSheetScreen(onClose: () -> Unit, onStarted: () -> Unit, displayId: In
                     maxDailyNetSpend = if (dailySpendCapEnabled) dailySpendCapValue else null,
                     stepIntervalMinutes = if (stepIntervalEnabled) stepIntervalValue else null,
                     failureCooldownMinutes = if (failureCooldownEnabled) failureCooldownValue else null,
-                    transferOnBlock = transferOnBlock)
+                    transferOnBlock = transferOnBlock,
+                    dailyStudyRoundCap = if (studyCapEnabled) studyCapValue else null)
                 PlanValidator.validate(snapshot, verified.map { it.id }.toSet())
                 withContext(Dispatchers.IO) { PlanV2Store(context).save(snapshot) }
                 didSave = true
@@ -297,7 +310,12 @@ fun PetPlanSheetScreen(onClose: () -> Unit, onStarted: () -> Unit, displayId: In
                         changed()
                     }
                     ActionChoice("护理", PetGlyph.Brush, selectedCare, !busy, Modifier.weight(1f)) { selectedCare = it; changed() }
-                    ActionChoice("学习", PetGlyph.Study, selectedStudy, !busy, Modifier.weight(1f)) { selectedStudy = it; changed() }
+                    ActionChoice("学习", PetGlyph.Study, selectedStudy, !busy, Modifier.weight(1f)) {
+                    selectedStudy = it
+                    // 停止线只对学习有意义：不学的时候一起关掉，否则方案会因为「没有学习步骤」保存失败。
+                    if (!it) studyCapEnabled = false
+                    changed()
+                }
                     ActionChoice("冒险", PetGlyph.Locate, selectedAdventure, !busy, Modifier.weight(1f)) { selectedAdventure = it; changed() }
                 }
                 Spacer(Modifier.height(8.dp))
@@ -359,6 +377,28 @@ fun PetPlanSheetScreen(onClose: () -> Unit, onStarted: () -> Unit, displayId: In
                                 color = if (isSelected) PetTokens.Surface else PetTokens.Ink,
                             )
                         }
+                    }
+                }
+                Spacer(Modifier.height(12.dp))
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text("今日停止线", fontSize = 14.sp, color = PetTokens.Ink)
+                        PetNote(if (todayStudyRounds > 0)
+                            "今日已确认学习 $todayStudyRounds 节，达到上限后不再开课"
+                            else "今天最多上几节课，达到上限后本轮自动跳过学习")
+                    }
+                    Switch(checked = studyCapEnabled, enabled = !busy,
+                        onCheckedChange = { studyCapEnabled = it; changed() },
+                        colors = SwitchDefaults.colors(
+                            checkedTrackColor = PetTokens.Blue,
+                            uncheckedTrackColor = PetTokens.GraySoft,
+                            uncheckedThumbColor = PetTokens.Chevron,
+                            uncheckedBorderColor = PetTokens.Chevron,
+                        ))
+                }
+                if (studyCapEnabled) {
+                    ParamRow("今日上限（节）", PetGlyph.Clock, studyCapValue, 1..StudyDailyCapPolicy.MAX_CAP, 1, !busy) {
+                        studyCapValue = it; changed()
                     }
                 }
                 Spacer(Modifier.height(10.dp))

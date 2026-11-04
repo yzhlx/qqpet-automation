@@ -40,6 +40,14 @@ class PlanV2Test {
         invalid { plan(listOf(StudyStep("s", "course"), WorkStep("w", workId))) }
         invalid { plan(listOf(WorkStep("same", workId), CareStep("same", 70, 70))) }
     }
+    @Test fun theDailyStudyCapNeedsAStudyStepAndStaysInRange() {
+        invalid { plan(listOf(CareStep("c", 70, 70))).copy(dailyStudyRoundCap = 3) }
+        invalid { plan().copy(dailyStudyRoundCap = 0) }
+        invalid { plan().copy(dailyStudyRoundCap = 51) }
+        assertEquals(3, plan().copy(dailyStudyRoundCap = 3).dailyStudyRoundCap)
+        assertNull(plan().dailyStudyRoundCap)
+        assertFalse(plan().copy(dailyStudyRoundCap = 3) == plan())
+    }
     @Test fun workWhitelistIsExplicitAndDoesNotLoadAndroid() {
         val p = plan(listOf(WorkStep("w", workId)))
         invalid { PlanValidator.validate(p, emptySet()) }

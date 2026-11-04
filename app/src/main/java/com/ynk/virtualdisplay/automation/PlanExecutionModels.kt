@@ -84,7 +84,8 @@ class StepExecution(
                 (type == PlanStepType.SIGN_IN && reason == SkipReason.ALREADY_SATISFIED.name) ||
                 (type == PlanStepType.MAILBOX && reason == SkipReason.ALREADY_SATISFIED.name) ||
                 (type == PlanStepType.LUCKY_BAG && (reason == SkipReason.ALREADY_SATISFIED.name || reason == SkipReason.DAILY_LIMIT_REACHED.name || reason == SkipReason.UNAVAILABLE.name)) ||
-                (type == PlanStepType.ADVENTURE && (reason == SkipReason.ALREADY_SATISFIED.name || reason == SkipReason.DAILY_LIMIT_REACHED.name))) { "STEP_SKIP_REASON_INVALID" }
+                (type == PlanStepType.ADVENTURE && (reason == SkipReason.ALREADY_SATISFIED.name || reason == SkipReason.DAILY_LIMIT_REACHED.name)) ||
+                (type == PlanStepType.STUDY && reason == SkipReason.DAILY_LIMIT_REACHED.name)) { "STEP_SKIP_REASON_INVALID" }
         }
         if (state in setOf(StepState.BLOCKED, StepState.FAILED, StepState.UNCONFIRMED, StepState.CANCELLED)) {
             require(!reason.isNullOrBlank()) { "STEP_STOP_REASON_REQUIRED:$state" }

@@ -39,6 +39,15 @@ class PlanV2StoreTest {
         }
     }
 
+    @Test fun theDailyStudyCapSurvivesReopeningAndIsOmittedWhenOff() {
+        val file = File(temporary.root, PlanV2Store.FILE_NAME)
+        val expected = plan().copy(dailyStudyRoundCap = 4)
+        PlanV2Store(file).save(expected)
+        assertEquals(expected, PlanV2Store(file).load())
+        PlanV2Store(file).save(plan())
+        assertFalse(file.readText().contains("dailyStudyRoundCap"))
+    }
+
     @Test fun unknownSchemaIsRejectedWithoutRewritingTheOriginalFile() {
         val bytes = PlanV2JsonCodec.encode(plan()).replace("\"schemaVersion\":2", "\"schemaVersion\":3")
             .toByteArray(Charsets.UTF_8)

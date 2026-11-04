@@ -12,6 +12,7 @@ internal object PlanRunJsonCodec {
         "dailyBudgetMinutes" to p.dailyBudgetMinutes, "executionProfile" to p.executionProfile.name,
         "legacySource" to p.legacySource, "minCoinFloor" to p.minCoinFloor, "maxDailyNetSpend" to p.maxDailyNetSpend,
         "stepIntervalMinutes" to p.stepIntervalMinutes, "failureCooldownMinutes" to p.failureCooldownMinutes,
+        "dailyStudyRoundCap" to p.dailyStudyRoundCap,
         "steps" to p.steps.map { s ->
             val fields = obj("stepId" to s.stepId, "type" to s.type.name)
             when (s) {
@@ -85,7 +86,8 @@ internal object PlanRunJsonCodec {
             if (p.containsKey("maxDailyNetSpend")) p.nullInt("maxDailyNetSpend") else null,
             if (p.containsKey("stepIntervalMinutes")) p.nullInt("stepIntervalMinutes") else null,
             if (p.containsKey("failureCooldownMinutes")) p.nullInt("failureCooldownMinutes") else null,
-            if (p.containsKey("transferOnBlock")) p.boolean("transferOnBlock") else false)
+            if (p.containsKey("transferOnBlock")) p.boolean("transferOnBlock") else false,
+            if (p.containsKey("dailyStudyRoundCap")) p.nullInt("dailyStudyRoundCap") else null)
         val request = RunRequest(r.string("requestId"), plan, r.string("deviceSerial"), r.int("displayId"),
             enumValueOf(r.string("origin")), r.long("createdAtMs"))
         val counts = s.value("counts").objectValue()

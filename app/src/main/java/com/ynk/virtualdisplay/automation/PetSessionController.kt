@@ -64,6 +64,8 @@ class PetSessionController(context:Context,capture:HeadlessDisplayCapture,input:
     private var planCareConsumed=false
     private var planCourseCost:CourseCostReading?=null
     private var planSkipWork=false
+    /** STR-08：本次方案今天还能上几节；预检算好后学习步骤按它开课。 */
+    private var planStudyAllowedRounds=0
     var planRunSnapshot:RunSnapshot?=null;private set
     private val ledger=PetRoundLedger()
     private val reader=MlKitCourseNameReader()
@@ -379,12 +381,19 @@ class PetSessionController(context:Context,capture:HeadlessDisplayCapture,input:
             },
             resources=ResourcePreflightPort {
                 val studyStep=selected.steps.filterIsInstance<StudyStep>().singleOrNull()
+                // STR-08 今日停止线：先算出今天还能上几节，学费预留、币值闸门和分钟预算都用这个数。
+                planStudyAllowedRounds=if(studyStep==null) 0 else StudyDailyCapPolicy.allowedRounds(
+                    confirmedToday=computeConfirmedStudyRoundsToday(),
+                    cap=selected.dailyStudyRoundCap,
+                    plannedRounds=studyStep.rounds)
                 tuitionReserveCoins=if(studyStep==null) 0 else CarePaymentPolicy.unpaidTuition(
-                    checkNotNull(planCourseCost).tuitionCoins,studyStep.rounds)
+                    checkNotNull(planCourseCost).tuitionCoins,planStudyAllowedRounds)
                 val conditional=selected.steps.filterIsInstance<WorkStep>().singleOrNull()
                     ?.trigger==WorkTrigger.IF_FUNDS_SHORT
                 if(conditional) {
-                    planSkipWork=checkNotNull(planCourseCost).balanceCoins>=tuitionReserveCoins
+                    // 今天已经不再学习时照常打工：学费预留为 0，不能因此把打工也跳掉。
+                    planSkipWork=planStudyAllowedRounds>0 &&
+                        checkNotNull(planCourseCost).balanceCoins>=tuitionReserveCoins
                     val careStep=selected.steps.filterIsInstance<CareStep>().singleOrNull()
                     if(careStep!=null) {
                         val health=care.readHealth("plan-funding-health")
@@ -397,16 +406,17 @@ class PetSessionController(context:Context,capture:HeadlessDisplayCapture,input:
                     }
                 }
                 val workStep=selected.steps.filterIsInstance<WorkStep>().singleOrNull()
-                if(studyStep!=null && workStep==null && checkNotNull(planCourseCost).balanceCoins<tuitionReserveCoins) {
+                if(studyStep!=null && planStudyAllowedRounds>0 && workStep==null &&
+                    checkNotNull(planCourseCost).balanceCoins<tuitionReserveCoins) {
                     return@ResourcePreflightPort ResourcePreflight.Insufficient("COURSE_SUFFIX_COINS_INSUFFICIENT")
                 }
-                if(studyStep!=null) {
+                if(studyStep!=null && planStudyAllowedRounds>0) {
                     val cost=checkNotNull(planCourseCost)
                     val spendToday=computeConfirmedNetSpendToday()
                     val decision=CoinSpendPolicy.evaluate(
                         balanceCoins=cost.balanceCoins,
                         tuitionCoins=cost.tuitionCoins,
-                        remainingRounds=studyStep.rounds,
+                        remainingRounds=planStudyAllowedRounds,
                         minCoinFloor=selected.minCoinFloor,
                         maxDailyNetSpend=selected.maxDailyNetSpend,
                         alreadySpentToday=spendToday)
@@ -417,7 +427,7 @@ class PetSessionController(context:Context,capture:HeadlessDisplayCapture,input:
                 }
                 val workMinutes=if(workStep==null || planSkipWork) 0 else WorkCatalog().all()
                     .single {it.id==workStep.workOptionId}.durationMinutes
-                val studyMinutes=if(studyStep==null) 0 else Math.multiplyExact(studyStep.rounds,
+                val studyMinutes=if(studyStep==null) 0 else Math.multiplyExact(planStudyAllowedRounds,
                     CourseTiming.resolve(plan,catalog,System.currentTimeMillis()).durationMinutes)
                 val adventureStep=selected.steps.filterIsInstance<AdventureStep>().singleOrNull()
                 val adventureMinutes=if(adventureStep==null) 0 else Math.multiplyExact(adventureStep.rounds, adventureStep.mode.durationMinutes)
@@ -578,13 +588,19 @@ class PetSessionController(context:Context,capture:HeadlessDisplayCapture,input:
      * reservation and its own completion record. Health is observed, never a gate.
      */
     private suspend fun runPlanStudy(step:StudyStep):StepOutcome {
-        val derived=plan.copy(courseId=step.courseId,rounds=step.rounds)
+        // STR-08：今天还能上几节已经在预检里算好，这里只按允许的节数开课；一节都不剩就跳过。
+        val rounds=planStudyAllowedRounds
+        if(rounds<=0) {
+            flow.emit("plan-study-skipped",result="DAILY_LIMIT_REACHED")
+            return StepOutcome.Skipped(SkipReason.DAILY_LIMIT_REACHED)
+        }
+        val derived=plan.copy(courseId=step.courseId,rounds=rounds)
         var lessons=0
-        repeat(step.rounds) {index ->
-            pausePoint("第 ${index+1}/${step.rounds} 节 ${derived.courseName}")
+        repeat(rounds) {index ->
+            pausePoint("第 ${index+1}/${rounds} 节 ${derived.courseName}")
             flow.round=index+1
             flow.state="SELECT_COURSE"
-            snapshot=snapshot.copy(currentFlow="STUDY",nextStep="第 ${index+1}/${step.rounds} 节 ${derived.courseName}")
+            snapshot=snapshot.copy(currentFlow="STUDY",nextStep="第 ${index+1}/${rounds} 节 ${derived.courseName}")
             val timing=CourseTiming.resolve(derived,catalog,System.currentTimeMillis())
             val ctx=checkNotNull(activePlanContext)
             val course=study.start(null,derived,timing,beforeStart={minutes ->
@@ -739,6 +755,28 @@ class PetSessionController(context:Context,capture:HeadlessDisplayCapture,input:
     }
 
     private var lastLuckyBagCheckMs: Long = 0L
+
+    /**
+     * 今日已确认的学习节数（STR-08）：遍历本会话外的当日会话目录，累加 run-record.json 里
+     * 已确认完成的学习节数。只认写进记录的数字；没有这个字段的旧记录贡献 0（未知不当作完成）。
+     */
+    private fun computeConfirmedStudyRoundsToday(): Int {
+        val root = evidence.parentFile ?: return 0
+        val records = mutableListOf<StudyDailyCapPolicy.ConfirmedRecord>()
+        val dirs = root.listFiles { f -> f.isDirectory } ?: return 0
+        for (dir in dirs) {
+            if (dir == evidence) continue
+            val recordFile = java.io.File(dir, "run-record.json")
+            if (!recordFile.isFile) continue
+            val parsed = runCatching {
+                com.ynk.virtualdisplay.ui.data.SessionRunRecord.parse(recordFile.readText())
+            }.getOrNull() ?: continue
+            val started = parsed.startedAtMs ?: continue
+            val rounds = parsed.studyRoundsCompleted ?: continue
+            records += StudyDailyCapPolicy.ConfirmedRecord(started, rounds, parsed.targetAttribute)
+        }
+        return StudyDailyCapPolicy.sumConfirmedToday(records, StudyDailyCapPolicy.dayKey(System.currentTimeMillis()))
+    }
 
     /**
      * 今日已确认学习净支出（金币）：遍历本会话外的当日会话目录，对既有 run-record.json 求和。
@@ -1276,6 +1314,10 @@ class PetSessionController(context:Context,capture:HeadlessDisplayCapture,input:
             "luckyBagCompleted" to (planRunSnapshot?.counts?.luckyBagCompleted ?: 0),
             "roomCoinsBefore" to sessionRoomCoinsBefore,
             "roomCoinsAfter" to sessionRoomCoinsAfter,
+            // STR-08：今日停止线靠这两个字段统计「今天已经确认学了几节」。
+            "studyRoundsCompleted" to (planRunSnapshot?.counts?.studyRoundsCompleted ?: ledger.completedCount),
+            "targetAttribute" to (planV2?.steps?.filterIsInstance<StudyStep>()?.singleOrNull()?.targetAttribute
+                ?: plan.targetAttribute),
             "strategyActions" to value.strategyActions.map {
                 mapOf("label" to it.label,"outcome" to it.outcome.name,"reason" to it.reason)})
         File(evidence,"run-record.json").writeText(EventJson.encode(record))

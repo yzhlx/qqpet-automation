@@ -2,6 +2,7 @@ package com.ynk.virtualdisplay.ui.data
 
 import android.content.Context
 import com.ynk.virtualdisplay.automation.StrategyExplanation
+import com.ynk.virtualdisplay.automation.StudyDailyCapPolicy
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
@@ -140,6 +141,10 @@ data class SessionRunRecord(
     val luckyBagCompleted: Int? = null,
     val roomCoinsBefore: Int? = null,
     val roomCoinsAfter: Int? = null,
+    /** STR-08: 本次会话已确认完成的学习节数；没写过就是未知，不当作 0 以外的事实。 */
+    val studyRoundsCompleted: Int? = null,
+    /** STR-08: 本次会话的学习目标属性（力量/智力/魅力）。 */
+    val targetAttribute: String? = null,
     /** STR-16: the real outcome and reason of every action, shown in the history detail. */
     val strategyActions: List<StrategyExplanation.Action> = emptyList(),
 ) {
@@ -175,6 +180,8 @@ data class SessionRunRecord(
                 luckyBagCompleted = o.intOrNull("luckyBagCompleted"),
                 roomCoinsBefore = o.intOrNull("roomCoinsBefore"),
                 roomCoinsAfter = o.intOrNull("roomCoinsAfter"),
+                studyRoundsCompleted = o.intOrNull("studyRoundsCompleted"),
+                targetAttribute = o.optString("targetAttribute").takeIf { it.isNotEmpty() && it != "null" },
                 strategyActions = parseStrategyActions(o.optJSONArray("strategyActions")),
             )
         }.getOrNull()
@@ -267,6 +274,24 @@ class PetEvidenceRepository(private val context: Context) {
                 ?.let { runCatching { it.readText() }.getOrNull() } ?: return@firstOrNull false
             runCatching { JSONObject(text).optString("sessionId") == managedSessionId }.getOrDefault(false)
         }
+    }
+
+    /**
+     * STR-08：今日已确认的学习节数（跨会话累计）。
+     *
+     * 只统计写进 run-record.json 的已确认节数；没有这个字段的旧记录不贡献任何数字，
+     * 也不会被猜成「已学 0 节以外的事实」。
+     */
+    fun confirmedStudyRoundsToday(nowMs: Long = System.currentTimeMillis()): Int {
+        val records = sessionDirectories(limit = Int.MAX_VALUE).mapNotNull { dir ->
+            val record = File(dir, "run-record.json").takeIf { it.isFile }
+                ?.let { runCatching { SessionRunRecord.parse(it.readText()) }.getOrNull() }
+                ?: return@mapNotNull null
+            val started = record.startedAtMs ?: return@mapNotNull null
+            val rounds = record.studyRoundsCompleted ?: return@mapNotNull null
+            StudyDailyCapPolicy.ConfirmedRecord(started, rounds, record.targetAttribute)
+        }
+        return StudyDailyCapPolicy.sumConfirmedToday(records, StudyDailyCapPolicy.dayKey(nowMs))
     }
 
     /** Sessions whose record's local start date is today, newest first. */

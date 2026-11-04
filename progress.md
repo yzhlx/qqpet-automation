@@ -336,3 +336,21 @@
 - 待验收：真实跑一轮「打工受阻 → 转护理/学习」的真机场景尚未执行（需要体力不足或金币不够的实际局面），该行为目前只有 JVM 测试覆盖。
 - 提交与推送：feat(plan): 学习优先与打工优先，受阻时按规则转移 (STR-01/02)，推送 backup/feat/onboarding-troubleshooting-p0，更新 PR #4。
 - 下一步：第三阶段 STR-08 属性目标（今日停止线）与 STR-09 均衡属性目标（轮换力量/智力/魅力并记录每项变化）；需先核实属性数值能否读取，目前打工详情页只读到属性名，读不到数值。
+
+## 属性目标与今日停止线（2026-11-03，feat/onboarding-troubleshooting-p0）
+- 目标：STR-08 属性优先目标。核实结论：「按选择的属性提高学习收益」在第一阶段已具备（选属性 → StudyAttribute.resolveCourse 自动匹配该属性的初级学园课，StudyStep.targetAttribute 也存进方案）；真正缺的是验收条款里的「可设置今日停止线」。
+- 改动：
+  - StudyDailyCapPolicy（新增，automation 层纯函数，JVM 可测）：allowedRounds(今日已确认节数, 停止线, 方案节数) → 本次还能上几节；sumConfirmedToday 只统计当天、只统计写进记录的已确认节数。停止线为 null 时方案照旧按自己排的节数执行。
+  - PlanV2 顶层新增 dailyStudyRoundCap（可空，null=关闭；默认关闭不启用），取值 1..50，且方案必须含学习步骤；同步 copy/equals/hashCode。
+  - PlanV2JsonCodec 与 PlanRunJsonCodec 双路编解码：字段缺省读回 null，关闭时不写入 JSON。
+  - PetSessionController：预检里先算今天还能上几节，学费预留、金币底线/每日花费上限闸门、每日分钟预算全部改用这个数；今天不再学习时照常打工（不会因为学费预留为 0 把打工也一起跳掉）；学习步骤按允许的节数开课，一节都不剩就以「已达今日次数上限」安全跳过，方案里后面的动作照常执行。
+  - 今日已确认学习节数来自各会话目录的 run-record.json（新增 studyRoundsCompleted 与 targetAttribute 两个字段）；只认写进记录的数字，旧记录贡献 0，没读到结果的课不计入（未知不当作完成）。
+  - StepExecution 白名单新增「学习 + 已达今日次数上限」：跳过仍算正常结束，策略说明里显示「已达今日次数上限」。
+  - PetPlanSheetScreen：培养目标属性卡片内新增「今日停止线」开关（默认关）与「今日上限（节）」数值行，并显示今日已确认学习节数；取消勾选学习时自动关掉停止线（否则方案会因没有学习步骤保存失败）。
+  - 用户没点属性但选的就是该属性课程时按课程如实记下属性，运行记录里才分得清学的是什么。
+  - 使用攻略「配置托管方案」补充第 8 条「属性目标与今日停止线」。
+  - 单元测试：新增 StudyDailyCapPolicyTest（5 项）、PlanRunJsonCodecTest（2 项），PlanV2Test 与 PlanV2StoreTest 各补 1 项；真机插桩 StrategyRecordJsonTest 补 3 项（org.json 只在设备可用，覆盖新字段写读往返、旧记录保持未知）。
+- 验证结果：全量单元测试 105 套件 / 980 项 100% PASS（0 failures, 0 errors, 3 skipped）；assembleDebug 构建通过（APK 49.2MB）；ADB 覆盖安装 DKS9K23420020242 成功，App 启动无崩溃；真机确认方案页出现「今日停止线」开关与「今日上限（节）」数值行，勾选力量并保存后 plan-v2.json 写入 dailyStudyRoundCap:5、study 步骤带 targetAttribute:力量，重新进入方案页开关与数值恢复。
+- 待验收：真实跑一轮「今天已学满 N 节 → 本轮跳过学习」的真机场景尚未执行（需要当天已有已确认学习记录的实际局面），该行为目前只有 JVM 测试覆盖；旧版托管参数路径（session-plan.json）不读停止线，只有方案页保存的 PlanV2 生效。
+- 提交与推送：feat(plan): 属性目标与今日停止线，今日学满即跳过 (STR-08)，推送 backup/feat/onboarding-troubleshooting-p0，更新 PR #4。
+- 下一步：第三阶段 STR-09 均衡属性目标（轮换力量/智力/魅力并记录每项变化）：StudyStep 目前只有单个 courseId，轮换需要每轮不同课程，预检的学费/时长/成本读取都要按属性分别取，工作量比 STR-08 大；run-record.json 已记下 targetAttribute 与 studyRoundsCompleted，可直接作为每项统计的原料。

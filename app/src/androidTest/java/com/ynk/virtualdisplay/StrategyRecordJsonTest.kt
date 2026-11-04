@@ -47,6 +47,37 @@ class StrategyRecordJsonTest {
         assertEquals("学习", parsed.strategyActions.single().label)
     }
 
+    @Test fun theStudyFactsComeBackFromTheRunRecord() {
+        val json = EventJson.encode(mapOf<String, Any?>(
+            "sessionId" to "s-2",
+            "terminalState" to "COMPLETED",
+            "studyRoundsCompleted" to 3,
+            "targetAttribute" to "智力"))
+        val parsed = SessionRunRecord.parse(json)
+        assertNotNull(parsed)
+        assertEquals(3, parsed!!.studyRoundsCompleted)
+        assertEquals("智力", parsed.targetAttribute)
+    }
+
+    @Test fun anOlderRecordWithoutStudyFactsStaysUnknown() {
+        val parsed = SessionRunRecord.parse("""{"terminalState":"COMPLETED","rounds":1}""")
+        assertNotNull(parsed)
+        assertNull(parsed!!.studyRoundsCompleted)
+        assertNull(parsed.targetAttribute)
+    }
+
+    @Test fun aNullTargetAttributeStaysUnknown() {
+        val json = EventJson.encode(mapOf<String, Any?>(
+            "sessionId" to "s-3",
+            "terminalState" to "COMPLETED",
+            "studyRoundsCompleted" to 1,
+            "targetAttribute" to null))
+        val parsed = SessionRunRecord.parse(json)
+        assertNotNull(parsed)
+        assertEquals(1, parsed!!.studyRoundsCompleted)
+        assertNull(parsed.targetAttribute)
+    }
+
     @Test fun aRecordWithoutStrategyFactsStillReadsBack() {
         val parsed = SessionRunRecord.parse("""{"terminalState":"COMPLETED","rounds":1}""")
         assertNotNull(parsed)
