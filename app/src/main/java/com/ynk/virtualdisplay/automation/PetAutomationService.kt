@@ -702,11 +702,43 @@ class PetAutomationService : Service() {
         return (decision as? FailureCooldownPolicy.Decision.Cooling)?.remainingMinutes
     }
 
+    /** 这次会话会做哪些动作；只有会扣费或会领奖的动作才需要中断确认。 */
+    private fun requestedStepTypes(mode: SessionMode, selected: PlanV2?): Set<PlanStepType> = when {
+        selected != null -> selected.steps.map { it.type }.toSet()
+        mode.runsStudy -> setOf(PlanStepType.STUDY)
+        else -> emptySet()
+    }
+
+    /** 给用户看的动作名字，不出现英文代号。 */
+    private fun pendingActionLabel(type: PlanStepType): String = when (type) {
+        PlanStepType.STUDY -> "学习"
+        PlanStepType.SIGN_IN -> "签到"
+        PlanStepType.MAILBOX -> "信箱"
+        PlanStepType.LUCKY_BAG -> "福袋"
+        else -> type.name
+    }
+
     private suspend fun runSession(displayId: Int, rounds: Int, mode: SessionMode, selected: PlanV2?=null,
         requestId:String?=null) {
         val errors = profile.validate(healthGuardInstalled=true)
         if (errors.isNotEmpty()) return stopSession("配置未完成：${errors.joinToString()}")
         if (displayId <= 0) return stopSession("拒绝默认/无效 displayId")
+        // 中断后先确认：上一次的动作结果未知时，不直接再来一次（可能重复扣费或重复领取）。
+        val pending=PendingActionGuard.pendingActions(DailyBudgetStore(this).attempts())
+        val unconfirmed=requestedStepTypes(mode,selected).flatMap { type ->
+            val decision=PendingActionGuard.decide(pending,type)
+            if (decision is PendingActionDecision.NeedsConfirmation) decision.actions else emptyList()
+        }
+        if (unconfirmed.isNotEmpty()) {
+            val names=unconfirmed.map { pendingActionLabel(it.stepType) }.distinct().joinToString("、")
+            logLine("SESSION_START_REFUSED PENDING_ACTION_UNCONFIRMED:" +
+                unconfirmed.map { it.stepType.name }.distinct().joinToString(","))
+            val message="上一次"+names+"被中断，是否已扣费或已领取无法确认。为避免重复执行，请先在「运行方案」页确认。"
+            android.os.Handler(android.os.Looper.getMainLooper()).post {
+                android.widget.Toast.makeText(applicationContext,message,android.widget.Toast.LENGTH_LONG).show()
+            }
+            return stopSession(message)
+        }
         // A HEALTH_CHECK session has no rounds to run, so the 1..10 batch rule does not apply to it.
         if (mode.runsStudy && rounds !in 1..10) return stopSession("Only finite 1..10 round batches are supported")
         // STR-15: 失败后冷却。同方案最近一次失败/未确认结束后仍在冷却期内，拒绝重开以免高频空转。
@@ -754,6 +786,10 @@ class PetAutomationService : Service() {
                 override fun started(id:String) {budget.startConfirmed(id)}
                 override fun completed(id:String) {budget.completed(id)}
                 override fun unconfirmed(id:String,reason:String) {budget.unconfirmed(id,reason)}
+                override fun pendingActions(): List<PendingAction> =
+                    PendingActionGuard.pendingActions(budget.attempts())
+                override fun confirmedDoneCount(day: String, type: PlanStepType): Int =
+                    PendingActionGuard.confirmedDoneCount(budget.attempts(), day, type)
             }
             val reservedAttempts=linkedSetOf<String>()
             val activeCareRounds=mutableSetOf<Int>()

@@ -122,6 +122,35 @@ class PlanBudgetLedger(
         store.read().attempts[attemptId]
     }
 
+    /** 账本里的全部尝试：中断确认要靠它找出「结果未知」的那些。 */
+    fun attempts(): List<BudgetAttempt> = synchronized(BudgetLedgerLock.monitor) {
+        store.read().attempts.values.toList()
+    }
+
+    /**
+     * 用户确认一次中断动作的结局。
+     *
+     * done=true  → 记成已完成（带 USER_CONFIRMED_DONE 标记），今天不再重复执行这一节；
+     * done=false → 记成确实没有发生（带 USER_CONFIRMED_NOT_DONE 标记），下一次可以重做。
+     *
+     * 用户确认的是「游戏里做没做」，不是「预算该不该算」：分钟、天数和其余尝试一律不动，
+     * 账本保持只进不出的既有规则。已经是 COMPLETED 的尝试不再改写。
+     */
+    fun confirmOutcome(attemptId: String, done: Boolean, note: String, nowMs: Long): BudgetAttempt =
+        synchronized(BudgetLedgerLock.monitor) {
+            require(note.isNotBlank()) { "BUDGET_CONFIRM_NOTE_BLANK" }
+            val state = store.read()
+            val previous = state.attempts[attemptId] ?: error("BUDGET_ATTEMPT_UNKNOWN:$attemptId")
+            check(previous.status == ReserveStatus.UNCONFIRMED_RETAINED ||
+                previous.status == ReserveStatus.RECONCILED_STOPPED) { "BUDGET_ATTEMPT_ALREADY_SETTLED:$attemptId" }
+            val marker = if (done) PendingActionGuard.USER_DONE_MARK else PendingActionGuard.USER_NOT_DONE_MARK
+            val updated = previous.copy(
+                status = if (done) ReserveStatus.COMPLETED else ReserveStatus.RECONCILED_STOPPED,
+                reason = (previous.reason ?: "") + "\n" + marker + ";at=" + nowMs + ";note=" + note)
+            store.write(state.copy(attempts = state.attempts + (attemptId to updated)))
+            updated
+        }
+
     fun reconcileStopped(proofs:List<LegacyCareStoppedProof>, baseline:CareRoomBaseline,
         noV2Pending:Boolean, now:Long) = synchronized(BudgetLedgerLock.monitor) {
         val state=store.read()

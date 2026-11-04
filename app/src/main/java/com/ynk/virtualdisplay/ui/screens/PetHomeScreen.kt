@@ -44,6 +44,7 @@ import androidx.core.content.ContextCompat
 import com.ynk.virtualdisplay.automation.CareStep
 import com.ynk.virtualdisplay.automation.CourseCatalogStore
 import com.ynk.virtualdisplay.automation.DailyBudgetStore
+import com.ynk.virtualdisplay.automation.PendingActionGuard
 import com.ynk.virtualdisplay.automation.ManualPause
 import com.ynk.virtualdisplay.automation.ManualPauseState
 import com.ynk.virtualdisplay.automation.PetAutomationService
@@ -144,6 +145,8 @@ fun PetHomeScreen(
     var planV2 by remember { mutableStateOf<PlanV2?>(null) }
     var logRows by remember { mutableStateOf<List<PetLogEntry>>(emptyList()) }
     var budgetUsed by remember { mutableStateOf(0) }
+    /** 中断后结果未知的动作数量：有就提示用户先确认，避免重复扣费。 */
+    var pendingCount by remember { mutableStateOf(0) }
     // The saved plan decides the batch: course, round count, thresholds and budget. It replaces the
     // old in-memory 1/3/10 selector, which reset every time the screen was left.
     var plan by remember { mutableStateOf(SessionPlan()) }
@@ -154,6 +157,7 @@ fun PetHomeScreen(
             latest = repo.latestSession()
             logRows = PetLogPresentation.timeline(repo.logEntries(limit = 600))
             budgetUsed = DailyBudgetStore(context).usedMinutes()
+            pendingCount = PendingActionGuard.pendingActions(DailyBudgetStore(context).attempts()).size
             plan = SessionPlanStore(context).load()
             planV2 = runCatching { PlanV2Store(context).load() }.getOrNull()
             val catalog = CourseCatalogStore(context).load()
@@ -298,6 +302,18 @@ fun PetHomeScreen(
             if (!runtime.running) {
                 val planReady = controls.startEnabled &&
                     (planV2?.steps?.none { it is StudyStep } == true || catalogFresh)
+                if (pendingCount > 0) {
+                    Row(
+                        Modifier.fillMaxWidth().clickable { onOpenPlanSheet() }
+                            .padding(horizontal = 4.dp).padding(bottom = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text("有 " + pendingCount + " 个待确认动作", fontSize = 12.5.sp, color = PetTokens.RedInk)
+                        Spacer(Modifier.weight(1f))
+                        Text("去确认", fontSize = 12.5.sp, color = PetTokens.Ink2)
+                        PetChevron()
+                    }
+                }
                 Row(
                     Modifier.fillMaxWidth().clickable { onOpenPlanSheet() }
                         .padding(horizontal = 4.dp).padding(bottom = 8.dp),

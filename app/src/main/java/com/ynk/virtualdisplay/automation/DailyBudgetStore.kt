@@ -120,6 +120,12 @@ class DailyBudgetStore private constructor(private val ledger: PlanBudgetLedger)
     fun completed(attemptId: String) = ledger.completed(attemptId)
     fun unconfirmed(attemptId: String, reason: String) = ledger.unconfirmed(attemptId, reason)
     fun attempt(attemptId: String): BudgetAttempt? = ledger.attempt(attemptId)
+    /** 账本里的全部尝试：中断确认要靠它找出「结果未知」的那些。 */
+    fun attempts(): List<BudgetAttempt> = ledger.attempts()
+
+    /** 用户确认一次中断动作的结局：已发生记成完成，没发生允许重做。 */
+    fun confirmOutcome(attemptId: String, done: Boolean, note: String): BudgetAttempt =
+        ledger.confirmOutcome(attemptId, done, note, System.currentTimeMillis())
     fun reconcileStopped(proofs:List<LegacyCareStoppedProof>,baseline:CareRoomBaseline,
         noV2Pending:Boolean,now:Long) = ledger.reconcileStopped(proofs,baseline,noV2Pending,now)
 

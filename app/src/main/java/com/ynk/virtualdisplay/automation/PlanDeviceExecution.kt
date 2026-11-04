@@ -6,6 +6,10 @@ interface PlanAttemptBudget {
     fun started(id: String)
     fun completed(id: String)
     fun unconfirmed(id: String, reason: String)
+    /** 中断后结果未知的动作：默认没有，既有实现不用改。 */
+    fun pendingActions(): List<PendingAction> = emptyList()
+    /** 用户确认「已经做完」的动作数量（今天）。默认 0。 */
+    fun confirmedDoneCount(day: String, type: PlanStepType): Int = 0
 }
 
 /** One identity for both journals. File intent precedes reservation and input. */

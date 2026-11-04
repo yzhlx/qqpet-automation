@@ -54,6 +54,8 @@ import com.ynk.virtualdisplay.automation.CourseCatalogStore
 import com.ynk.virtualdisplay.automation.DailyBudgetStore
 import com.ynk.virtualdisplay.automation.ExecutionProfile
 import com.ynk.virtualdisplay.automation.PetAutomationService
+import com.ynk.virtualdisplay.automation.PendingAction
+import com.ynk.virtualdisplay.automation.PendingActionGuard
 import com.ynk.virtualdisplay.automation.PetRuntime
 import com.ynk.virtualdisplay.automation.PlanStep
 import com.ynk.virtualdisplay.automation.PlanStepType
@@ -87,6 +89,7 @@ import com.ynk.virtualdisplay.ui.kit.PetStepper
 import com.ynk.virtualdisplay.ui.main.PetTitleBar
 import com.ynk.virtualdisplay.ui.theme.PetTokens
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -142,8 +145,18 @@ fun PetPlanSheetScreen(onClose: () -> Unit, onStarted: () -> Unit, displayId: In
     var lastSavedSnapshot by remember { mutableStateOf<PlanV2?>(null) }
     var loadNote by remember { mutableStateOf<String?>(null) }
     var saveError by remember { mutableStateOf<String?>(null) }
+    /** 中断后结果未知的动作：等用户确认「做没做」之后才允许再开始。 */
+    var pendingActions by remember { mutableStateOf<List<PendingAction>>(emptyList()) }
+    var pendingRefresh by remember { mutableStateOf(0) }
     val runtime by PetRuntime.state.collectAsState()
     val verified = remember { WorkCatalog().all().filter { it.confidence == RewardConfidence.VERIFIED } }
+
+    LaunchedEffect(pendingRefresh) {
+        pendingActions = withContext(Dispatchers.IO) {
+            runCatching { PendingActionGuard.pendingActions(DailyBudgetStore(context).attempts()) }
+                .getOrDefault(emptyList())
+        }
+    }
 
     LaunchedEffect(Unit) {
         val loaded = withContext(Dispatchers.IO) {
@@ -318,6 +331,28 @@ fun PetPlanSheetScreen(onClose: () -> Unit, onStarted: () -> Unit, displayId: In
                         Text("方案配置攻略", fontSize = 11.5.sp, color = PetTokens.Ink2)
                     }
                 }
+            }
+            if (pendingActions.isNotEmpty()) PetCard {
+                PetSection("待确认动作")
+                Spacer(Modifier.height(8.dp))
+                PetNote("上一次任务被中断，下面这个动作到底做没做无法确认。先告诉蟹啦实际情况，避免重复扣费或重复领取。")
+                pendingActions.forEach { action ->
+                    Spacer(Modifier.height(8.dp))
+                    Text(pendingActionLabel(action.stepType) +
+                        (if (action.minutes > 0) " · " + action.minutes + " 分钟" else "") +
+                        " · " + action.day, fontSize = 14.sp, color = PetTokens.Ink)
+                    Spacer(Modifier.height(6.dp))
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        PetFootButton("已经做完", PetButtonTone.GHOST,
+                            { resolvePending(scope, context, action, true) { pendingRefresh += 1 } },
+                            Modifier.weight(1f))
+                        PetFootButton("没有发生", PetButtonTone.GHOST,
+                            { resolvePending(scope, context, action, false) { pendingRefresh += 1 } },
+                            Modifier.weight(1f))
+                    }
+                }
+                Spacer(Modifier.height(6.dp))
+                PetNote("确认「已经做完」后今天不会再重复这个动作；确认「没有发生」后可以重新开始。")
             }
             PetCard {
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -706,17 +741,42 @@ fun PetPlanSheetScreen(onClose: () -> Unit, onStarted: () -> Unit, displayId: In
             (saveError ?: validationMessage)?.let { PetNote(it) }
             if (displayId == null || displayId <= 0) PetNote("后台画面未就绪，暂不能运行。")
             if (runtime.running) PetNote("已有任务正在运行，可以保存下次方案，暂不能再次启动。")
+            if (pendingActions.isNotEmpty()) PetNote("有 " + pendingActions.size + " 个待确认动作，确认后才能开始本次任务。")
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 PetFootButton(if (saving) "正在保存…" else if (saved) "已保存" else "保存方案",
                     if (busy || saved || validationMessage != null) PetButtonTone.DISABLED else PetButtonTone.GHOST,
                     { persistSelection(false) }, Modifier.weight(1f))
                 PetFootButton("保存并运行",
-                    if (busy || validationMessage != null || runtime.running || displayId == null || displayId <= 0)
+                    if (busy || validationMessage != null || runtime.running || displayId == null || displayId <= 0 ||
+                        pendingActions.isNotEmpty())
                         PetButtonTone.DISABLED else PetButtonTone.PRIMARY,
                     { persistSelection(true) }, Modifier.weight(1f))
             }
         }
     }
+}
+
+/** 用户确认一次中断动作的结局：已经做完记成完成，没有发生允许重做。 */
+private fun resolvePending(scope: CoroutineScope, context: Context, action: PendingAction, done: Boolean,
+    onResolved: () -> Unit) {
+    scope.launch {
+        val ok = withContext(Dispatchers.IO) {
+            runCatching {
+                DailyBudgetStore(context).confirmOutcome(action.attemptId, done,
+                    if (done) "用户确认已完成" else "用户确认没有发生")
+            }.isSuccess
+        }
+        if (ok) onResolved()
+    }
+}
+
+/** 给用户看的动作名字，不出现英文代号。 */
+private fun pendingActionLabel(type: PlanStepType): String = when (type) {
+    PlanStepType.STUDY -> "学习"
+    PlanStepType.SIGN_IN -> "签到"
+    PlanStepType.MAILBOX -> "信箱"
+    PlanStepType.LUCKY_BAG -> "福袋"
+    else -> type.name
 }
 
 private fun startCourseScan(context: Context, displayId: Int) {

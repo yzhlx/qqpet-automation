@@ -399,6 +399,12 @@ class PetSessionController(context:Context,capture:HeadlessDisplayCapture,input:
                     confirmedToday=computeConfirmedStudyRoundsToday(),
                     cap=selected.dailyStudyRoundCap,
                     plannedRounds=studyStep.rounds)
+                // 中断后用户确认「已经做完」的学习节数，今天不再重复上这一节。
+                if(studyStep!=null) {
+                    val confirmedDone=planAttemptBudget?.confirmedDoneCount(
+                        StudyDailyCapPolicy.dayKey(System.currentTimeMillis()),PlanStepType.STUDY) ?: 0
+                    planStudyAllowedRounds=maxOf(0,planStudyAllowedRounds-confirmedDone)
+                }
                 // STR-09：按真实顺序排出本轮的课；学费与时长都按每节自己那门课算。
                 val lessons=if(studyStep==null) emptyList() else StudyRotationPolicy.schedule(studyStep,planStudyAllowedRounds)
                 tuitionReserveCoins=if(studyStep==null) 0 else StudyRotationPolicy.tuitionTotal(lessons,planCourseCosts)
