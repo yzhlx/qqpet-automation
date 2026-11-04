@@ -108,9 +108,43 @@ class EnvironmentDiagnosticTest {
         val baseItems = report.items.filter { it.level == DiagnosticLevel.BASE }
         val capItems = report.items.filter { it.level == DiagnosticLevel.CAPABILITY }
         val targetItems = report.items.filter { it.level == DiagnosticLevel.TARGET_APP }
-        assertEquals(4, baseItems.size)
+        assertEquals(5, baseItems.size)
         assertEquals(3, capItems.size)
         assertEquals(1, targetItems.size)
+    }
+
+    @Test
+    fun unverifiedModelIsFlaggedForReviewWithoutBlocking() = runBlocking {
+        val repo = FakeDiagnosticRepo()
+        val diag = EnvironmentDiagnostic(
+            packageInstalled = { true },
+            repository = repo,
+            deviceModel = "Pixel 7",
+        )
+
+        val report = diag.runCheck(ShizukuState.Checking)
+
+        val modelItem = report.items.first { it.title == "机型适配" }
+        assertTrue("未实测机型不算失败", modelItem.passed)
+        assertTrue("但必须标成待核对", modelItem.unknown)
+        assertNotNull("并给出下一步", modelItem.remedy)
+        assertTrue("未实测不能当成已实测", modelItem.message.contains("未实测"))
+    }
+
+    @Test
+    fun calibratedModelShowsNoModelWarning() = runBlocking {
+        val repo = FakeDiagnosticRepo()
+        val diag = EnvironmentDiagnostic(
+            packageInstalled = { true },
+            repository = repo,
+            deviceModel = "FOA-AL00",
+        )
+
+        val report = diag.runCheck(ShizukuState.Checking)
+
+        val modelItem = report.items.first { it.title == "机型适配" }
+        assertFalse("已实测机型不该标待核对", modelItem.unknown)
+        assertNull("已实测机型不需要下一步", modelItem.remedy)
     }
 
     @Test

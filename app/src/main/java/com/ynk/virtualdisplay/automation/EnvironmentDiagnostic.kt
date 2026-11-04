@@ -55,6 +55,8 @@ class EnvironmentDiagnostic(
     private val repository: IDisplayRepository,
     private val identity: EnvironmentIdentity = EnvironmentIdentity.UNKNOWN,
     private val capabilityCache: CapabilityCheckCache? = null,
+    /** 机型只用于说明适配情况；测试可注入，真机默认读 Build.MODEL。 */
+    private val deviceModel: String? = Build.MODEL,
 ) {
     companion object {
         fun defaultPackageChecker(context: Context): (String) -> Boolean = { pkg ->
@@ -121,6 +123,18 @@ class EnvironmentDiagnostic(
                 passed = qqInstalled,
                 message = if (qqInstalled) "已安装" else "未安装手机 QQ",
                 remedy = if (!qqInstalled) "请先安装并登录手机 QQ，托管需在 QQ 内进行" else null,
+            )
+        )
+
+        // 机型适配：没在这台机器上量过不等于不能用，所以只标「待核对」，不拦托管。
+        items.add(
+            DiagnosticItem(
+                level = DiagnosticLevel.BASE,
+                title = "机型适配",
+                passed = true,
+                unknown = !DeviceSupport.isCalibrated(deviceModel),
+                message = DeviceSupport.diagnosticMessage(deviceModel),
+                remedy = DeviceSupport.diagnosticRemedy(deviceModel),
             )
         )
 

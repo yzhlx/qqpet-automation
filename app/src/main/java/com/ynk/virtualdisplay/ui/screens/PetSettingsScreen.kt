@@ -40,6 +40,7 @@ import androidx.compose.ui.unit.sp
 import androidx.core.app.NotificationManagerCompat
 import com.ynk.virtualdisplay.BuildConfig
 import com.ynk.virtualdisplay.automation.DailyBudgetStore
+import com.ynk.virtualdisplay.automation.DeviceSupport
 import com.ynk.virtualdisplay.automation.PetAutomationService
 import com.ynk.virtualdisplay.automation.PetProfile
 import com.ynk.virtualdisplay.automation.QuietWindow
@@ -334,7 +335,8 @@ fun PetSettingsScreen(
                 tileBg = PetTokens.VioletSoft,
                 icon = { PetIcon(PetGlyph.Info, 17.dp) },
                 title = "版本",
-                sub = "设备 ${android.os.Build.MODEL} · Android ${android.os.Build.VERSION.RELEASE}",
+                sub = "设备 ${android.os.Build.MODEL} · Android ${android.os.Build.VERSION.RELEASE}" +
+                    (if (DeviceSupport.isCalibrated()) " · 坐标已实测" else " · 坐标未实测"),
                 trailing = { ValueText(BuildConfig.VERSION_NAME) },
             )
             Row(Modifier.fillMaxWidth().padding(bottom = 10.dp, top = 2.dp)) {

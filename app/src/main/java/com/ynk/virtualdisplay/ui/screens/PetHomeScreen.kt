@@ -45,6 +45,7 @@ import com.ynk.virtualdisplay.automation.CareStep
 import com.ynk.virtualdisplay.automation.CourseCatalog
 import com.ynk.virtualdisplay.automation.CourseCatalogStore
 import com.ynk.virtualdisplay.automation.DailyBudgetStore
+import com.ynk.virtualdisplay.automation.DeviceSupport
 import com.ynk.virtualdisplay.automation.PendingActionGuard
 import com.ynk.virtualdisplay.automation.ManualPause
 import com.ynk.virtualdisplay.automation.ManualPauseState
@@ -323,6 +324,10 @@ fun PetHomeScreen(
                         shizukuState = uiState.shizukuState,
                         onOpenShizuku = { context.openShizuku() },
                     )
+                }
+                // MKA-07：坐标只在一台真机上量过。其他机型先如实说明，再由页面识别兜底。
+                DeviceSupport.homeWarningTitle()?.let { title ->
+                    UnverifiedDeviceCard(title, DeviceSupport.homeWarningBody().orEmpty())
                 }
                 TodayProgressCard(budgetUsed, budgetCap)
                 StrategyCard("上一轮策略", strategyLines, strategySummary)
@@ -981,6 +986,20 @@ private fun pillForeground(tone: StatusPillTone): Color = when (tone) {
 private fun hhmmFormatter(): (Long) -> String {
     val fmt = SimpleDateFormat("HH:mm", Locale.US)
     return { ms -> fmt.format(Date(ms)) }
+}
+
+/** 未实测机型提示：不阻止开始，但先说清「认不出就停」，避免用户以为一定能跑通。 */
+@Composable
+private fun UnverifiedDeviceCard(title: String, body: String) {
+    PetCard {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            PetChip("未实测", PetTokens.AmberSoft, PetTokens.AmberInk)
+            Spacer(Modifier.width(8.dp))
+            Text(title, fontSize = 13.5.sp, fontWeight = FontWeight(650), color = PetTokens.Ink)
+        }
+        Spacer(Modifier.height(6.dp))
+        PetNote(body)
+    }
 }
 
 /**
