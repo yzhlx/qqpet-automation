@@ -26,6 +26,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ynk.virtualdisplay.automation.PetManagedRuntime
 import com.ynk.virtualdisplay.automation.PetRuntime
+import com.ynk.virtualdisplay.ui.data.JournalEvent
 import com.ynk.virtualdisplay.ui.data.PetEvidenceRepository
 import com.ynk.virtualdisplay.ui.data.SessionEvidence
 import com.ynk.virtualdisplay.ui.kit.PetCard
@@ -39,6 +40,8 @@ import com.ynk.virtualdisplay.ui.records.MetricChange
 import com.ynk.virtualdisplay.ui.records.RecordsPresentation
 import com.ynk.virtualdisplay.ui.records.RecordsSummary
 import com.ynk.virtualdisplay.ui.records.SessionHistoryRow
+import com.ynk.virtualdisplay.ui.records.TimelinePresentation
+import com.ynk.virtualdisplay.ui.records.TimelineRow
 import com.ynk.virtualdisplay.ui.records.VerdictTone
 import com.ynk.virtualdisplay.ui.theme.PetTokens
 import kotlinx.coroutines.Dispatchers
@@ -61,6 +64,7 @@ fun PetRecordsScreen() {
     var today by remember { mutableStateOf<List<SessionEvidence>>(emptyList()) }
     var yesterday by remember { mutableStateOf<List<SessionEvidence>>(emptyList()) }
     var history by remember { mutableStateOf<List<SessionHistoryRow>>(emptyList()) }
+    var events by remember { mutableStateOf<List<JournalEvent>>(emptyList()) }
     var loaded by remember { mutableStateOf(false) }
 
     val hhmm = remember { SimpleDateFormat("HH:mm", Locale.US) }
@@ -72,6 +76,7 @@ fun PetRecordsScreen() {
         suspend fun reload() = withContext(Dispatchers.IO) {
             today = repo.todaySessions()
             yesterday = repo.yesterdaySessions()
+            events = repo.todayJournalEvents()
             history = RecordsPresentation.history(
                 repo.sessionDirectories(limit = 40).map { repo.read(it) },
                 timeFormatter, dateFormatter,
@@ -88,6 +93,7 @@ fun PetRecordsScreen() {
 
     val summary = RecordsPresentation.summary(today, timeFormatter, dateFormatter)
     val yesterdayLine = RecordsPresentation.dailyLine(yesterday.mapNotNull { it.record })
+    val timeline = TimelinePresentation.rows(today, events, timeFormatter)
     val focus = today.firstOrNull()
     val changes = focus?.let { RecordsPresentation.changes(it.rounds, it.record) }.orEmpty()
 
@@ -107,6 +113,11 @@ fun PetRecordsScreen() {
             Spacer(Modifier.height(11.dp))
             if (changes.any { it.beforeText != "—" || it.afterText != "—" }) ChangesCard(changes)
             else PetNote("这次运行没有成对的前后读数，所以不显示变化。")
+        }
+
+        if (timeline.isNotEmpty()) {
+            Spacer(Modifier.height(11.dp))
+            TimelineCard(timeline)
         }
 
         if (yesterdayLine != null) {
@@ -161,6 +172,39 @@ private fun StripCell(value: Int, label: String, modifier: Modifier = Modifier) 
         Text("$value", fontSize = 21.sp, fontWeight = FontWeight.Bold, color = PetTokens.Ink)
         Spacer(Modifier.height(2.dp))
         Text(label, fontSize = 10.5.sp, color = PetTokens.Ink3)
+    }
+}
+
+@Composable
+private fun TimelineCard(rows: List<TimelineRow>) {
+    PetCard {
+        PetRowHeader("今天的事件", "按时间倒序")
+        Spacer(Modifier.height(6.dp))
+        rows.forEachIndexed { index, row ->
+            if (index > 0) PetDivider(Modifier.padding(vertical = 2.dp))
+            Row(
+                Modifier.fillMaxWidth().padding(vertical = 7.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    row.timeText, fontSize = 12.sp, color = PetTokens.Ink3,
+                    modifier = Modifier.width(44.dp),
+                )
+                Column(Modifier.weight(1f)) {
+                    Text(row.label, fontSize = 13.5.sp, fontWeight = FontWeight(650), color = PetTokens.Ink)
+                    if (row.detail.isNotEmpty()) {
+                        Spacer(Modifier.height(2.dp))
+                        Text(row.detail, fontSize = 11.sp, color = PetTokens.Ink3, maxLines = 2)
+                    }
+                }
+                Spacer(Modifier.width(8.dp))
+                when (row.tone) {
+                    VerdictTone.CONFIRMED -> PetChip(row.chip, PetTokens.GreenSoft, PetTokens.GreenInk)
+                    VerdictTone.PENDING -> PetChip(row.chip, PetTokens.AmberSoft, PetTokens.AmberInk)
+                    VerdictTone.UNKNOWN -> PetChip(row.chip, PetTokens.GraySoft, PetTokens.Ink2)
+                }
+            }
+        }
     }
 }
 

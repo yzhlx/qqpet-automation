@@ -228,6 +228,23 @@ data class LogEntry(
     }
 }
 
+/** One row of `files/pet-events/<sessionId>.jsonl` (OBS-05), reduced to scalars. */
+data class JournalEvent(val wallTimeMs: Long, val kind: String, val payload: Map<String, String>) {
+    companion object {
+        fun parse(line: String): JournalEvent? = runCatching {
+            val o = JSONObject(line)
+            val kind = o.optString("kind").takeIf { it.isNotEmpty() } ?: return@runCatching null
+            val source = o.optJSONObject("payload")
+            val fields = linkedMapOf<String, String>()
+            source?.keys()?.forEach { key ->
+                val value = source.opt(key)
+                if (value != null && value != JSONObject.NULL) fields[key] = value.toString()
+            }
+            JournalEvent(o.optLong("wallTimeMs"), kind, fields)
+        }.getOrNull()
+    }
+}
+
 /**
  * Reads evidence off disk. All calls are cheap, synchronous file reads; call them from a background
  * dispatcher (the screens use `withContext(Dispatchers.IO)`).
@@ -314,6 +331,44 @@ class PetEvidenceRepository(private val context: Context) {
         val day = dayKey(nowMs)
         return sessionDirectories().map { read(it) }
             .filter { ev -> ev.record?.startedAtMs?.let { dayKey(it) == day } ?: false }
+    }
+
+    /**
+     * OBS-05：今天会话的持久事件，按时间正序。
+     *
+     * 只读 `pet-events/<sessionId>.jsonl`，sessionId 来自同一目录的 run-record 或 runtime-state；
+     * 找不到就不读，绝不用目录名猜一个会话。事件时间取自日志里的 wallTimeMs。
+     */
+    fun todayJournalEvents(nowMs: Long = System.currentTimeMillis()): List<JournalEvent> {
+        val day = dayKey(nowMs)
+        return sessionDirectories(limit = Int.MAX_VALUE).asSequence()
+            .filter { dir ->
+                val started = File(dir, "run-record.json").takeIf { it.isFile }
+                    ?.let { runCatching { SessionRunRecord.parse(it.readText()) }.getOrNull() }?.startedAtMs
+                    ?: dir.name.toLongOrNull()
+                started != null && dayKey(started) == day
+            }
+            .mapNotNull { dir -> sessionIdOf(dir) }
+            .distinct()
+            .flatMap { id ->
+                val file = File(eventsDir, id + ".jsonl")
+                if (!file.isFile) emptySequence()
+                else runCatching { file.readLines() }.getOrDefault(emptyList()).asSequence()
+            }
+            .mapNotNull { JournalEvent.parse(it) }
+            .filter { it.wallTimeMs > 0 }
+            .sortedBy { it.wallTimeMs }
+            .toList()
+    }
+
+    private fun sessionIdOf(dir: File): String? {
+        for (name in listOf("run-record.json", "runtime-state.json")) {
+            val file = File(dir, name)
+            if (!file.isFile) continue
+            val id = runCatching { JSONObject(file.readText()).optString("sessionId") }.getOrNull()
+            if (!id.isNullOrEmpty() && id != "null") return id
+        }
+        return null
     }
 
     /** Tail of `files/pet_mvp.log`, newest last, parsed defensively. */

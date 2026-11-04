@@ -1,13 +1,17 @@
 package com.ynk.virtualdisplay
 
 import com.ynk.virtualdisplay.automation.StudyAttributeFact
+import com.ynk.virtualdisplay.ui.data.JournalEvent
+import com.ynk.virtualdisplay.ui.data.SessionEvidence
 import com.ynk.virtualdisplay.ui.data.SessionRunRecord
 import com.ynk.virtualdisplay.ui.records.RecordsPresentation
 import com.ynk.virtualdisplay.ui.records.RecordsSummary
+import com.ynk.virtualdisplay.ui.records.TimelinePresentation
 import com.ynk.virtualdisplay.ui.records.VerdictTone
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
+import java.io.File
 
 /** STR-09：每个属性的变化在记录里如实显示，读不到就说读不到。 */
 class RecordsPresentationTest {
@@ -73,6 +77,40 @@ class RecordsPresentationTest {
         assertEquals("学习 2 节 · 打工 1 班 · 签到 1 次 · 运行 45 分钟",
             RecordsPresentation.dailyLine(listOf(day(courses = 2, work = 1, signIn = 1, minutes = 45))))
         assertEquals("福袋 1 个", RecordsPresentation.dailyLine(listOf(day(luckyBag = 1))))
+    }
+
+
+    /** OBS-05：今天的事件按时间倒序，只显示能解释的事件，未知类型不编造。 */
+    private fun sessionWith(record: SessionRunRecord) =
+        SessionEvidence(File("."), record, emptyList(), emptyList(), null)
+
+    @Test fun timelineListsKnownEventsNewestFirst() {
+        val events = listOf(
+            JournalEvent(3_000L, "LEARNING_CONFIRMED", mapOf("round" to "1")),
+            JournalEvent(1_000L, "COURSE_STARTED", mapOf(
+                "round" to "1", "course" to "study:蹦蹦跳跳体能课", "durationMinutes" to "10")),
+            JournalEvent(2_000L, "ERROR", mapOf("reason" to "PAGE_MISMATCH")),
+            JournalEvent(4_000L, "FRAME_VALID", emptyMap()),
+        )
+        val rows = TimelinePresentation.rows(emptyList(), events, timeFormatter = { "$it" })
+        assertEquals(listOf("学习已确认", "这一步没完成", "开始上课"), rows.map { it.label })
+        assertEquals("第 1 节", rows[0].detail)
+        assertEquals("页面对不上", rows[1].detail)
+        assertEquals("第 1 节 · 蹦蹦跳跳体能课 · 约 10 分钟", rows[2].detail)
+    }
+
+    @Test fun timelineShowsSessionStartAndStop() {
+        val rows = TimelinePresentation.rows(
+            listOf(sessionWith(record(emptyList()))), emptyList(), timeFormatter = { "$it" })
+        assertEquals(listOf("本轮结束", "开始托管"), rows.map { it.label })
+        assertEquals("已完成", rows[0].detail)
+        assertEquals("已完成", rows[0].chip)
+        assertEquals("开始", rows[1].chip)
+        assertEquals(VerdictTone.CONFIRMED, rows[0].tone)
+    }
+
+    @Test fun aDayWithoutEventsHasNoTimeline() {
+        assertEquals(0, TimelinePresentation.rows(emptyList(), emptyList(), timeFormatter = { "$it" }).size)
     }
 
     @Test fun aYesterdayWithoutRecordsHasNoLine() {
