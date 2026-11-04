@@ -34,6 +34,7 @@ class EnvironmentDiagnosticTest {
         var createDisplaySucceeds: Boolean = true
         var releasedDisplayId: Int? = null
         var captureSucceeds: Boolean = true
+        var captureFailureMessage: String = "CAPTURE_FAILED"
         var hostingPackages: Set<Int> = setOf(88)
 
         override fun isShizukuAvailable(): Boolean = available
@@ -63,7 +64,7 @@ class EnvironmentDiagnosticTest {
                 val mockBitmap = allocateDummyBitmap()
                 Result.success(ActiveCapturedFrame(mockBitmap, displayId, 1024, 10, 10, "test", 0))
             } else {
-                Result.failure(IllegalStateException("CAPTURE_FAILED"))
+                Result.failure(IllegalStateException(captureFailureMessage))
             }
         }
 
@@ -206,6 +207,32 @@ class EnvironmentDiagnosticTest {
         assertEquals(repo.createdDisplayId, repo.releasedDisplayId)
         val captureItem = report.items.first { it.title == "后台画面捕获能力" }
         assertFalse(captureItem.passed)
+    }
+
+    @Test
+    fun blackFrameOnEmptyTestDisplayIsUnknownNotFailure() = runBlocking {
+        // 空测试屏没有内容，screencap 出来必然全黑。这不能证明设备不能捕获，
+        // 也不能当作成功：必须显示「待核对」，开始托管后会用真实画面复检。
+        val repo = FakeDiagnosticRepo().apply {
+            captureSucceeds = false
+            captureFailureMessage = "CAPTURE_INVALID_BLACK_FRAME"
+        }
+        val cache = InMemoryCapabilityCache()
+        val diag = EnvironmentDiagnostic(
+            packageInstalled = { true },
+            repository = repo,
+            capabilityCache = cache,
+        )
+
+        val report = diag.runCheck(ShizukuState.Ready)
+
+        val captureItem = report.items.first { it.title == "后台画面捕获能力" }
+        assertFalse(captureItem.passed)
+        assertTrue("黑帧是未知，不是失败", captureItem.unknown)
+        assertNull("未知项不给出误导性的失败修复建议", captureItem.remedy)
+        assertFalse(report.isReadyForAutomation)
+        assertNull("未知项不是阻断项，不能拦住托管", report.firstBlocker?.takeIf { it.title == "后台画面捕获能力" })
+        assertNull("黑帧不能留下「上次已通过」缓存", cache.entry)
     }
 
     @Test

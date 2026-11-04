@@ -182,6 +182,7 @@ class EnvironmentDiagnostic(
                     var testDisplayId: Int? = null
                     var displayCreated = false
                     var captureOk = false
+                    var captureBlackFrame = false
                     try {
                         // 自有虚拟屏测试创建
                         val createResult = repository.createDisplay("crab_diag_test", 720, 1280, 320)
@@ -193,6 +194,10 @@ class EnvironmentDiagnostic(
                             val captureResult = repository.captureDisplay(testDisplayId)
                             val frame = captureResult.getOrNull()
                             captureOk = frame != null && frame.byteCount > 0
+                            // 空测试屏没有渲染内容，screencap 出来必然是全黑帧。黑帧说明「截屏链路
+                            // 走通了、但没有内容可截」，不能据此判设备不能捕获，也不能冒充成功。
+                            captureBlackFrame = !captureOk &&
+                                captureResult.exceptionOrNull()?.message?.contains("INVALID_BLACK_FRAME") == true
                         }
                     } catch (_: Exception) {
                         // 仅记录状态，不崩溃
@@ -231,8 +236,13 @@ class EnvironmentDiagnostic(
                             level = DiagnosticLevel.CAPABILITY,
                             title = "后台画面捕获能力",
                             passed = captureOk,
-                            message = if (captureOk) "画面传输与帧捕获正常" else "无法读取后台显示器画面",
-                            remedy = if (!captureOk) "请检查 Shizuku 权限与系统多显示器支持" else null,
+                            message = when {
+                                captureOk -> "画面传输与帧捕获正常"
+                                captureBlackFrame -> "截屏链路已走通，但自检测试屏没有内容（全黑帧），无法据此判定；开始托管后会用真实画面复检"
+                                else -> "无法读取后台显示器画面"
+                            },
+                            remedy = if (!captureOk && !captureBlackFrame) "请检查 Shizuku 权限与系统多显示器支持" else null,
+                            unknown = captureBlackFrame,
                         )
                     )
                 }
