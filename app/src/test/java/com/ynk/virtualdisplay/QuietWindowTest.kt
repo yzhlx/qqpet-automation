@@ -4,9 +4,11 @@ import com.ynk.virtualdisplay.automation.QuietWindow
 import com.ynk.virtualdisplay.automation.QuietWindowPolicy
 import com.ynk.virtualdisplay.automation.SessionMode
 import com.ynk.virtualdisplay.automation.SessionStartGate
+import com.ynk.virtualdisplay.ui.screens.QuietWindowPresentation
 import java.time.LocalTime
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -89,5 +91,34 @@ class QuietWindowTest {
             failed = true
         }
         assertTrue(failed)
+    }
+
+    /** 主页要能直接看到「今晚不托管」，不用进设置里找。 */
+    @Test fun theHomeLineSaysWhenThePauseEnds() {
+        assertEquals("夜间暂停中 · 到第二天 07:00 再开始",
+            QuietWindowPresentation.statusLine(night, 23 * 60 + 30))
+        assertEquals("夜间暂停中 · 到第二天 07:00 再开始",
+            QuietWindowPresentation.statusLine(night, 0))
+    }
+
+    @Test fun theHomeLineAlsoTellsTheUserItCanStartNow() {
+        assertEquals("夜间暂停 23:00–07:00 · 现在可以开始",
+            QuietWindowPresentation.statusLine(night, 12 * 60))
+        assertFalse(QuietWindowPresentation.isQuietNow(night, 12 * 60))
+    }
+
+    /** 没有窗口就不占一行；起止相同也不是窗口，别让主页多出一句废话。 */
+    @Test fun thereIsNoLineWhenThereIsNoWindow() {
+        assertNull(QuietWindowPresentation.statusLine(night.copy(enabled = false), 23 * 60))
+        assertNull(QuietWindowPresentation.statusLine(
+            QuietWindow(enabled = true, startMinute = 60, endMinute = 60), 60))
+    }
+
+    /** 当天内的窗口不能写「第二天」——那句话只在跨零点时成立。 */
+    @Test fun aDaytimeWindowDoesNotMentionTheSecondDay() {
+        assertEquals("夜间暂停中 · 到 05:00 再开始",
+            QuietWindowPresentation.statusLine(daytime, 3 * 60))
+        assertEquals("夜间暂停 01:00–05:00 · 现在可以开始",
+            QuietWindowPresentation.statusLine(daytime, 12 * 60))
     }
 }

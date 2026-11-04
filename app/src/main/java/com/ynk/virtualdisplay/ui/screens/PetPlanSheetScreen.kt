@@ -57,6 +57,7 @@ import com.ynk.virtualdisplay.automation.PetAutomationService
 import com.ynk.virtualdisplay.automation.PendingAction
 import com.ynk.virtualdisplay.automation.PendingActionGuard
 import com.ynk.virtualdisplay.automation.PetRuntime
+import com.ynk.virtualdisplay.automation.QuietWindowStore
 import com.ynk.virtualdisplay.automation.PlanStep
 import com.ynk.virtualdisplay.automation.PlanStepType
 import com.ynk.virtualdisplay.automation.AdventureStep
@@ -296,6 +297,17 @@ fun PetPlanSheetScreen(onClose: () -> Unit, onStarted: () -> Unit, displayId: In
                 if (runAfterSave) {
                     val target = displayId?.takeIf { it > 0 } ?: error("请先选择虚拟屏")
                     check(!PetRuntime.state.value.running) { "已有任务正在运行，请先停止或等待完成" }
+                    // 保存并运行也先过同一条开始判定：待确认动作、夜间暂停不能绕过。
+                    val blocked = SessionStartBlockPolicy.evaluate(
+                        budget = { DailyBudgetStore(context) },
+                        quietWindow = { QuietWindowStore(context).load() },
+                        now = { java.time.LocalTime.now() },
+                        plan = lastSavedSnapshot,
+                    )
+                    if (blocked is SessionStartBlockPolicy.Decision.Refused) {
+                        saveError = blocked.message
+                        return@launch
+                    }
                     val intent = SessionStartRequest.forPlan(lastSavedSnapshot ?: error("方案尚未保存"),
                         target, UUID.randomUUID().toString())
                     ContextCompat.startForegroundService(context, intent)

@@ -1,6 +1,7 @@
 package com.ynk.virtualdisplay.automation
 
 import android.content.Context
+
 import java.time.LocalTime
 
 /**
@@ -61,6 +62,15 @@ object QuietWindowPolicy {
 }
 
 /**
+ * 提示句里「什么时候可以开始」那一半：跨零点的窗口说「第二天」，当天内的窗口直接写时刻。
+ * 开始前的拒绝提示和主页状态行共用这一句，免得两处各写一套说法。
+ */
+object QuietWindowText {
+    fun opensAt(window: QuietWindow): String =
+        if (window.spansMidnight()) "到第二天 " + window.endText() else "到 " + window.endText()
+}
+
+/**
  * 落盘用 SharedPreferences：只有一个开关和两个整数，没有需要原子提交的理由。
  * 读到的分钟数一律夹到合法范围，坏值不能让 App 起不来。
  */
@@ -109,7 +119,7 @@ object SessionStartGate {
         // 健康检查只读不动作，用户明确点了就照做。
         if (mode == SessionMode.HEALTH_CHECK) return Decision.Proceed
         if (!QuietWindowPolicy.isQuiet(nowMinute, window)) return Decision.Proceed
-        val until = if (window.spansMidnight()) "到第二天 " + window.endText() else "到 " + window.endText()
-        return Decision.Refused("现在是夜间暂停时段（" + window.startText() + "–" + window.endText() + "），" + until + "再开始托管。")
+        return Decision.Refused("现在是夜间暂停时段（" + window.startText() + "–" + window.endText() + "），" +
+            QuietWindowText.opensAt(window) + "再开始托管。")
     }
 }

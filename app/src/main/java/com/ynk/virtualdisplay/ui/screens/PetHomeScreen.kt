@@ -52,6 +52,9 @@ import com.ynk.virtualdisplay.automation.PetManagedRuntime
 import com.ynk.virtualdisplay.automation.PetProfile
 import com.ynk.virtualdisplay.automation.PetRuntime
 import com.ynk.virtualdisplay.automation.PlanV2
+import com.ynk.virtualdisplay.automation.QuietWindow
+import com.ynk.virtualdisplay.automation.QuietWindowPolicy
+import com.ynk.virtualdisplay.automation.QuietWindowStore
 import com.ynk.virtualdisplay.automation.AdventureStep
 import com.ynk.virtualdisplay.automation.SignInStep
 import com.ynk.virtualdisplay.automation.MailboxStep
@@ -96,6 +99,7 @@ import com.ynk.virtualdisplay.ui.theme.PetTokens
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
+import java.time.LocalTime
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -147,10 +151,21 @@ fun PetHomeScreen(
     var budgetUsed by remember { mutableStateOf(0) }
     /** 中断后结果未知的动作数量：有就提示用户先确认，避免重复扣费。 */
     var pendingCount by remember { mutableStateOf(0) }
+    /** STR-17：主页直接显示夜间暂停状态，不用进设置里查。 */
+    var quietWindow by remember { mutableStateOf(QuietWindow()) }
+    var quietMinute by remember { mutableStateOf(QuietWindowPolicy.nowMinute(LocalTime.now())) }
     // The saved plan decides the batch: course, round count, thresholds and budget. It replaces the
     // old in-memory 1/3/10 selector, which reset every time the screen was left.
     var plan by remember { mutableStateOf(SessionPlan()) }
     var catalogFresh by remember { mutableStateOf(false) }
+
+    // 这行字只随时钟变：30 秒刷新一次，窗口到点不用重启 App 才更新。
+    LaunchedEffect(Unit) {
+        while (true) {
+            quietMinute = QuietWindowPolicy.nowMinute(LocalTime.now())
+            delay(30_000L)
+        }
+    }
 
     LaunchedEffect(runtime.running, managed.sessionId) {
         suspend fun reload() = withContext(Dispatchers.IO) {
@@ -158,6 +173,7 @@ fun PetHomeScreen(
             logRows = PetLogPresentation.timeline(repo.logEntries(limit = 600))
             budgetUsed = DailyBudgetStore(context).usedMinutes()
             pendingCount = PendingActionGuard.pendingActions(DailyBudgetStore(context).attempts()).size
+            quietWindow = QuietWindowStore(context).load()
             plan = SessionPlanStore(context).load()
             planV2 = runCatching { PlanV2Store(context).load() }.getOrNull()
             val catalog = CourseCatalogStore(context).load()
@@ -314,6 +330,18 @@ fun PetHomeScreen(
                         PetChevron()
                     }
                 }
+                QuietWindowPresentation.statusLine(quietWindow, quietMinute)?.let { line ->
+                    val quietNow = QuietWindowPresentation.isQuietNow(quietWindow, quietMinute)
+                    Row(
+                        Modifier.fillMaxWidth().padding(horizontal = 4.dp).padding(bottom = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        PetDot(if (quietNow) PetTokens.AmberInk else PetTokens.Ink3)
+                        Spacer(Modifier.width(5.dp))
+                        Text(line, fontSize = 12.5.sp,
+                            color = if (quietNow) PetTokens.AmberInk else PetTokens.Ink2)
+                    }
+                }
                 Row(
                     Modifier.fillMaxWidth().clickable { onOpenPlanSheet() }
                         .padding(horizontal = 4.dp).padding(bottom = 8.dp),
@@ -325,18 +353,32 @@ fun PetHomeScreen(
                     PetChevron()
                 }
                 StartManagedButton(planReady) {
-                    val displayId = readyDisplay?.id ?: return@StartManagedButton
-                    val saved = planV2
-                    if (saved != null) {
-                        ContextCompat.startForegroundService(
-                            context, SessionStartRequest.forPlan(saved, displayId, UUID.randomUUID().toString()),
-                        )
-                    } else {
-                        ContextCompat.startForegroundService(context, PetAutomationService.startIntent(
-                            context, displayId,
-                            SessionStartRequest.plannedRounds(SessionMode.FULL, SessionStartRequest.sanitize(plan.rounds)),
-                            SessionMode.FULL,
-                        ))
+                    // 后台的「开始」和服务自己守同一套闸门：待确认动作、夜间暂停，一个都不能漏。
+                    when (val blocked = SessionStartBlockPolicy.evaluate(
+                        budget = { DailyBudgetStore(context) },
+                        quietWindow = { quietWindow },
+                        now = { LocalTime.now() },
+                        plan = planV2,
+                    )) {
+                        is SessionStartBlockPolicy.Decision.Refused -> {
+                            android.widget.Toast.makeText(context, blocked.message,
+                                android.widget.Toast.LENGTH_LONG).show()
+                        }
+                        SessionStartBlockPolicy.Decision.Proceed -> {
+                            val displayId = readyDisplay?.id ?: return@StartManagedButton
+                            val saved = planV2
+                            if (saved != null) {
+                                ContextCompat.startForegroundService(
+                                    context, SessionStartRequest.forPlan(saved, displayId, UUID.randomUUID().toString()),
+                                )
+                            } else {
+                                ContextCompat.startForegroundService(context, PetAutomationService.startIntent(
+                                    context, displayId,
+                                    SessionStartRequest.plannedRounds(SessionMode.FULL, SessionStartRequest.sanitize(plan.rounds)),
+                                    SessionMode.FULL,
+                                ))
+                            }
+                        }
                     }
                 }
             } else {

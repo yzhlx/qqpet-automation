@@ -5,6 +5,9 @@ import com.ynk.virtualdisplay.automation.ManualPause
 import com.ynk.virtualdisplay.automation.ManualPauseState
 import com.ynk.virtualdisplay.automation.ObservedValue
 import com.ynk.virtualdisplay.automation.SessionRunState
+import com.ynk.virtualdisplay.automation.QuietWindow
+import com.ynk.virtualdisplay.automation.QuietWindowPolicy
+import com.ynk.virtualdisplay.automation.QuietWindowText
 import com.ynk.virtualdisplay.automation.at
 
 /**
@@ -250,3 +253,23 @@ data class LastRunSummary(
     val minutes: Int,
     val screenshots: Int,
 )
+
+/**
+ * STR-17：夜间暂停在主页上的那一行字。
+ *
+ * 只在真的设置了窗口时出现；窗口外也保留一行，让用户知道「现在为什么能开始」，
+ * 不必进设置去猜。判定复用 [QuietWindowPolicy]，这里只负责措辞。
+ */
+object QuietWindowPresentation {
+    fun statusLine(window: QuietWindow, nowMinute: Int): String? {
+        if (!window.enabled || window.startMinute == window.endMinute) return null
+        return if (QuietWindowPolicy.isQuiet(nowMinute, window)) {
+            "夜间暂停中 · " + QuietWindowText.opensAt(window) + " 再开始"
+        } else {
+            "夜间暂停 " + window.startText() + "–" + window.endText() + " · 现在可以开始"
+        }
+    }
+
+    fun isQuietNow(window: QuietWindow, nowMinute: Int): Boolean =
+        QuietWindowPolicy.isQuiet(nowMinute, window)
+}

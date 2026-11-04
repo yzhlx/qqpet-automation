@@ -15,6 +15,7 @@ import android.os.PowerManager
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import com.ynk.virtualdisplay.MyApplication
+import com.ynk.virtualdisplay.ui.main.MainActivity
 import com.ynk.virtualdisplay.floating.PetCapsuleOverlay
 import com.ynk.virtualdisplay.R
 import com.ynk.virtualdisplay.data.repository.ConnectionStatus
@@ -971,6 +972,13 @@ class PetAutomationService : Service() {
     }
 
     private fun notification(text: String): Notification {
+        // 点通知回到 App：停止后的失败提示不能只是一句话，得有一个能走下去的入口。
+        val open = PendingIntent.getActivity(
+            this, 1,
+            Intent(this, MainActivity::class.java)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP),
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
         val stop = PendingIntent.getService(
             this, 2,
             Intent(this, PetAutomationService::class.java).setAction(ACTION_STOP),
@@ -981,6 +989,7 @@ class PetAutomationService : Service() {
             .setContentTitle("蟹啦")
             .setContentText(text)
             .setOngoing(true)
+            .setContentIntent(open)
             .apply {
                 ManualPause.actionLabel(PetRuntime.state.value.running,
                     PetManagedRuntime.state.value.pauseBoundariesLeft, ManualPause.state.value)?.let { label ->
