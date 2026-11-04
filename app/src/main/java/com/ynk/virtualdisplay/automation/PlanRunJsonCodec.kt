@@ -9,7 +9,8 @@ internal object PlanRunJsonCodec {
     private fun plan(p: PlanV2): Map<String, Any?> = obj(
         "schemaVersion" to p.schemaVersion, "planId" to p.planId, "name" to p.name,
         "dailyBudgetMinutes" to p.dailyBudgetMinutes, "executionProfile" to p.executionProfile.name,
-        "legacySource" to p.legacySource, "steps" to p.steps.map { s ->
+        "legacySource" to p.legacySource, "minCoinFloor" to p.minCoinFloor, "maxDailyNetSpend" to p.maxDailyNetSpend,
+        "steps" to p.steps.map { s ->
             val fields = obj("stepId" to s.stepId, "type" to s.type.name)
             when (s) {
                 is WorkStep -> fields.putAll(obj("workOptionId" to s.workOptionId, "trigger" to s.trigger.name, "shifts" to s.shifts))
@@ -65,7 +66,9 @@ internal object PlanRunJsonCodec {
                     PlanStepType.STUDY -> StudyStep(id, step.string("courseId"), step.int("rounds"))
                     PlanStepType.ADVENTURE -> AdventureStep(id, if (step.containsKey("mode")) enumValueOf<AdventureMode>(step.string("mode")) else AdventureMode.NEARBY_WALK, step.int("rounds"), if (step.containsKey("maxDailyRounds")) step.nullInt("maxDailyRounds") else null)
                 }
-            }, enumValueOf(p.string("executionProfile")), p.nullString("legacySource"))
+            }, enumValueOf(p.string("executionProfile")), p.nullString("legacySource"),
+            if (p.containsKey("minCoinFloor")) p.nullInt("minCoinFloor") else null,
+            if (p.containsKey("maxDailyNetSpend")) p.nullInt("maxDailyNetSpend") else null)
         val request = RunRequest(r.string("requestId"), plan, r.string("deviceSerial"), r.int("displayId"),
             enumValueOf(r.string("origin")), r.long("createdAtMs"))
         val counts = s.value("counts").objectValue()

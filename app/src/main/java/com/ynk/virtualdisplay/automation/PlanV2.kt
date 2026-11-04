@@ -110,6 +110,10 @@ class PlanV2(
     steps: List<PlanStep>,
     val executionProfile: ExecutionProfile = ExecutionProfile.SELECTED_ACTIONS,
     val legacySource: String? = null,
+    /** 金币底线：学习扣费后余额不得低于该值；null 表示不启用 (STR-13)。 */
+    val minCoinFloor: Int? = null,
+    /** 每日学习净支出上限（金币）；null 表示不启用 (STR-13)。 */
+    val maxDailyNetSpend: Int? = null,
 ) {
     val steps: List<PlanStep> = Collections.unmodifiableList(steps.toList())
 
@@ -129,6 +133,8 @@ class PlanV2(
                 "PLAN_CONDITIONAL_WORK_REQUIRES_STUDY"
             }
         }
+        if (minCoinFloor != null) require(minCoinFloor in 0..999_999) { "PLAN_MIN_COIN_FLOOR_OUT_OF_RANGE:$minCoinFloor" }
+        if (maxDailyNetSpend != null) require(maxDailyNetSpend in 1..999_999) { "PLAN_MAX_DAILY_NET_SPEND_OUT_OF_RANGE:$maxDailyNetSpend" }
     }
 
     fun copy(
@@ -139,12 +145,16 @@ class PlanV2(
         steps: List<PlanStep> = this.steps,
         executionProfile: ExecutionProfile = this.executionProfile,
         legacySource: String? = this.legacySource,
-    ) = PlanV2(schemaVersion, planId, name, dailyBudgetMinutes, steps, executionProfile, legacySource)
+        minCoinFloor: Int? = this.minCoinFloor,
+        maxDailyNetSpend: Int? = this.maxDailyNetSpend,
+    ) = PlanV2(schemaVersion, planId, name, dailyBudgetMinutes, steps, executionProfile, legacySource,
+        minCoinFloor, maxDailyNetSpend)
 
     override fun equals(other: Any?): Boolean = other is PlanV2 &&
         schemaVersion == other.schemaVersion && planId == other.planId && name == other.name &&
         dailyBudgetMinutes == other.dailyBudgetMinutes && steps == other.steps &&
-        executionProfile == other.executionProfile && legacySource == other.legacySource
+        executionProfile == other.executionProfile && legacySource == other.legacySource &&
+        minCoinFloor == other.minCoinFloor && maxDailyNetSpend == other.maxDailyNetSpend
 
     override fun hashCode(): Int {
         var result = schemaVersion
@@ -153,7 +163,9 @@ class PlanV2(
         result = 31 * result + dailyBudgetMinutes
         result = 31 * result + steps.hashCode()
         result = 31 * result + executionProfile.hashCode()
-        return 31 * result + (legacySource?.hashCode() ?: 0)
+        result = 31 * result + (legacySource?.hashCode() ?: 0)
+        result = 31 * result + (minCoinFloor ?: 0)
+        return 31 * result + (maxDailyNetSpend ?: 0)
     }
 
     override fun toString(): String = "PlanV2(planId=$planId, name=$name, steps=$steps, executionProfile=$executionProfile)"

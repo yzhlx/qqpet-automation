@@ -277,3 +277,16 @@
   - 真机安装：通过 ADB 成功覆盖安装至真机 DKS9K23420020242（Success）。
 - 提交与推送：提交 feat(daily): 增加福袋任务、每日上限控制与失败安全跳过 (SOC-05)，推送到远端 backup/feat/onboarding-troubleshooting-p0，更新 PR #4。
 - 下一步：实现第二阶段剩余的每日完成次数及收益记录汇总呈现（OBS-03~06），或进入第三阶段任务目标策略排班（STR-01~05）。
+
+## 金币底线与每日学习花费上限（2026-11-03，feat/onboarding-troubleshooting-p0）
+- 目标：STR-13（用户自定最低金币余额与每日学习净支出上限），并覆盖 STR-05 中「学费/金币不足」资源分支的剩余缺口。
+- 改动：
+  - PlanV2 顶层新增 minCoinFloor、maxDailyNetSpend（可空，null=关闭；默认关闭不启用），含取值校验、copy/equals/hashCode 同步。
+  - PlanV2JsonCodec 与 PlanRunJsonCodec 双路编解码：字段缺省读回 null，关闭时不写入 JSON。
+  - CoinSpendPolicy（新增，纯函数 JVM 可测）：余额-总学费低于底线 → COIN_FLOOR_BREACH；今日已确认花费+本次方案学费超过上限 → COIN_SPEND_DAILY_CAP_EXCEEDED。
+  - PetSessionController：ResourcePreflightPort 内学习步骤执行前接入 CoinSpendPolicy，命中即 ResourcePreflight.Insufficient（安全停止，不去扣费）；computeConfirmedNetSpendToday 仅从当日已确认 run-record（roomCoinsBefore/After 都已读出）求和，未知记录按 0 处理，不把未知当成功。
+  - PetPlanSheetScreen：学习开启时展示「金币保护（STR-13）」卡片，金币底线/每日花费上限各自带 Switch（默认关）+ 数值参数行，沿用既有 Switch 风格。
+  - 单元测试：新增 CoinSpendPolicyTest（6 项），PlanV2StoreTest 增加字段往返与省略校验。
+- 验证结果：全量单元测试 97 套件 / 931 项 100% PASS（0 failures, 0 errors, 3 skipped）；assembleDebug 构建通过（APK 约 45.8MB）；ADB 覆盖安装 DKS9K23420020242 成功。
+- 提交与推送：feat(plan): 金币底线与每日学习花费上限门禁 (STR-13)，推送 backup/feat/onboarding-troubleshooting-p0，更新 PR #4。
+- 下一步：第三阶段 STR-15 任务间隔与冷却（失败后合理冷却、不高频空转），或 STR-16 策略解释（展示本轮选择/排除原因）。

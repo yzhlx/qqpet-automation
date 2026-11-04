@@ -17,6 +17,8 @@ object PlanV2JsonCodec {
             "dailyBudgetMinutes" to plan.dailyBudgetMinutes, "executionProfile" to plan.executionProfile.name,
         )
         plan.legacySource?.let { root["legacySource"] = it }
+        plan.minCoinFloor?.let { root["minCoinFloor"] = it }
+        plan.maxDailyNetSpend?.let { root["maxDailyNetSpend"] = it }
         root["steps"] = plan.steps.map { step ->
             linkedMapOf<String, Any?>("stepId" to step.stepId, "type" to step.type.name).apply {
                 when (step) {
@@ -47,7 +49,7 @@ object PlanV2JsonCodec {
     fun decode(text: String): PlanV2 {
         require(text.length <= MAX_DOCUMENT_SIZE) { "PLAN_JSON_TOO_LARGE" }
         val root = Json.parse(text).objectValue()
-        root.only("schemaVersion", "planId", "name", "dailyBudgetMinutes", "executionProfile", "legacySource", "steps")
+        root.only("schemaVersion", "planId", "name", "dailyBudgetMinutes", "executionProfile", "legacySource", "steps", "minCoinFloor", "maxDailyNetSpend")
         require(root.int("schemaVersion") == 2) { "PLAN_SCHEMA_UNSUPPORTED" }
         val steps = root.list("steps").map { item ->
             val step = item.objectValue()
@@ -87,8 +89,11 @@ object PlanV2JsonCodec {
                 }
             }
         }
+        val minCoinFloor = if (root.containsKey("minCoinFloor")) root.int("minCoinFloor") else null
+        val maxDailyNetSpend = if (root.containsKey("maxDailyNetSpend")) root.int("maxDailyNetSpend") else null
         return PlanV2(2, root.string("planId"), root.string("name"), root.int("dailyBudgetMinutes"), steps,
-            enumValueOf(root.string("executionProfile")), root.optionalString("legacySource"))
+            enumValueOf(root.string("executionProfile")), root.optionalString("legacySource"),
+            minCoinFloor, maxDailyNetSpend)
     }
 
     @Suppress("UNCHECKED_CAST")

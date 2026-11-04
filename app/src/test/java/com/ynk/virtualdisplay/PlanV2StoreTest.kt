@@ -172,6 +172,26 @@ class PlanV2StoreTest {
         assertEquals(expected, PlanV2Store(file).load())
     }
 
+    @Test fun coinFloorAndSpendCapRoundtrip() {
+        val file = File(temporary.root, PlanV2Store.FILE_NAME)
+        val base = plan()
+        val withGates = base.copy(minCoinFloor = 150, maxDailyNetSpend = 800)
+        PlanV2Store(file).save(withGates)
+        val loaded = PlanV2Store(file).load()
+        assertNotNull(loaded)
+        assertEquals(150, loaded!!.minCoinFloor)
+        assertEquals(800, loaded.maxDailyNetSpend)
+
+        // 关闭后字段从 JSON 中省略，读回为 null（默认不启用）。
+        val off = withGates.copy(minCoinFloor = null, maxDailyNetSpend = null)
+        PlanV2Store(file).save(off)
+        val loadedOff = PlanV2Store(file).load()
+        assertNull(loadedOff!!.minCoinFloor)
+        assertNull(loadedOff.maxDailyNetSpend)
+        assertFalse(PlanV2JsonCodec.encode(off).contains("minCoinFloor"))
+        assertFalse(PlanV2JsonCodec.encode(off).contains("maxDailyNetSpend"))
+    }
+
     @Test fun luckyBagStepRoundtripsWithLimitsAndInterval() {
         val file = File(temporary.root, PlanV2Store.FILE_NAME)
         val p = plan(listOf(LuckyBagStep("lb-1", 10, 45)))

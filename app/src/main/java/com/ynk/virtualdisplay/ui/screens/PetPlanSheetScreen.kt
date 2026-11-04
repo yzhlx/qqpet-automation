@@ -103,6 +103,10 @@ fun PetPlanSheetScreen(onClose: () -> Unit, onStarted: () -> Unit, displayId: In
     var selectedLuckyBag by remember { mutableStateOf(false) }
     var luckyBagMaxDaily by remember { mutableStateOf(5) }
     var luckyBagIntervalMinutes by remember { mutableStateOf(30) }
+    var coinFloorEnabled by remember { mutableStateOf(false) }
+    var coinFloorValue by remember { mutableStateOf(100) }
+    var dailySpendCapEnabled by remember { mutableStateOf(false) }
+    var dailySpendCapValue by remember { mutableStateOf(500) }
     var adventureMode by remember { mutableStateOf(com.ynk.virtualdisplay.automation.AdventureMode.NEARBY_WALK) }
     var adventureRounds by remember { mutableStateOf(1) }
     var adventureMaxDaily by remember { mutableStateOf(5) }
@@ -144,6 +148,10 @@ fun PetPlanSheetScreen(onClose: () -> Unit, onStarted: () -> Unit, displayId: In
                 luckyBagMaxDaily = luckyBag.maxDailyCount
                 luckyBagIntervalMinutes = luckyBag.scanIntervalMinutes
             }
+            coinFloorEnabled = stored.minCoinFloor != null
+            coinFloorValue = stored.minCoinFloor ?: 100
+            dailySpendCapEnabled = stored.maxDailyNetSpend != null
+            dailySpendCapValue = stored.maxDailyNetSpend ?: 500
             if (adventure != null) {
                 adventureMode = adventure.mode
                 adventureRounds = adventure.rounds
@@ -204,7 +212,9 @@ fun PetPlanSheetScreen(onClose: () -> Unit, onStarted: () -> Unit, displayId: In
                     if (selectedAdventure) add(AdventureStep(stepIds[PlanStepType.ADVENTURE] ?: "$planId:adventure", adventureMode, adventureRounds, maxDailyRounds = adventureMaxDaily))
                 }
                 val snapshot = PlanV2(planId = planId, name = name, dailyBudgetMinutes = plan.dailyBudgetMinutes,
-                    steps = steps, executionProfile = ExecutionProfile.SELECTED_ACTIONS, legacySource = legacySource)
+                    steps = steps, executionProfile = ExecutionProfile.SELECTED_ACTIONS, legacySource = legacySource,
+                    minCoinFloor = if (coinFloorEnabled) coinFloorValue else null,
+                    maxDailyNetSpend = if (dailySpendCapEnabled) dailySpendCapValue else null)
                 PlanValidator.validate(snapshot, verified.map { it.id }.toSet())
                 withContext(Dispatchers.IO) { PlanV2Store(context).save(snapshot) }
                 didSave = true
@@ -408,6 +418,49 @@ fun PetPlanSheetScreen(onClose: () -> Unit, onStarted: () -> Unit, displayId: In
                     }
                     ParamRow("扫描间隔（分）", PetGlyph.Clock, luckyBagIntervalMinutes, 5..180, 5, !busy) {
                         luckyBagIntervalMinutes = it; changed()
+                    }
+                }
+                if (selectedStudy) PetCard {
+                    PetSection("金币保护（STR-13）")
+                    Spacer(Modifier.height(8.dp))
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
+                            Text("金币底线", fontSize = 14.sp, color = PetTokens.Ink)
+                            PetNote("扣完全部学费后余额低于该值则停止学习")
+                        }
+                        Switch(checked = coinFloorEnabled, enabled = !busy,
+                            onCheckedChange = { coinFloorEnabled = it; changed() },
+                            colors = SwitchDefaults.colors(
+                                checkedTrackColor = PetTokens.Blue,
+                                uncheckedTrackColor = PetTokens.GraySoft,
+                                uncheckedThumbColor = PetTokens.Chevron,
+                                uncheckedBorderColor = PetTokens.Chevron,
+                            ))
+                    }
+                    if (coinFloorEnabled) {
+                        ParamRow("底线金额", PetGlyph.Coin, coinFloorValue, 0..10000, 50, !busy) {
+                            coinFloorValue = it; changed()
+                        }
+                    }
+                    Spacer(Modifier.height(6.dp))
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
+                            Text("每日学习花费上限", fontSize = 14.sp, color = PetTokens.Ink)
+                            PetNote("今日已确认花费 + 本次方案学费超过该值则停止")
+                        }
+                        Switch(checked = dailySpendCapEnabled, enabled = !busy,
+                            onCheckedChange = { dailySpendCapEnabled = it; changed() },
+                            colors = SwitchDefaults.colors(
+                                checkedTrackColor = PetTokens.Blue,
+                                uncheckedTrackColor = PetTokens.GraySoft,
+                                uncheckedThumbColor = PetTokens.Chevron,
+                                uncheckedBorderColor = PetTokens.Chevron,
+                            ))
+                    }
+                    if (dailySpendCapEnabled) {
+                        ParamRow("上限金额", PetGlyph.Coin, dailySpendCapValue, 10..10000, 50, !busy) {
+                            dailySpendCapValue = it; changed()
+                        }
                     }
                 }
                 if (selectedCare) {

@@ -400,6 +400,21 @@ class PetSessionController(context:Context,capture:HeadlessDisplayCapture,input:
                 if(studyStep!=null && workStep==null && checkNotNull(planCourseCost).balanceCoins<tuitionReserveCoins) {
                     return@ResourcePreflightPort ResourcePreflight.Insufficient("COURSE_SUFFIX_COINS_INSUFFICIENT")
                 }
+                if(studyStep!=null) {
+                    val cost=checkNotNull(planCourseCost)
+                    val spendToday=computeConfirmedNetSpendToday()
+                    val decision=CoinSpendPolicy.evaluate(
+                        balanceCoins=cost.balanceCoins,
+                        tuitionCoins=cost.tuitionCoins,
+                        remainingRounds=studyStep.rounds,
+                        minCoinFloor=selected.minCoinFloor,
+                        maxDailyNetSpend=selected.maxDailyNetSpend,
+                        alreadySpentToday=spendToday)
+                    if(decision is CoinSpendPolicy.Decision.Rejected) {
+                        flow.emit("plan-coin-gate-rejected", result = decision.reason)
+                        return@ResourcePreflightPort ResourcePreflight.Insufficient(decision.reason)
+                    }
+                }
                 val workMinutes=if(workStep==null || planSkipWork) 0 else WorkCatalog().all()
                     .single {it.id==workStep.workOptionId}.durationMinutes
                 val studyMinutes=if(studyStep==null) 0 else Math.multiplyExact(studyStep.rounds,
@@ -720,6 +735,35 @@ class PetSessionController(context:Context,capture:HeadlessDisplayCapture,input:
     }
 
     private var lastLuckyBagCheckMs: Long = 0L
+
+    /**
+     * 今日已确认学习净支出（金币）：遍历本会话外的当日会话目录，对既有 run-record.json 求和。
+     * 只统计 terminalState 存在且 roomCoinsBefore/After 都已确认的记录；未知记录贡献 0，
+     * 避免把未知当作已花费（产品约束：未知不当作成功）。
+     */
+    private fun computeConfirmedNetSpendToday(): Int {
+        val root = evidence.parentFile ?: return 0
+        val todayKey = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US)
+            .format(java.util.Date(System.currentTimeMillis()))
+        val fmt = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US)
+        var total = 0
+        val dirs = root.listFiles { f -> f.isDirectory } ?: return 0
+        for (dir in dirs) {
+            if (dir == evidence) continue
+            val recordFile = java.io.File(dir, "run-record.json")
+            if (!recordFile.isFile) continue
+            val parsed = runCatching {
+                com.ynk.virtualdisplay.ui.data.SessionRunRecord.parse(recordFile.readText())
+            }.getOrNull() ?: continue
+            val started = parsed.startedAtMs ?: continue
+            if (fmt.format(java.util.Date(started)) != todayKey) continue
+            val before = parsed.roomCoinsBefore ?: continue
+            val after = parsed.roomCoinsAfter ?: continue
+            val delta = before - after
+            if (delta > 0) total += delta
+        }
+        return total
+    }
 
     private suspend fun runPlanLuckyBag(step: LuckyBagStep): StepOutcome {
         flow.round = 1
