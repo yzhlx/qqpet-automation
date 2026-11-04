@@ -21,6 +21,9 @@ data class ManagedRuntimeState(
     /** Boundaries between actions not yet passed, where a manual pause can still take effect. */
     val pauseBoundariesLeft:Int=0,
     val runtimeMs:Long=0,
+    /** OBS-02：本节课程在墙钟上的开始时间与页面确认的时长；两者都有才显示预计剩余。 */
+    val courseStartedAtMs:Long?=null,
+    val courseMinutes:Int?=null,
     val energy:ObservedValue<Int> = ObservedValue.Unknown("NOT_OBSERVED",0,"session not started"),
     val cleanliness:ObservedValue<Int> = ObservedValue.Unknown("NOT_OBSERVED",0,"session not started"),
     val mood:ObservedValue<Int> = ObservedValue.Unknown("NOT_OBSERVED",0,"session not started"),

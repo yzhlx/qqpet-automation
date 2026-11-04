@@ -177,6 +177,18 @@ class PetSessionController(context:Context,capture:HeadlessDisplayCapture,input:
             result="item=$item qty=$quantity unit=$unit total=$total wallet=$wallet " +
                 "tuitionReserve=$tuitionReserveCoins")
     }
+    /** OBS-02：开课已确认，记下页面上的开始时间与本节时长；只用于首页倒计时，不落盘。 */
+    private fun publishCourseWindow(course:org.json.JSONObject) {
+        val started=course.optLong("start_ts",0L)
+        val minutes=course.optInt("durationMinutes",0)
+        snapshot=snapshot.copy(courseStartedAtMs=started.takeIf {it>0},courseMinutes=minutes.takeIf {it>0})
+        publish()
+    }
+    private fun clearCourseWindow() {
+        if(snapshot.courseStartedAtMs==null && snapshot.courseMinutes==null) return
+        snapshot=snapshot.copy(courseStartedAtMs=null,courseMinutes=null)
+        publish()
+    }
     @Synchronized private fun publish() {
         val value=snapshot.at(System.currentTimeMillis(),SystemClock.elapsedRealtime())
         PetManagedRuntime.publish(value)
@@ -317,6 +329,7 @@ class PetSessionController(context:Context,capture:HeadlessDisplayCapture,input:
                 }
                 snapshot=snapshot.copy(runState=terminal,pauseReason=stopReason,
                     completedRounds=completed,pauseBoundariesLeft=0,
+                    courseStartedAtMs=null,courseMinutes=null,
                     nextStep=if(terminal==SessionRunState.COMPLETED) "批次完成" else "已安全停止")
                 publish()
                 writeRunRecord(terminal)
@@ -680,6 +693,7 @@ class PetSessionController(context:Context,capture:HeadlessDisplayCapture,input:
                 observedGain=page.attributeGain
             })
             ctx.startConfirmed(index+1)
+            publishCourseWindow(course)
             val started=course.getLong("courseStartElapsedRealtime")
             study.highFiveWindow(started,course)
             val result=study.waitResult(started,course.getInt("durationMinutes"))
@@ -687,6 +701,7 @@ class PetSessionController(context:Context,capture:HeadlessDisplayCapture,input:
                 .put("round",flow.round).put("course",course).put("result",result).toString())
             ctx.completed(index+1,course.getInt("durationMinutes"))
             check(ledger.complete(flow.round)) {"DUPLICATE_ROUND_COMPLETION"}
+            clearCourseWindow()
             lessons++
             recordStudyAttribute(lesson.attribute,observedGain)
             completed=ledger.completedCount
@@ -1166,6 +1181,7 @@ class PetSessionController(context:Context,capture:HeadlessDisplayCapture,input:
                         }
                     })
                 onCourseStarted(flow.round)
+                publishCourseWindow(course)
                 val started=course.getLong("courseStartElapsedRealtime")
                 snapshot=snapshot.copy(currentFlow="STUDY",nextStep="开课约30秒后鼓励10次")
                 study.highFiveWindow(started,course)
@@ -1176,6 +1192,7 @@ class PetSessionController(context:Context,capture:HeadlessDisplayCapture,input:
                 File(evidence,"round-${flow.round}-completion.json").writeText(JSONObject()
                     .put("round",flow.round).put("course",course).put("result",result).toString())
                 check(ledger.complete(flow.round)) {"DUPLICATE_ROUND_COMPLETION"}
+                clearCourseWindow()
                 completed=ledger.completedCount;onRoundCompleted(flow.round)
                 snapshot=snapshot.copy(completedRounds=completed,nextStep="处理成绩及升级弹窗")
                 publish()

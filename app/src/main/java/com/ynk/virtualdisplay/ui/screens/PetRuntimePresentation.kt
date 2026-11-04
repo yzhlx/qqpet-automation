@@ -75,6 +75,8 @@ data class ManagedRuntimeView(
     val roundText: String,
     val completedText: String,
     val durationText: String,
+    /** OBS-02：本节课程的预计剩余，只有本会话正在上课且时长已确认时才有。 */
+    val courseProgressText: String?,
     val pauseText: String,
     val nextStepText: String,
     /** States only which readings are current observations; never a course-readiness verdict. */
@@ -144,6 +146,7 @@ object ManagedRuntimePresentation {
             completedText = if (managed.totalRounds <= 0) "已完成：${managed.completedRounds} 节"
                 else "已完成：${managed.completedRounds}/${managed.totalRounds}",
             durationText = durationText(managed, elapsedNowMs),
+            courseProgressText = courseProgressText(aged, currentSession, wallNowMs),
             pauseText = pauseText(managed.pauseCount, managed.pauseReason),
             nextStepText = managed.nextStep,
             confirmedReadingsText = confirmedReadingsText(aged, currentSession),
@@ -209,6 +212,24 @@ object ManagedRuntimePresentation {
             managed.runState == SessionRunState.IDLE
         if (neverStarted) return "运行时长：未启动"
         return "运行时长：${formatDuration(displayedRuntimeMs(managed, elapsedNowMs))}"
+    }
+
+    /**
+     * OBS-02：用开课确认时的墙钟与页面读到的时长算预计剩余。没有这两项、不是本会话或已结束时
+     * 返回 null；不按轮次或运行时长猜课程进度。
+     */
+    fun courseProgressText(state: ManagedRuntimeState, sessionIsCurrent: Boolean, wallNowMs: Long): String? {
+        if (!sessionIsCurrent || !isActive(state.runState)) return null
+        val started = state.courseStartedAtMs ?: return null
+        val minutes = state.courseMinutes ?: return null
+        if (minutes <= 0) return null
+        val remaining = minutes * 60_000L - (wallNowMs - started).coerceAtLeast(0)
+        val round = if (state.round > 0) "第 " + state.round + " 节 · " else ""
+        return when {
+            remaining > 60_000L -> round + "预计还要 " + ((remaining + 59_999L) / 60_000L) + " 分钟"
+            remaining > 0L -> round + "预计不到 1 分钟结束"
+            else -> round + "课程时间已到，等待结果"
+        }
     }
 
     fun formatDuration(ms: Long): String {

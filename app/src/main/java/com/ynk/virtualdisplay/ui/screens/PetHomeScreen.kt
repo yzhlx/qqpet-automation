@@ -651,6 +651,14 @@ private fun CurrentTaskCard(view: ManagedRuntimeView, progress: RoundProgress, m
                 fontSize = 11.5.sp, color = PetTokens.Ink2, maxLines = 1,
             )
         }
+        view.courseProgressText?.let { text ->
+            Spacer(Modifier.height(6.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                PetIcon(PetGlyph.Clock, 13.dp, PetTokens.Blue)
+                Spacer(Modifier.width(5.dp))
+                Text(text, fontSize = 11.5.sp, color = PetTokens.BlueInk, maxLines = 1)
+            }
+        }
         if (view.lifecycle == ManagedLifecycle.PAUSED || view.lifecycle == ManagedLifecycle.RESUMING) {
             Spacer(Modifier.height(10.dp))
             PausedBanner(view, manualHeld)
