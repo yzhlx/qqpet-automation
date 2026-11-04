@@ -172,6 +172,25 @@ class PlanV2StoreTest {
         assertEquals(expected, PlanV2Store(file).load())
     }
 
+    @Test fun intervalAndCooldownRoundtrip() {
+        val file = File(temporary.root, PlanV2Store.FILE_NAME)
+        val withRhythm = plan().copy(stepIntervalMinutes = 15, failureCooldownMinutes = 45)
+        PlanV2Store(file).save(withRhythm)
+        val loaded = PlanV2Store(file).load()
+        assertNotNull(loaded)
+        assertEquals(15, loaded!!.stepIntervalMinutes)
+        assertEquals(45, loaded.failureCooldownMinutes)
+
+        val off = withRhythm.copy(stepIntervalMinutes = null, failureCooldownMinutes = null)
+        PlanV2Store(file).save(off)
+        val loadedOff = PlanV2Store(file).load()
+        assertNull(loadedOff!!.stepIntervalMinutes)
+        assertNull(loadedOff.failureCooldownMinutes)
+        val encoded = PlanV2JsonCodec.encode(off)
+        assertFalse(encoded.contains("stepIntervalMinutes"))
+        assertFalse(encoded.contains("failureCooldownMinutes"))
+    }
+
     @Test fun coinFloorAndSpendCapRoundtrip() {
         val file = File(temporary.root, PlanV2Store.FILE_NAME)
         val base = plan()

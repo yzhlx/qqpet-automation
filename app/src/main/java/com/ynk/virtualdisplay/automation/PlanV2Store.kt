@@ -19,6 +19,8 @@ object PlanV2JsonCodec {
         plan.legacySource?.let { root["legacySource"] = it }
         plan.minCoinFloor?.let { root["minCoinFloor"] = it }
         plan.maxDailyNetSpend?.let { root["maxDailyNetSpend"] = it }
+        plan.stepIntervalMinutes?.let { root["stepIntervalMinutes"] = it }
+        plan.failureCooldownMinutes?.let { root["failureCooldownMinutes"] = it }
         root["steps"] = plan.steps.map { step ->
             linkedMapOf<String, Any?>("stepId" to step.stepId, "type" to step.type.name).apply {
                 when (step) {
@@ -49,7 +51,8 @@ object PlanV2JsonCodec {
     fun decode(text: String): PlanV2 {
         require(text.length <= MAX_DOCUMENT_SIZE) { "PLAN_JSON_TOO_LARGE" }
         val root = Json.parse(text).objectValue()
-        root.only("schemaVersion", "planId", "name", "dailyBudgetMinutes", "executionProfile", "legacySource", "steps", "minCoinFloor", "maxDailyNetSpend")
+        root.only("schemaVersion", "planId", "name", "dailyBudgetMinutes", "executionProfile", "legacySource", "steps",
+            "minCoinFloor", "maxDailyNetSpend", "stepIntervalMinutes", "failureCooldownMinutes")
         require(root.int("schemaVersion") == 2) { "PLAN_SCHEMA_UNSUPPORTED" }
         val steps = root.list("steps").map { item ->
             val step = item.objectValue()
@@ -91,9 +94,11 @@ object PlanV2JsonCodec {
         }
         val minCoinFloor = if (root.containsKey("minCoinFloor")) root.int("minCoinFloor") else null
         val maxDailyNetSpend = if (root.containsKey("maxDailyNetSpend")) root.int("maxDailyNetSpend") else null
+        val stepInterval = if (root.containsKey("stepIntervalMinutes")) root.int("stepIntervalMinutes") else null
+        val failureCooldown = if (root.containsKey("failureCooldownMinutes")) root.int("failureCooldownMinutes") else null
         return PlanV2(2, root.string("planId"), root.string("name"), root.int("dailyBudgetMinutes"), steps,
             enumValueOf(root.string("executionProfile")), root.optionalString("legacySource"),
-            minCoinFloor, maxDailyNetSpend)
+            minCoinFloor, maxDailyNetSpend, stepInterval, failureCooldown)
     }
 
     @Suppress("UNCHECKED_CAST")

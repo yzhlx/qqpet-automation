@@ -290,3 +290,18 @@
 - 验证结果：全量单元测试 97 套件 / 931 项 100% PASS（0 failures, 0 errors, 3 skipped）；assembleDebug 构建通过（APK 约 45.8MB）；ADB 覆盖安装 DKS9K23420020242 成功。
 - 提交与推送：feat(plan): 金币底线与每日学习花费上限门禁 (STR-13)，推送 backup/feat/onboarding-troubleshooting-p0，更新 PR #4。
 - 下一步：第三阶段 STR-15 任务间隔与冷却（失败后合理冷却、不高频空转），或 STR-16 策略解释（展示本轮选择/排除原因）。
+
+## 任务间隔与失败冷却（2026-11-03，feat/onboarding-troubleshooting-p0）
+- 目标：STR-15 任务间隔与冷却（按用户设定的间隔执行，失败后合理冷却，不高频空转），并补齐 STR-04 自定义排班中的「任务间隔」缺口。
+- 改动：
+  - PlanV2 顶层新增 stepIntervalMinutes（相邻步骤最小间隔）、failureCooldownMinutes（失败后冷却），均为可空且默认关闭；含取值校验与 copy/equals/hashCode 同步。
+  - PlanV2JsonCodec 与 PlanRunJsonCodec 双路编解码支持新字段，关闭时不写入 JSON。
+  - PlanRunner：第二步起按「上一步 endedAtMs + 间隔」等待，等待前后各执行一次 checkAuthority，暂停/停止可打断；等待函数 waitMs 可注入，生产默认真正 delay。
+  - FailureCooldownPolicy（新增，纯函数 JVM 可测）：同一 planId 最近一次 FAILED/UNCONFIRMED 结束后在冷却期内拒绝重开；STOPPED（用户主动停）与 COMPLETED 不触发；没有 endedAtMs 的记录不参与判定（未知不当作失败证据）。
+  - PetAutomationService：runSession 开头做冷却检查，命中则 stopSession 并提示还需等待多少分钟，避免失败后反复空转。
+  - PetPlanSheetScreen：新增「任务节奏（STR-15）」卡片，步骤最小间隔与失败后冷却各自带 Switch（默认关）+ 数值行。
+  - PetUserManualScreen：使用攻略补充「金币底线与花费上限」「任务节奏：间隔与失败冷却」两条说明。
+  - 单元测试：新增 FailureCooldownPolicyTest（7 项）、PlanRunnerIntervalTest（3 项），PlanV2StoreTest 增加字段往返与省略校验。
+- 验证结果：全量单元测试 99 套件 / 942 项 100% PASS（0 failures, 0 errors, 3 skipped）；assembleDebug 构建通过；ADB 覆盖安装 DKS9K23420020242 成功。
+- 提交与推送：feat(plan): 任务间隔与失败冷却，避免高频空转 (STR-15)，推送 backup/feat/onboarding-troubleshooting-p0，更新 PR #4。
+- 下一步：第三阶段 STR-16 策略解释（展示本轮为什么选学习/打工/冒险以及排除其他选项的原因），或 STR-08/09 属性目标与均衡目标。

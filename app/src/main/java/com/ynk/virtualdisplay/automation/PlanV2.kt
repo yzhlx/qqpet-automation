@@ -114,6 +114,10 @@ class PlanV2(
     val minCoinFloor: Int? = null,
     /** 每日学习净支出上限（金币）；null 表示不启用 (STR-13)。 */
     val maxDailyNetSpend: Int? = null,
+    /** 相邻步骤间最小间隔（分钟）；null 表示不启用 (STR-15)。 */
+    val stepIntervalMinutes: Int? = null,
+    /** 方案级失败后冷却（分钟）；冷却期内拒绝重开同一方案 (STR-15)。 */
+    val failureCooldownMinutes: Int? = null,
 ) {
     val steps: List<PlanStep> = Collections.unmodifiableList(steps.toList())
 
@@ -135,6 +139,8 @@ class PlanV2(
         }
         if (minCoinFloor != null) require(minCoinFloor in 0..999_999) { "PLAN_MIN_COIN_FLOOR_OUT_OF_RANGE:$minCoinFloor" }
         if (maxDailyNetSpend != null) require(maxDailyNetSpend in 1..999_999) { "PLAN_MAX_DAILY_NET_SPEND_OUT_OF_RANGE:$maxDailyNetSpend" }
+        if (stepIntervalMinutes != null) require(stepIntervalMinutes in 1..120) { "PLAN_STEP_INTERVAL_OUT_OF_RANGE:$stepIntervalMinutes" }
+        if (failureCooldownMinutes != null) require(failureCooldownMinutes in 1..240) { "PLAN_FAILURE_COOLDOWN_OUT_OF_RANGE:$failureCooldownMinutes" }
     }
 
     fun copy(
@@ -147,14 +153,17 @@ class PlanV2(
         legacySource: String? = this.legacySource,
         minCoinFloor: Int? = this.minCoinFloor,
         maxDailyNetSpend: Int? = this.maxDailyNetSpend,
+        stepIntervalMinutes: Int? = this.stepIntervalMinutes,
+        failureCooldownMinutes: Int? = this.failureCooldownMinutes,
     ) = PlanV2(schemaVersion, planId, name, dailyBudgetMinutes, steps, executionProfile, legacySource,
-        minCoinFloor, maxDailyNetSpend)
+        minCoinFloor, maxDailyNetSpend, stepIntervalMinutes, failureCooldownMinutes)
 
     override fun equals(other: Any?): Boolean = other is PlanV2 &&
         schemaVersion == other.schemaVersion && planId == other.planId && name == other.name &&
         dailyBudgetMinutes == other.dailyBudgetMinutes && steps == other.steps &&
         executionProfile == other.executionProfile && legacySource == other.legacySource &&
-        minCoinFloor == other.minCoinFloor && maxDailyNetSpend == other.maxDailyNetSpend
+        minCoinFloor == other.minCoinFloor && maxDailyNetSpend == other.maxDailyNetSpend &&
+        stepIntervalMinutes == other.stepIntervalMinutes && failureCooldownMinutes == other.failureCooldownMinutes
 
     override fun hashCode(): Int {
         var result = schemaVersion
@@ -165,7 +174,9 @@ class PlanV2(
         result = 31 * result + executionProfile.hashCode()
         result = 31 * result + (legacySource?.hashCode() ?: 0)
         result = 31 * result + (minCoinFloor ?: 0)
-        return 31 * result + (maxDailyNetSpend ?: 0)
+        result = 31 * result + (maxDailyNetSpend ?: 0)
+        result = 31 * result + (stepIntervalMinutes ?: 0)
+        return 31 * result + (failureCooldownMinutes ?: 0)
     }
 
     override fun toString(): String = "PlanV2(planId=$planId, name=$name, steps=$steps, executionProfile=$executionProfile)"

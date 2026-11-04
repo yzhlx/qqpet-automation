@@ -18,6 +18,8 @@ class PlanRunner(
     private val executors: Map<PlanStepType, StepExecutor>,
     private val nowMs: () -> Long = { System.currentTimeMillis() },
     private val checkAuthority: () -> Unit = {},
+    /** STR-15 的步骤间隔等待；测试注入记录值，生产默认真正等待。 */
+    private val waitMs: suspend (Long) -> Unit = { kotlinx.coroutines.delay(it) },
 ) {
     /** Provide the run a fresh store has to persist into before it starts; production passes AtomicFile. */
     suspend fun run(request: RunRequest, runId: String): RunSnapshot {
@@ -63,7 +65,21 @@ class PlanRunner(
         for ((index, step) in plan.steps.withIndex()) {
             val executor = executors[step.type]
                 ?: return stop(snapshot, index, StepState.BLOCKED, "NO_EXECUTOR_FOR:${step.type}")
-            val ctx = ExecutingContext(store, runId, plan, step, index, nowMs)
+                        // STR-15: 第二步起遵守用户配置的最小步骤间隔；等待可被暂停/停止打断（checkAuthority 在 delay 前后都执行）。
+            val intervalMin = plan.stepIntervalMinutes
+            if (index > 0 && intervalMin != null) {
+                val prevEnded = snapshot.steps[index - 1].endedAtMs
+                if (prevEnded != null) {
+                    val earliest = prevEnded + intervalMin * 60_000L
+                    val remaining = earliest - nowMs()
+                    if (remaining > 0) {
+                        checkAuthority()
+                        waitMs(remaining)
+                        checkAuthority()
+                    }
+                }
+            }
+val ctx = ExecutingContext(store, runId, plan, step, index, nowMs)
             val outcome = try {
                 checkAuthority()
                 executor.execute(step, ctx)

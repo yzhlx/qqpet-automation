@@ -442,6 +442,24 @@ class PetAutomationService : Service() {
         return SelectedPlanConfiguration.toSessionPlan(selected)
     }
 
+    /**
+     * 返回仍在冷却期的剩余分钟数；null 表示不在冷却期（允许启动）。
+     * 只读取已结束的 run 记录；没有 endedAtMs 的记录不参与判定。
+     */
+    private fun planFailureCooldown(plan: PlanV2): Long? {
+        val root = File(filesDir, "plan-runs")
+        val store = FileRunStore(root)
+        val history = (root.listFiles { f -> f.isFile && f.name.endsWith(".json") } ?: return null)
+            .mapNotNull { file ->
+                val runId = file.name.removeSuffix(".json")
+                if (!Regex("[A-Za-z0-9_-]{1,128}").matches(runId)) return@mapNotNull null
+                val snapshot = store.load(runId) ?: return@mapNotNull null
+                FailureCooldownPolicy.Snapshot(snapshot.request.planSnapshot.planId, snapshot.state, snapshot.endedAtMs)
+            }
+        val decision = FailureCooldownPolicy.evaluate(history, plan.planId, plan.failureCooldownMinutes, System.currentTimeMillis())
+        return (decision as? FailureCooldownPolicy.Decision.Cooling)?.remainingMinutes
+    }
+
     private suspend fun runSession(displayId: Int, rounds: Int, mode: SessionMode, selected: PlanV2?=null,
         requestId:String?=null) {
         val errors = profile.validate(healthGuardInstalled=true)
@@ -449,6 +467,13 @@ class PetAutomationService : Service() {
         if (displayId <= 0) return stopSession("拒绝默认/无效 displayId")
         // A HEALTH_CHECK session has no rounds to run, so the 1..10 batch rule does not apply to it.
         if (mode.runsStudy && rounds !in 1..10) return stopSession("Only finite 1..10 round batches are supported")
+        // STR-15: 失败后冷却。同方案最近一次失败/未确认结束后仍在冷却期内，拒绝重开以免高频空转。
+        if (selected != null && selected.failureCooldownMinutes != null) {
+            val cooldown = planFailureCooldown(selected)
+            if (cooldown != null) {
+                return stopSession("上一次任务失败后仍在冷却期，请等待 " + cooldown + " 分钟再试")
+            }
+        }
         // A plan runs the lessons its own STUDY step asks for, so its round count is the plan's.
         val planRunsStudy=selected?.steps?.any {it is StudyStep} == true
         if (selected!=null && planRunsStudy) {

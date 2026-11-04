@@ -107,6 +107,10 @@ fun PetPlanSheetScreen(onClose: () -> Unit, onStarted: () -> Unit, displayId: In
     var coinFloorValue by remember { mutableStateOf(100) }
     var dailySpendCapEnabled by remember { mutableStateOf(false) }
     var dailySpendCapValue by remember { mutableStateOf(500) }
+    var stepIntervalEnabled by remember { mutableStateOf(false) }
+    var stepIntervalValue by remember { mutableStateOf(10) }
+    var failureCooldownEnabled by remember { mutableStateOf(false) }
+    var failureCooldownValue by remember { mutableStateOf(30) }
     var adventureMode by remember { mutableStateOf(com.ynk.virtualdisplay.automation.AdventureMode.NEARBY_WALK) }
     var adventureRounds by remember { mutableStateOf(1) }
     var adventureMaxDaily by remember { mutableStateOf(5) }
@@ -152,6 +156,10 @@ fun PetPlanSheetScreen(onClose: () -> Unit, onStarted: () -> Unit, displayId: In
             coinFloorValue = stored.minCoinFloor ?: 100
             dailySpendCapEnabled = stored.maxDailyNetSpend != null
             dailySpendCapValue = stored.maxDailyNetSpend ?: 500
+            stepIntervalEnabled = stored.stepIntervalMinutes != null
+            stepIntervalValue = stored.stepIntervalMinutes ?: 10
+            failureCooldownEnabled = stored.failureCooldownMinutes != null
+            failureCooldownValue = stored.failureCooldownMinutes ?: 30
             if (adventure != null) {
                 adventureMode = adventure.mode
                 adventureRounds = adventure.rounds
@@ -214,7 +222,9 @@ fun PetPlanSheetScreen(onClose: () -> Unit, onStarted: () -> Unit, displayId: In
                 val snapshot = PlanV2(planId = planId, name = name, dailyBudgetMinutes = plan.dailyBudgetMinutes,
                     steps = steps, executionProfile = ExecutionProfile.SELECTED_ACTIONS, legacySource = legacySource,
                     minCoinFloor = if (coinFloorEnabled) coinFloorValue else null,
-                    maxDailyNetSpend = if (dailySpendCapEnabled) dailySpendCapValue else null)
+                    maxDailyNetSpend = if (dailySpendCapEnabled) dailySpendCapValue else null,
+                    stepIntervalMinutes = if (stepIntervalEnabled) stepIntervalValue else null,
+                    failureCooldownMinutes = if (failureCooldownEnabled) failureCooldownValue else null)
                 PlanValidator.validate(snapshot, verified.map { it.id }.toSet())
                 withContext(Dispatchers.IO) { PlanV2Store(context).save(snapshot) }
                 didSave = true
@@ -460,6 +470,49 @@ fun PetPlanSheetScreen(onClose: () -> Unit, onStarted: () -> Unit, displayId: In
                     if (dailySpendCapEnabled) {
                         ParamRow("上限金额", PetGlyph.Coin, dailySpendCapValue, 10..10000, 50, !busy) {
                             dailySpendCapValue = it; changed()
+                        }
+                    }
+                }
+                PetCard {
+                    PetSection("任务节奏（STR-15）")
+                    Spacer(Modifier.height(8.dp))
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
+                            Text("步骤最小间隔", fontSize = 14.sp, color = PetTokens.Ink)
+                            PetNote("相邻动作之间至少等待这么久，避免连续高频操作")
+                        }
+                        Switch(checked = stepIntervalEnabled, enabled = !busy,
+                            onCheckedChange = { stepIntervalEnabled = it; changed() },
+                            colors = SwitchDefaults.colors(
+                                checkedTrackColor = PetTokens.Blue,
+                                uncheckedTrackColor = PetTokens.GraySoft,
+                                uncheckedThumbColor = PetTokens.Chevron,
+                                uncheckedBorderColor = PetTokens.Chevron,
+                            ))
+                    }
+                    if (stepIntervalEnabled) {
+                        ParamRow("间隔（分）", PetGlyph.Clock, stepIntervalValue, 1..120, 5, !busy) {
+                            stepIntervalValue = it; changed()
+                        }
+                    }
+                    Spacer(Modifier.height(6.dp))
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
+                            Text("失败后冷却", fontSize = 14.sp, color = PetTokens.Ink)
+                            PetNote("上一次失败后这段时间内不再重开同一方案")
+                        }
+                        Switch(checked = failureCooldownEnabled, enabled = !busy,
+                            onCheckedChange = { failureCooldownEnabled = it; changed() },
+                            colors = SwitchDefaults.colors(
+                                checkedTrackColor = PetTokens.Blue,
+                                uncheckedTrackColor = PetTokens.GraySoft,
+                                uncheckedThumbColor = PetTokens.Chevron,
+                                uncheckedBorderColor = PetTokens.Chevron,
+                            ))
+                    }
+                    if (failureCooldownEnabled) {
+                        ParamRow("冷却（分）", PetGlyph.Clock, failureCooldownValue, 1..240, 5, !busy) {
+                            failureCooldownValue = it; changed()
                         }
                     }
                 }
