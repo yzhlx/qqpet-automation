@@ -42,6 +42,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import com.ynk.virtualdisplay.automation.CareStep
+import com.ynk.virtualdisplay.automation.CourseCatalog
 import com.ynk.virtualdisplay.automation.CourseCatalogStore
 import com.ynk.virtualdisplay.automation.DailyBudgetStore
 import com.ynk.virtualdisplay.automation.PendingActionGuard
@@ -158,6 +159,8 @@ fun PetHomeScreen(
     // old in-memory 1/3/10 selector, which reset every time the screen was left.
     var plan by remember { mutableStateOf(SessionPlan()) }
     var catalogFresh by remember { mutableStateOf(false) }
+    /** 开始前摘要要用的课程目录：只有扫描过且未过期，摘要里才写得出时长。 */
+    var courseCatalog by remember { mutableStateOf<CourseCatalog?>(null) }
 
     // 这行字只随时钟变：30 秒刷新一次，窗口到点不用重启 App 才更新。
     LaunchedEffect(Unit) {
@@ -179,6 +182,7 @@ fun PetHomeScreen(
             val catalog = CourseCatalogStore(context).load()
             catalogFresh = catalog?.isUsable(System.currentTimeMillis()) == true &&
                 catalog.find(plan.courseId)?.let { it.unlocked && it.durationMinutes in 1..DailyBudgetStore.HARD_STOP_MINUTES } == true
+            courseCatalog = catalog
         }
         reload()
         while (runtime.running) {
@@ -213,6 +217,36 @@ fun PetHomeScreen(
     val strategySummary = StrategyPresentation.summary(strategyActions)
 
     var dialog by remember { mutableStateOf<HomeDialog?>(null) }
+    // 摘要要贴住实际会执行的那份方案；没有 v2 方案时才回落到旧计划。
+    val startBudget = minOf(
+        planV2?.dailyBudgetMinutes ?: plan.dailyBudgetMinutes,
+        DailyBudgetStore.HARD_STOP_MINUTES,
+    )
+    val startSummary = planV2?.let { StartSummaryPresentation.lines(it, courseCatalog, startBudget) }
+        ?: listOf(
+            StartSummaryLine("执行顺序", planSummary(null, plan)),
+            StartSummaryLine("预计占用", "按课程页显示的时长；未读取时不预估"),
+            StartSummaryLine("已知消耗", "与打工共用每日预算 ≤ $startBudget 分钟；学费以课程页为准"),
+        )
+
+    // 摘要确认后才真正下发开始请求；展示与实际启动使用同一份方案。
+    val beginManaged: () -> Unit = {
+        val displayId = readyDisplay?.id
+        if (displayId != null) {
+            val saved = planV2
+            if (saved != null) {
+                ContextCompat.startForegroundService(
+                    context, SessionStartRequest.forPlan(saved, displayId, UUID.randomUUID().toString()),
+                )
+            } else {
+                ContextCompat.startForegroundService(context, PetAutomationService.startIntent(
+                    context, displayId,
+                    SessionStartRequest.plannedRounds(SessionMode.FULL, SessionStartRequest.sanitize(plan.rounds)),
+                    SessionMode.FULL,
+                ))
+            }
+        }
+    }
 
     Column(Modifier.fillMaxSize()) {
         if (runtime.running) {
@@ -365,19 +399,7 @@ fun PetHomeScreen(
                                 android.widget.Toast.LENGTH_LONG).show()
                         }
                         SessionStartBlockPolicy.Decision.Proceed -> {
-                            val displayId = readyDisplay?.id ?: return@StartManagedButton
-                            val saved = planV2
-                            if (saved != null) {
-                                ContextCompat.startForegroundService(
-                                    context, SessionStartRequest.forPlan(saved, displayId, UUID.randomUUID().toString()),
-                                )
-                            } else {
-                                ContextCompat.startForegroundService(context, PetAutomationService.startIntent(
-                                    context, displayId,
-                                    SessionStartRequest.plannedRounds(SessionMode.FULL, SessionStartRequest.sanitize(plan.rounds)),
-                                    SessionMode.FULL,
-                                ))
-                            }
+                            dialog = HomeDialog.StartSummary
                         }
                     }
                 }
@@ -429,11 +451,44 @@ fun PetHomeScreen(
                 TextButton(onClick = { dialog = null }) { Text("取消", color = PetTokens.Ink2) }
             },
         )
+        HomeDialog.StartSummary -> AlertDialog(
+            onDismissRequest = { dialog = null },
+            containerColor = PetTokens.Surface,
+            titleContentColor = PetTokens.Ink,
+            textContentColor = PetTokens.Ink2,
+            title = { Text("开始前先确认") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    startSummary.forEach { line ->
+                        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                            Text(line.label, fontSize = 12.sp, color = PetTokens.Ink3)
+                            Text(line.value, fontSize = 13.sp, color = PetTokens.Ink)
+                        }
+                    }
+                    Text(
+                        "未读取到的数字不会按猜测执行；开始后第一步会立即运行。" +
+                            "托管期间请保持屏幕亮起、网络可用；锁屏或切走其他应用可能中断本次托管。",
+                        fontSize = 12.sp, color = PetTokens.Ink2,
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    dialog = null
+                    beginManaged()
+                    android.widget.Toast.makeText(context, "已开始托管，正在准备第一步",
+                        android.widget.Toast.LENGTH_SHORT).show()
+                }) { Text("开始托管", color = PetTokens.Blue) }
+            },
+            dismissButton = {
+                TextButton(onClick = { dialog = null }) { Text("取消", color = PetTokens.Ink2) }
+            },
+        )
         null -> Unit
     }
 }
 
-private enum class HomeDialog { ConfirmStop }
+private enum class HomeDialog { ConfirmStop, StartSummary }
 
 private fun planSummary(saved: PlanV2?, plan: SessionPlan): String {
     if (saved == null) return "${plan.courseName} × ${plan.rounds} 节"
