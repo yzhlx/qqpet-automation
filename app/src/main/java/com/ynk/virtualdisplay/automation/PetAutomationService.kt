@@ -437,6 +437,7 @@ class PetAutomationService : Service() {
             m.contains("not managed") || m.contains("disappeared") ->
                 "读取课程失败：后台画面不可用，请到「设置 → 后台画面」重新创建"
             t is TimeoutCancellationException -> "读取课程失败：等待后台画面超时，请确认 Shizuku 已启动"
+            m.contains("INITIAL_PAGE_UNKNOWN") -> "读取课程失败：QQ 没有停在宠物房间。请在后台画面里手动进入宠物房间，再点「读取我的课程」"
             m.contains("COURSE_SCAN_INCOMPLETE") -> "读取课程不完整（$m），请重新读取"
             else -> "读取课程失败：${t.javaClass.simpleName}: $m"
         }

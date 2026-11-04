@@ -34,6 +34,8 @@ class HeadlessDisplayCapture(
 ) {
     val facts = AutomationFacts(repository.automationEventsDirectory, displayId)
     private class InvalidFrame(message: String): IllegalStateException(message)
+    /** 屏还没有任何渲染内容（全黑帧）：QQ 尚未启动/渲染完，等一等再试，不算捕获失败。 */
+    class FrameNotReady(message: String): IllegalStateException(message)
     private val thread = HandlerThread("pet-headless-capture-$displayId").apply { start() }
     private val reader = ImageReader.newInstance(width, height, PixelFormat.RGBA_8888, 2)
     private val latestImage = AtomicReference<Image?>(null)
@@ -177,10 +179,23 @@ class HeadlessDisplayCapture(
         return latestImage.getAndSet(null) ?: error("frame signal without image")
     }
 
-    suspend fun awaitFrame(timeoutMs: Long = 350L): Bitmap {
+    suspend fun awaitFrame(timeoutMs: Long = 350L): Bitmap = awaitFrameWithReadyWindow(timeoutMs)
+
+    /**
+     * 屏上还没有内容（全黑帧）时不算失败：QQ 冷启动可能要好几秒才渲染第一帧。
+     * 在 [notReadyWindowMs] 内每隔一段时间重试一次；窗口耗尽才当作真正的捕获问题。
+     * 重试不计入信任门——黑帧不是链路故障。
+     */
+    suspend fun awaitFrameWithReadyWindow(
+        timeoutMs: Long = 350L,
+        notReadyWindowMs: Long = 20_000L,
+    ): Bitmap {
         check(!facts.frames.stopped) { "FRAME_FAILURE_LIMIT" }
         var failure: Throwable?=null
-        repeat(3) {
+        var notReadyStartedMs: Long = 0L
+        var attempts = 0
+        while(true) {
+            attempts++
             try { return awaitSingleFrame(timeoutMs) }
             catch(cancelled: CancellationException) {
                 facts.frame(FrameLiveness.failure(cancelled.toString()),lastTelemetry.optString("captureSource"))
@@ -188,13 +203,24 @@ class HeadlessDisplayCapture(
             }
             catch(t: Exception) {
                 failure=t
+                val notReady = t is FrameNotReady ||
+                    (t is InvalidFrame && "INVALID_BLACK_FRAME" in t.message.orEmpty())
+                if(notReady) {
+                    val now = SystemClock.elapsedRealtime()
+                    if(notReadyStartedMs == 0L) notReadyStartedMs = now
+                    if(now - notReadyStartedMs > notReadyWindowMs) {
+                        throw IllegalStateException("FRAME_NOT_READY_TIMEOUT:${now - notReadyStartedMs}ms", t)
+                    }
+                    delay(800)
+                    continue
+                }
                 if(t !is InvalidFrame) facts.frame(FrameLiveness.failure(t.toString()),
                     lastTelemetry.optString("captureSource"))
                 if(facts.frames.stopped) throw IllegalStateException("FRAME_FAILURE_LIMIT",t)
+                if(attempts >= 3) throw IllegalStateException("FRAME_UNCONFIRMED",failure)
                 delay(100)
             }
         }
-        throw IllegalStateException("FRAME_UNCONFIRMED",failure)
     }
 
     private suspend fun awaitSingleFrame(timeoutMs: Long): Bitmap {
@@ -225,6 +251,9 @@ class HeadlessDisplayCapture(
                 lastTelemetry.put("fallbackResult", "FAILED").put("error", t.toString())
                     .put("fallbackDurationMs", SystemClock.elapsedRealtime() - fallbackBegan)
                 if(t is InvalidFrame || t is CancellationException) throw t
+                // 全黑帧说明屏上还没有任何内容（QQ 尚未启动/渲染）。这与「捕获链路坏了」不同：
+                // 标记为 FrameNotReady 让调用方等待重试，而不是惩罚信任门。
+                if("INVALID_BLACK_FRAME" in t.toString()) throw FrameNotReady("FRAME_NOT_READY:${t.message}")
                 throw IllegalStateException("CAPTURE_UNCONFIRMED:${t.message}", t)
             }
         }
