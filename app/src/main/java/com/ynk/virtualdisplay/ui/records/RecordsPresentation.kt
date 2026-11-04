@@ -137,6 +137,19 @@ object RecordsPresentation {
     }
 
     /**
+     * 每日领取类动作今天确认完成的次数。全部为 0 时返回 null：没做过就不占一行，
+     * 也不显示「签到 0 次」这种容易被读成失败的数字。
+     */
+    fun dailyRewardsText(summary: RecordsSummary): String? {
+        val parts = buildList {
+            if (summary.signInCount > 0) add("签到 " + summary.signInCount + " 次")
+            if (summary.mailboxCount > 0) add("信箱 " + summary.mailboxCount + " 次")
+            if (summary.luckyBagCount > 0) add("福袋 " + summary.luckyBagCount + " 个")
+        }
+        return if (parts.isEmpty()) null else parts.joinToString(" · ")
+    }
+
+    /**
      * Health changes across the rounds of one session, deduced from the before → after readings the
      * controller itself recorded. A round whose readings are missing contributes nothing.
      */

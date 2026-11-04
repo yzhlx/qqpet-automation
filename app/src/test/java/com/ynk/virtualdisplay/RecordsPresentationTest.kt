@@ -3,8 +3,10 @@ package com.ynk.virtualdisplay
 import com.ynk.virtualdisplay.automation.StudyAttributeFact
 import com.ynk.virtualdisplay.ui.data.SessionRunRecord
 import com.ynk.virtualdisplay.ui.records.RecordsPresentation
+import com.ynk.virtualdisplay.ui.records.RecordsSummary
 import com.ynk.virtualdisplay.ui.records.VerdictTone
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Test
 
 /** STR-09：每个属性的变化在记录里如实显示，读不到就说读不到。 */
@@ -37,5 +39,21 @@ class RecordsPresentationTest {
     @Test fun aSessionWithoutAttributeFactsShowsNoAttributeRow() {
         val actions = RecordsPresentation.actions(emptyList(), record(emptyList()))
         assertEquals(0, actions.count { it.label.endsWith("属性") })
+    }
+
+    /** 每日领取的计数只在真的做过时才占一行；没做过不显示 0，避免读成失败。 */
+    private fun summary(signIn: Int = 0, mailbox: Int = 0, luckyBag: Int = 0) = RecordsSummary(
+        rangeText = "今天", minutesText = null, courses = 0, careCount = 0, pauseCount = 0,
+        signInCount = signIn, mailboxCount = mailbox, luckyBagCount = luckyBag)
+
+    @Test fun todaysDailyClaimCountsAreShownTogether() {
+        assertEquals("签到 1 次 · 信箱 2 次 · 福袋 3 个",
+            RecordsPresentation.dailyRewardsText(summary(signIn = 1, mailbox = 2, luckyBag = 3)))
+        assertEquals("福袋 1 个",
+            RecordsPresentation.dailyRewardsText(summary(luckyBag = 1)))
+    }
+
+    @Test fun aDayWithoutDailyClaimsShowsNoLine() {
+        assertNull(RecordsPresentation.dailyRewardsText(summary()))
     }
 }

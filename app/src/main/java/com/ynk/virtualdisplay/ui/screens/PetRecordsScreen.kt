@@ -137,6 +137,13 @@ private fun TodayCard(summary: RecordsSummary) {
             StripCell(summary.adventureCount, "冒险 轮", Modifier.weight(1f))
             StripCell(summary.careCount, "护理 次", Modifier.weight(1f))
         }
+        // 签到／信箱／福袋也计入今日；没做过就不占一行，不显示 0。
+        RecordsPresentation.dailyRewardsText(summary)?.let { line ->
+            Spacer(Modifier.height(9.dp))
+            PetDivider()
+            Spacer(Modifier.height(7.dp))
+            PetNote(line)
+        }
     }
 }
 
