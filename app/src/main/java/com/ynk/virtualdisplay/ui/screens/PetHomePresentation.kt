@@ -9,6 +9,7 @@ import com.ynk.virtualdisplay.automation.QuietWindow
 import com.ynk.virtualdisplay.automation.QuietWindowPolicy
 import com.ynk.virtualdisplay.automation.QuietWindowText
 import com.ynk.virtualdisplay.automation.at
+import com.ynk.virtualdisplay.data.model.ShizukuState
 
 /**
  * Pure presentation layer for the v0.1 managed UI. No Android, Compose or automation *side-effect*
@@ -272,4 +273,34 @@ object QuietWindowPresentation {
 
     fun isQuietNow(window: QuietWindow, nowMinute: Int): Boolean =
         QuietWindowPolicy.isQuiet(nowMinute, window)
+}
+
+
+/**
+ * 首页检查卡里 Shizuku 第一行的说法与下一步。
+ *
+ * 「服务没启动」和「服务在跑但没授权」是两种完全不同的阻塞，恢复动作也不同：
+ * 前者让用户点启动，后者让用户在 Shizuku 里勾选蟹啦。都没确认时不冒充已连接。
+ */
+data class ShizukuSetupHint(
+    val stateLabel: String,
+    val actionLabel: String?,
+    val message: String?,
+)
+
+fun shizukuSetupHint(state: ShizukuState): ShizukuSetupHint = when (state) {
+    ShizukuState.PermissionDenied -> ShizukuSetupHint(
+        stateLabel = "未授权",
+        actionLabel = "去授权",
+        message = "Shizuku 已在运行，但还没允许蟹啦使用。打开 Shizuku →「已授权应用」→ 勾选蟹啦；" +
+            "若弹出授权窗口请选「始终允许」。不用重新配对，方案与进度已保存。",
+    )
+    ShizukuState.NotRunning -> ShizukuSetupHint(
+        stateLabel = "未连接",
+        actionLabel = "去恢复",
+        message = "Shizuku 已停止：打开 Shizuku 点「启动」即可恢复，通常无需重新配对；" +
+            "若系统清除了无线调试授权，按 Shizuku 页面提示重新配对。方案与进度已保存。",
+    )
+    ShizukuState.Ready -> ShizukuSetupHint("已连接", null, null)
+    ShizukuState.Checking -> ShizukuSetupHint("检查中…", null, null)
 }

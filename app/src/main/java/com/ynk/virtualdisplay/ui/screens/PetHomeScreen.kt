@@ -320,7 +320,7 @@ fun PetHomeScreen(
                             }
                         },
                         onOpenPlanSheet = onOpenPlanSheet,
-                        shizukuStopped = uiState.shizukuState is ShizukuState.NotRunning,
+                        shizukuState = uiState.shizukuState,
                         onOpenShizuku = { context.openShizuku() },
                     )
                 }
@@ -560,8 +560,8 @@ private fun SetupChecklistCard(
     calibrationBlocker: String?,
     onOpenDisplay: () -> Unit,
     onOpenPlanSheet: () -> Unit,
-    /** Shizuku 服务曾被授权但已停止（如手机重启或服务被系统停止）；只提示恢复，不算失败。 */
-    shizukuStopped: Boolean = false,
+    /** 当前 Shizuku 状态；区分「服务已停止」与「服务在跑但未授权」两种恢复动作。 */
+    shizukuState: ShizukuState = ShizukuState.NotRunning,
     onOpenShizuku: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -586,10 +586,13 @@ private fun SetupChecklistCard(
             )
         }
         Spacer(Modifier.height(8.dp))
+        val shizukuHint = shizukuSetupHint(shizukuState)
         if (!shizukuReady) {
             SetupStepRow(
                 index = "1", title = "Shizuku",
-                state = "未连接", done = false,
+                state = shizukuHint.stateLabel, done = false,
+                actionText = shizukuHint.actionLabel,
+                onAction = if (shizukuHint.actionLabel != null) onOpenShizuku else null,
             )
         }
         if (!displayReady) {
@@ -614,23 +617,12 @@ private fun SetupChecklistCard(
             )
         }
         Spacer(Modifier.height(6.dp))
-        if (shizukuStopped && !shizukuReady) {
-            Row(
-                Modifier.fillMaxWidth()
-                    .clickable { onOpenShizuku() }
-                    .padding(vertical = 4.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(
-                    "Shizuku 已停止：打开 Shizuku 点「启动」即可恢复，通常无需重新配对；若系统清除了无线调试授权，按 Shizuku 页面提示重新配对。方案与进度已保存。",
-                    fontSize = 12.sp, lineHeight = 18.sp, color = PetTokens.AmberInk,
-                    modifier = Modifier.weight(1f),
-                )
-                Text(
-                    "去恢复", fontSize = 12.5.sp, fontWeight = FontWeight(650), color = PetTokens.Blue,
-                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 4.dp),
-                )
-            }
+        if (!shizukuReady && shizukuHint.message != null) {
+            Spacer(Modifier.height(2.dp))
+            Text(
+                shizukuHint.message,
+                fontSize = 12.sp, lineHeight = 18.sp, color = PetTokens.AmberInk,
+            )
         }
         PetNote(
             "完成前下面的按钮保持灰色，这些步骤都不花游戏金币。" +

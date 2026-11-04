@@ -6,6 +6,7 @@ import com.ynk.virtualdisplay.automation.ManualPauseState
 import com.ynk.virtualdisplay.automation.ObservationSource
 import com.ynk.virtualdisplay.automation.ObservedValue
 import com.ynk.virtualdisplay.automation.SessionRunState
+import com.ynk.virtualdisplay.data.model.ShizukuState
 import com.ynk.virtualdisplay.ui.data.CareStats
 import com.ynk.virtualdisplay.ui.data.HealthSnapshot
 import com.ynk.virtualdisplay.ui.data.RoundRecord
@@ -20,6 +21,7 @@ import com.ynk.virtualdisplay.ui.screens.RoundProgressPresentation
 import com.ynk.virtualdisplay.ui.screens.StatusPillPresentation
 import com.ynk.virtualdisplay.ui.screens.StatusPillTone
 import com.ynk.virtualdisplay.ui.screens.StudyStepTrack
+import com.ynk.virtualdisplay.ui.screens.shizukuSetupHint
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -385,5 +387,31 @@ class PetHomePresentationTest {
         assertNull(summary.minutesText)
         assertEquals(0, summary.courses)
         assertEquals(0, summary.careCount)
+    }
+    @Test
+    fun deniedPermissionGetsItsOwnRecoveryAction() {
+        val stopped = shizukuSetupHint(ShizukuState.NotRunning)
+        assertEquals("未连接", stopped.stateLabel)
+        assertEquals("去恢复", stopped.actionLabel)
+        assertTrue(stopped.message!!.contains("点「启动」"))
+
+        val denied = shizukuSetupHint(ShizukuState.PermissionDenied)
+        assertEquals("未授权", denied.stateLabel)
+        assertEquals("去授权", denied.actionLabel)
+        assertTrue(denied.message!!.contains("已授权应用"))
+        assertFalse(denied.message.contains("点「启动」"))
+    }
+
+    @Test
+    fun readyAndCheckingStatesOfferNoAction() {
+        val ready = shizukuSetupHint(ShizukuState.Ready)
+        assertEquals("已连接", ready.stateLabel)
+        assertNull(ready.actionLabel)
+        assertNull(ready.message)
+
+        val checking = shizukuSetupHint(ShizukuState.Checking)
+        assertEquals("检查中…", checking.stateLabel)
+        assertNull(checking.actionLabel)
+        assertNull(checking.message)
     }
 }
