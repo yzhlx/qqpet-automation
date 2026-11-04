@@ -1310,26 +1310,7 @@ class PetSessionController(context:Context,capture:HeadlessDisplayCapture,input:
      * 学费和属性收益写在同一页上，所以一次读页就够，不必再读一帧；
      * 属性收益读不到就是 null（未知），不影响学费的判定。
      */
-    private suspend fun readCoursePage():CoursePageReading {
-        var lastLines:List<String> = emptyList()
-        var attempts=0
-        while(attempts<COURSE_COST_READ_ATTEMPTS) {
-            if(attempts>0) delay(COURSE_COST_RETRY_DELAY_MS)
-            val frame=flow.frame(latest=attempts>0)
-            try {
-                check(flow.score(frame,listOf(flow.profile.courseListProbe))>=flow.profile.matchThreshold) {"COURSE_COST_PAGE_UNCONFIRMED"}
-                val lines=reader.read(frame).sortedBy {it.bounds.top}
-                lastLines=lines.map {it.text}
-                val text=lines.joinToString(" ") {it.text}
-                val cost=CourseCostReading.parse(text)
-                if(cost!=null) return CoursePageReading(cost,CourseAttributeGain.parse(text))
-            } finally {frame.recycle()}
-            attempts++
-        }
-        flow.emit("course-cost-read-unresolved", result="FAIL",
-            reason="COURSE_COST_UNREADABLE|lines="+lastLines.joinToString(";"))
-        error("COURSE_COST_UNREADABLE")
-    }
+    private suspend fun readCoursePage():CoursePageReading = readCoursePageReading(flow,reader)
 
     companion object {
         private const val COURSE_COST_READ_ATTEMPTS = 4

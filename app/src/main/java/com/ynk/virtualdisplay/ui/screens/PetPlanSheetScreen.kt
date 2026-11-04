@@ -44,6 +44,9 @@ import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import com.ynk.virtualdisplay.automation.CareStep
 import com.ynk.virtualdisplay.automation.CourseCatalog
+import com.ynk.virtualdisplay.automation.CourseComparison
+import com.ynk.virtualdisplay.automation.CourseReading
+import com.ynk.virtualdisplay.automation.CourseReadingStore
 import com.ynk.virtualdisplay.automation.CourseCatalogStore
 import com.ynk.virtualdisplay.automation.DailyBudgetStore
 import com.ynk.virtualdisplay.automation.ExecutionProfile
@@ -128,6 +131,7 @@ fun PetPlanSheetScreen(onClose: () -> Unit, onStarted: () -> Unit, displayId: In
     var legacySource by remember { mutableStateOf<String?>(null) }
     var showCompatibilityNote by remember { mutableStateOf(false) }
     var catalog by remember { mutableStateOf<CourseCatalog?>(null) }
+    var courseReadings by remember { mutableStateOf<Map<String, CourseReading>>(emptyMap()) }
     var loading by remember { mutableStateOf(true) }
     var saving by remember { mutableStateOf(false) }
     var saved by remember { mutableStateOf(false) }
@@ -199,16 +203,23 @@ fun PetPlanSheetScreen(onClose: () -> Unit, onStarted: () -> Unit, displayId: In
         todayStudyRounds = withContext(Dispatchers.IO) {
             runCatching { PetEvidenceRepository(context).confirmedStudyRoundsToday() }.getOrDefault(0)
         }
+        courseReadings = withContext(Dispatchers.IO) {
+            runCatching { CourseReadingStore(context).load() }.getOrDefault(emptyMap())
+        }
         loading = false
     }
     LaunchedEffect(runtime.running, runtime.status) {
         catalog = withContext(Dispatchers.IO) { runCatching { CourseCatalogStore(context).load() }.getOrNull() }
+        courseReadings = withContext(Dispatchers.IO) {
+            runCatching { CourseReadingStore(context).load() }.getOrDefault(emptyMap())
+        }
     }
 
     val unlocked = catalog?.unlocked().orEmpty()
     val fresh = catalog?.isUsable(System.currentTimeMillis()) == true
     val busy = loading || saving
     val selectedCourse = unlocked.firstOrNull { it.id == plan.courseId }
+    val courseComparison = CourseComparison.compare(unlocked, courseReadings, System.currentTimeMillis())
     val selectedActionCount = listOf(selectedSignIn, selectedMailbox, selectedLuckyBag,
         selectedWork, selectedCare, selectedStudy, selectedAdventure).count { it }
     val validationMessage = when {
@@ -449,11 +460,25 @@ fun PetPlanSheetScreen(onClose: () -> Unit, onStarted: () -> Unit, displayId: In
                 else if (unlocked.isEmpty()) PetNote("没有读到已解锁的课程。")
                 else unlocked.forEach { course ->
                     val inRotation = balancedRotation.any { it.courseId == course.id }
-                    ChoiceRow(course.name, course.durationMinutes?.let { "$it 分钟" } ?: "时长未读出",
+                    val row = courseComparison.rows.firstOrNull { it.courseId == course.id }
+                    val note = buildString {
+                        append(row?.durationMinutes?.let { "$it 分钟" } ?: "时长未读出")
+                        if (row?.tuitionCoins != null) {
+                            append(" · 学费 ${row.tuitionCoins}")
+                            append(row.attributeGain?.let { " · ${it.attribute}+${it.amount}" } ?: " · 收益未读到")
+                        } else {
+                            append(" · 学费/收益未读取或已过期")
+                        }
+                    }
+                    ChoiceRow(course.name, note,
                         inRotation || (balancedRotation.isEmpty() && course.id == plan.courseId),
                         !busy && balancedRotation.isEmpty()) { plan = plan.copy(courseId = course.id); changed() }
                 }
                 if (balancedRotation.isNotEmpty()) PetNote("均衡模式下按上面三门课轮换，不手动选单门课。")
+                if (fresh && unlocked.isNotEmpty()) {
+                    Spacer(Modifier.height(6.dp))
+                    PetNote(courseComparisonSummary(courseComparison))
+                }
                 Spacer(Modifier.height(6.dp))
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     PetFootButton(if (runtime.running) "任务进行中" else "读取我的课程",
@@ -464,6 +489,14 @@ fun PetPlanSheetScreen(onClose: () -> Unit, onStarted: () -> Unit, displayId: In
                         SimpleDateFormat("MM-dd HH:mm", Locale.US).format(Date(it))
                     }
                     PetNote(scannedAt?.let { "已读取 ${unlocked.size} 门\n$it" } ?: "从未读取")
+                }
+                Spacer(Modifier.height(6.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    PetFootButton(if (runtime.running) "任务进行中" else "读取课程收益",
+                        if (displayId != null && !runtime.running && !busy) PetButtonTone.GHOST else PetButtonTone.DISABLED,
+                        { displayId?.let { startCourseReading(context, it) } }, Modifier.weight(1f))
+                    Spacer(Modifier.width(10.dp))
+                    PetNote("只读，不花金币\n逐门读取学费与收益")
                 }
                 if (displayId == null) PetNote("后台画面未就绪，暂不能读取。")
                 if (runtime.status.startsWith("课程") || runtime.status.startsWith("读取课程")) PetNote(runtime.status)
@@ -660,6 +693,29 @@ fun PetPlanSheetScreen(onClose: () -> Unit, onStarted: () -> Unit, displayId: In
 
 private fun startCourseScan(context: Context, displayId: Int) {
     ContextCompat.startForegroundService(context, PetAutomationService.scanCoursesIntent(context, displayId))
+}
+
+private fun startCourseReading(context: Context, displayId: Int) {
+    ContextCompat.startForegroundService(context, PetAutomationService.readCourseGainsIntent(context, displayId))
+}
+
+/** STR-10：只写读到的数；读不到就说明未知，不参与排名。 */
+private fun courseComparisonSummary(summary: CourseComparison.Summary): String {
+    if (!summary.hasAnyReading) {
+        return "还没有可用的课程收益数据（未读取或已过期）。点「读取课程收益」逐门读取学费和属性收益；读不到的会标为未知。"
+    }
+    val parts = mutableListOf<String>()
+    summary.cheapestTuition?.let { parts += "最省学费 ${it.name} ${it.tuitionCoins} 金币" }
+    summary.cheapestPerMinute?.let { parts += "每分钟最省 ${it.name} ${courseNumber(it.coinsPerMinute)} 金币" }
+    summary.bestAttributeValue?.let { parts += "每点属性最省 ${it.name} ${courseNumber(it.coinsPerAttribute)} 金币" }
+    val head = "按上次读取比较：" + parts.joinToString(" · ")
+    return if (summary.unknownNames.isEmpty()) head
+        else head + "\n未读到收益：" + summary.unknownNames.joinToString("、")
+}
+
+private fun courseNumber(value: Double?): String {
+    if (value == null) return "未知"
+    return String.format(Locale.US, "%.2f", value).trimEnd('0').trimEnd('.')
 }
 
 @Composable

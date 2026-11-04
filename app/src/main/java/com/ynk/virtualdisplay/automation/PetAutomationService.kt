@@ -79,6 +79,11 @@ class PetAutomationService : Service() {
                 startForeground(NOTIFICATION_ID, notification("读取课程中…"))
                 launchOwned(intent) { scanCourses(displayId) }
             }
+            ACTION_READ_COURSE_GAINS -> {
+                val displayId = intent.getIntExtra(EXTRA_DISPLAY_ID, -1)
+                startForeground(NOTIFICATION_ID, notification("读取课程收益…"))
+                launchOwned(intent) { readCourseGains(displayId) }
+            }
             ACTION_START -> {
                 val displayId = intent.getIntExtra(EXTRA_DISPLAY_ID, -1)
                 startForeground(NOTIFICATION_ID, notification("正在初始化…"))
@@ -431,6 +436,99 @@ class PetAutomationService : Service() {
     }
 
     /**
+     * STR-10：逐门打开课程详情页，读学费、时长和页面上写明的属性收益，存成候选课程比较数据。
+     *
+     * 只读：只点课程卡片和返回，不点开课/购买按钮，不花金币。每读完一门就落盘，
+     * 中途失败时已读到的课程仍然保留，用户可以直接重试。课表缺失或过期时先补一次读取。
+     */
+    private suspend fun readCourseGains(displayId: Int) {
+        if (displayId <= 0) return stopSession("拒绝默认/无效 displayId")
+        try {
+            withTimeout(7_000L) {
+                app.displayRepository.connectionStatus.first { it == ConnectionStatus.CONNECTED }
+                app.displayRepository.managedDisplayIds.first { displayId in it }
+            }
+            verifyDisplay(displayId)
+            acquireWakeLock()
+            PetRuntime.update { it.copy(running = true, runState = SessionRunState.RUNNING,
+                displayId = displayId, status = "读取课程收益…") }
+            val capture = HeadlessDisplayCapture(app.displayRepository, displayId, profile.displayWidth, profile.displayHeight)
+            val input = PetInputController(app.displayRepository, displayId, profile.displayWidth, profile.displayHeight, capture.facts)
+            val evidence = File(getExternalFilesDir(null), "pet_mvp_session/${System.currentTimeMillis()}")
+            capture.start()
+            try {
+                val flow = PetFlowContext(this, capture, input, evidence, { verifyDisplay(displayId) }, ::logEvent)
+                val reader = MlKitCourseNameReader()
+                val navigation = PetNavigation(flow, DeviceWorkPageReader(flow, reader))
+                flow.state = "INITIAL_NAVIGATION"
+                navigation.initialise()
+                val catalogStore = CourseCatalogStore(this)
+                val existing = catalogStore.load()
+                val catalog = if (existing != null && existing.isUsable(System.currentTimeMillis())) existing
+                    else {
+                        navigation.enterOutdoor("course-gain-scan-outdoor")
+                        val scanned = CourseScanFlow(flow, navigation, reader).scan()
+                        check(existing == null || existing.mayBeReplacedBy(scanned, System.currentTimeMillis())) {
+                            "COURSE_SCAN_INCOMPLETE:READ_${scanned.courses.size}_OF_${existing?.courses?.size}"
+                        }
+                        catalogStore.save(scanned)
+                        navigation.tap(profile.courseListProbe, android.graphics.PointF(80f, 160f), flow.academy, "course-gain-scan-close-panel")
+                        navigation.tap(flow.academy, android.graphics.PointF(80f, 160f), flow.outdoor, "course-gain-scan-leave-academy")
+                        navigation.returnHomeFromMap("course-gain-scan")
+                        scanned
+                    }
+                val targets = catalog.unlocked()
+                check(targets.isNotEmpty()) { "COURSE_SCAN_EMPTY" }
+                val store = CourseReadingStore(this)
+                val readings = runCatching { store.load() }.getOrDefault(emptyMap()).toMutableMap()
+                for ((index, course) in targets.withIndex()) {
+                    PetRuntime.update { it.copy(status = "读取课程收益 ${index + 1}/${targets.size}：${course.name}") }
+                    val plan = SessionPlan(courseId = course.id)
+                    navigation.enterOutdoor("course-gain-outdoor")
+                    val selected = CourseSelector(flow, navigation, reader).select(plan)
+                    val timing = CourseTiming.resolve(plan, catalog, System.currentTimeMillis())
+                    timing.confirmDetail(selected.name, selected.durationMinutes ?: error("COURSE_DURATION_UNREAD"))
+                    val page = readCoursePageReading(flow, reader)
+                    readings[course.id] = CourseReading(
+                        courseId = course.id,
+                        courseName = course.name,
+                        durationMinutes = timing.durationMinutes,
+                        tuitionCoins = page.cost.tuitionCoins,
+                        attributeGain = page.attributeGain,
+                        readAtMs = System.currentTimeMillis(),
+                    )
+                    store.save(readings.values)
+                    navigation.tap(profile.courseListProbe, android.graphics.PointF(80f, 160f), flow.academy, "course-gain-close-course")
+                    navigation.tap(flow.academy, android.graphics.PointF(80f, 160f), flow.outdoor, "course-gain-leave-academy")
+                    navigation.returnHomeFromMap("course-gain")
+                }
+                stopReason = "课程收益读取完成 ${targets.size} 门"
+            } finally { capture.stop() }
+        } catch (ce: CancellationException) {
+            throw ce
+        } catch (t: Throwable) {
+            Log.e(TAG, "course gains failed", t)
+            stopSession(courseGainFailureText(t))
+        }
+    }
+
+    /** 用户能照着做的失败原因；原始异常名只留在日志里。 */
+    private fun courseGainFailureText(t: Throwable): String {
+        val m = t.message.orEmpty()
+        return when {
+            m.contains("PHONE_LOCKED") -> "读取课程收益失败：手机处于锁屏状态。解锁后重新读取，并把自动锁屏时间调长"
+            m.contains("not managed") || m.contains("disappeared") ->
+                "读取课程收益失败：后台画面不可用，请到「设置 → 后台画面」重新创建"
+            m.contains("COURSE_COST_UNREADABLE") ->
+                "读取课程收益失败：课程详情页的学费读不出来。请确认页面显示正常后重试；已读到的课程会保留"
+            m.contains("COURSE_NOT_FOUND") || m.contains("COURSE_MISMATCH") ->
+                "读取课程收益失败：课程页和课表对不上。请先重新读取课表再试"
+            t is TimeoutCancellationException -> "读取课程收益失败：等待后台画面超时，请确认 Shizuku 已启动"
+            else -> "读取课程收益失败：${m.ifEmpty { t.javaClass.simpleName }}。已读到的课程会保留，可重试"
+        }
+    }
+
+    /**
      * The effective legacy-shaped plan for a saved plan (方案).
      *
      * The plan's own steps decide the course, the lesson count, the care thresholds and the work
@@ -758,6 +856,7 @@ class PetAutomationService : Service() {
         private const val ACTION_STOP = "com.ynk.virtualdisplay.pet.STOP"
         private const val ACTION_PAUSE = "com.ynk.virtualdisplay.pet.PAUSE"
         private const val ACTION_SCAN_COURSES = "com.ynk.virtualdisplay.pet.SCAN_COURSES"
+        private const val ACTION_READ_COURSE_GAINS = "com.ynk.virtualdisplay.pet.READ_COURSE_GAINS"
         private const val MAX_WAKELOCK_MS = 8L * 60L * 60L * 1000L
 
         /** What the foreground notification shows while a session runs, per mode. */
@@ -783,5 +882,10 @@ class PetAutomationService : Service() {
         fun scanCoursesIntent(context: Context, displayId: Int) =
             Intent(context, PetAutomationService::class.java)
                 .setAction(ACTION_SCAN_COURSES).putExtra(EXTRA_DISPLAY_ID, displayId)
+
+        /** A read-only pass over every unlocked course's detail page. It spends nothing. */
+        fun readCourseGainsIntent(context: Context, displayId: Int) =
+            Intent(context, PetAutomationService::class.java)
+                .setAction(ACTION_READ_COURSE_GAINS).putExtra(EXTRA_DISPLAY_ID, displayId)
     }
 }
