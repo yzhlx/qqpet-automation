@@ -2,6 +2,7 @@ package com.ynk.virtualdisplay.ui.data
 
 import android.content.Context
 import com.ynk.virtualdisplay.automation.StrategyExplanation
+import com.ynk.virtualdisplay.automation.StudyAttributeFact
 import com.ynk.virtualdisplay.automation.StudyDailyCapPolicy
 import org.json.JSONArray
 import org.json.JSONObject
@@ -145,6 +146,8 @@ data class SessionRunRecord(
     val studyRoundsCompleted: Int? = null,
     /** STR-08: 本次会话的学习目标属性（力量/智力/魅力）。 */
     val targetAttribute: String? = null,
+    /** STR-09: 本次会话每个属性的学习事实（上了几节、页面上写明加多少）。 */
+    val studyAttributes: List<StudyAttributeFact> = emptyList(),
     /** STR-16: the real outcome and reason of every action, shown in the history detail. */
     val strategyActions: List<StrategyExplanation.Action> = emptyList(),
 ) {
@@ -182,6 +185,7 @@ data class SessionRunRecord(
                 roomCoinsAfter = o.intOrNull("roomCoinsAfter"),
                 studyRoundsCompleted = o.intOrNull("studyRoundsCompleted"),
                 targetAttribute = o.optString("targetAttribute").takeIf { it.isNotEmpty() && it != "null" },
+                studyAttributes = parseStudyAttributes(o.optJSONObject("studyAttributes")),
                 strategyActions = parseStrategyActions(o.optJSONArray("strategyActions")),
             )
         }.getOrNull()
@@ -367,6 +371,23 @@ private fun JSONObject.longOrNull(key: String): Long? =
 
 private fun JSONObject.optLongOrNull(key: String): Long? =
     if (has(key) && !isNull(key)) optLong(key) else null
+
+/** STR-09: 读回每个属性的学习事实。读不懂的条目丢掉，不猜数值。 */
+private fun parseStudyAttributes(obj: JSONObject?): List<StudyAttributeFact> {
+    if (obj == null) return emptyList()
+    val out = mutableListOf<StudyAttributeFact>()
+    for (attribute in obj.keys()) {
+        val entry = obj.optJSONObject(attribute) ?: continue
+        val rounds = entry.intOrNull("rounds") ?: continue
+        if (rounds <= 0) continue
+        out.add(StudyAttributeFact(
+            attribute = attribute,
+            rounds = rounds,
+            gain = entry.intOrNull("gain"),
+            lessonsWithGain = entry.optInt("lessonsWithGain", 0)))
+    }
+    return out
+}
 
 /** STR-16: read back the per-action facts. An unreadable entry is dropped, never guessed. */
 private fun parseStrategyActions(array: JSONArray?): List<StrategyExplanation.Action> {

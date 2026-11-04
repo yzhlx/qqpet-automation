@@ -44,6 +44,17 @@ class CoinSpendPolicyTest {
     }
 
     @Test
+    fun thePlannedSpendIsJudgedAsItIs() {
+        // STR-09：轮换方案每节课学费不同，闸门按真实合计判断，而不是「单节学费 × 节数」。
+        val d = CoinSpendPolicy.evaluatePlanned(balanceCoins = 300, plannedSpendCoins = 150L,
+            minCoinFloor = 100, maxDailyNetSpend = null, alreadySpentToday = 0)
+        assertEquals(CoinSpendPolicy.Decision.Allowed, d)
+        val r = CoinSpendPolicy.evaluatePlanned(balanceCoins = 300, plannedSpendCoins = 250L,
+            minCoinFloor = 100, maxDailyNetSpend = null, alreadySpentToday = 0) as CoinSpendPolicy.Decision.Rejected
+        assertTrue(r.reason.startsWith("COIN_FLOOR_BREACH"))
+    }
+
+    @Test
     fun invalidInputIsRejectedLoudly() {
         try {
             CoinSpendPolicy.evaluate(balanceCoins = -1, tuitionCoins = 100, remainingRounds = 1,

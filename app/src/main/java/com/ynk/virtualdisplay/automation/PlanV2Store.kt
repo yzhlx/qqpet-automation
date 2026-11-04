@@ -38,7 +38,13 @@ object PlanV2JsonCodec {
                     is CareStep -> {
                         put("energyThreshold", step.energyThreshold); put("cleanlinessThreshold", step.cleanlinessThreshold)
                     }
-                    is StudyStep -> { put("courseId", step.courseId); put("rounds", step.rounds); if (step.targetAttribute != null) put("targetAttribute", step.targetAttribute) }
+                    is StudyStep -> {
+                        put("courseId", step.courseId); put("rounds", step.rounds)
+                        if (step.targetAttribute != null) put("targetAttribute", step.targetAttribute)
+                        // STR-09：均衡轮换按顺序写下来，读回来还是同一串课。
+                        if (step.rotation.isNotEmpty()) put("rotation", step.rotation.map {
+                            linkedMapOf<String, Any?>("attribute" to it.attribute, "courseId" to it.courseId) })
+                    }
                     is AdventureStep -> {
                         put("mode", step.mode.name); put("rounds", step.rounds)
                         if (step.maxDailyRounds != null) put("maxDailyRounds", step.maxDailyRounds)
@@ -84,8 +90,13 @@ object PlanV2JsonCodec {
                     CareStep(id, step.int("energyThreshold"), step.int("cleanlinessThreshold"))
                 }
                 PlanStepType.STUDY -> {
-                    step.only("stepId", "type", "courseId", "rounds", "targetAttribute")
-                    StudyStep(id, step.string("courseId"), step.int("rounds"), step.optionalString("targetAttribute"))
+                    step.only("stepId", "type", "courseId", "rounds", "targetAttribute", "rotation")
+                    val rotation = if (step.containsKey("rotation")) step.list("rotation").map { item ->
+                        val entry = item.objectValue()
+                        entry.only("attribute", "courseId")
+                        StudyRotation(entry.string("attribute"), entry.string("courseId"))
+                    } else emptyList()
+                    StudyStep(id, step.string("courseId"), step.int("rounds"), step.optionalString("targetAttribute"), rotation)
                 }
                 PlanStepType.ADVENTURE -> {
                     step.only("stepId", "type", "mode", "rounds", "maxDailyRounds")

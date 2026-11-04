@@ -62,7 +62,12 @@ class PetSessionController(context:Context,capture:HeadlessDisplayCapture,input:
     private val planAttemptBudget:PlanAttemptBudget?=null) {
     private var activePlanContext:StepExecutionContext?=null
     private var planCareConsumed=false
-    private var planCourseCost:CourseCostReading?=null
+    /** STR-09：均衡方案要逐门课读学费，这里按课程 id 存每一门读到的学费、时长与当时的余额。 */
+    private val planCourseCosts=mutableMapOf<String,CourseCostReading>()
+    private val planCourseMinutes=mutableMapOf<String,Int>()
+    private var planCourseBalance:Int?=null
+    /** STR-09：本次会话每个属性的学习事实（上了几节、页面上写明加多少）。 */
+    private val studyAttributeFacts=mutableMapOf<String,StudyAttributeFact>()
     private var planSkipWork=false
     /** STR-08：本次方案今天还能上几节；预检算好后学习步骤按它开课。 */
     private var planStudyAllowedRounds=0
@@ -373,11 +378,19 @@ class PetSessionController(context:Context,capture:HeadlessDisplayCapture,input:
         val preflight=PlanPreflight(
             courses=CourseDependencyPort { courseId ->
                 val step=selected.steps.filterIsInstance<StudyStep>().single()
-                check(step.courseId==courseId)
-                val cost=readPlanCourseCost(step)
-                planCourseCost=cost
-                val timing=CourseTiming.resolve(plan,catalog,System.currentTimeMillis())
-                StudyPreflight.Ok(courseId,plan.courseName,timing.durationMinutes,cost.tuitionCoins)
+                check(step.courseIds.contains(courseId)) {"PLAN_COURSE_NOT_IN_STEP:$courseId"}
+                // STR-09：均衡方案要把每一门轮换的课都读一遍学费与时长，闸门才按真实顺序算。
+                planCourseCosts.clear();planCourseMinutes.clear();planCourseBalance=null
+                for(id in step.courseIds) {
+                    val cost=readPlanCourseCost(id)
+                    planCourseCosts[id]=cost
+                    planCourseBalance=cost.balanceCoins
+                    planCourseMinutes[id]=CourseTiming.resolve(plan.copy(courseId=id),catalog,
+                        System.currentTimeMillis()).durationMinutes
+                }
+                val cost=checkNotNull(planCourseCosts[courseId])
+                StudyPreflight.Ok(courseId,plan.copy(courseId=courseId).courseName,
+                    checkNotNull(planCourseMinutes[courseId]),cost.tuitionCoins)
             },
             resources=ResourcePreflightPort {
                 val studyStep=selected.steps.filterIsInstance<StudyStep>().singleOrNull()
@@ -386,14 +399,15 @@ class PetSessionController(context:Context,capture:HeadlessDisplayCapture,input:
                     confirmedToday=computeConfirmedStudyRoundsToday(),
                     cap=selected.dailyStudyRoundCap,
                     plannedRounds=studyStep.rounds)
-                tuitionReserveCoins=if(studyStep==null) 0 else CarePaymentPolicy.unpaidTuition(
-                    checkNotNull(planCourseCost).tuitionCoins,planStudyAllowedRounds)
+                // STR-09：按真实顺序排出本轮的课；学费与时长都按每节自己那门课算。
+                val lessons=if(studyStep==null) emptyList() else StudyRotationPolicy.schedule(studyStep,planStudyAllowedRounds)
+                tuitionReserveCoins=if(studyStep==null) 0 else StudyRotationPolicy.tuitionTotal(lessons,planCourseCosts)
                 val conditional=selected.steps.filterIsInstance<WorkStep>().singleOrNull()
                     ?.trigger==WorkTrigger.IF_FUNDS_SHORT
                 if(conditional) {
                     // 今天已经不再学习时照常打工：学费预留为 0，不能因此把打工也跳掉。
                     planSkipWork=planStudyAllowedRounds>0 &&
-                        checkNotNull(planCourseCost).balanceCoins>=tuitionReserveCoins
+                        checkNotNull(planCourseBalance)>=tuitionReserveCoins
                     val careStep=selected.steps.filterIsInstance<CareStep>().singleOrNull()
                     if(careStep!=null) {
                         val health=care.readHealth("plan-funding-health")
@@ -407,16 +421,15 @@ class PetSessionController(context:Context,capture:HeadlessDisplayCapture,input:
                 }
                 val workStep=selected.steps.filterIsInstance<WorkStep>().singleOrNull()
                 if(studyStep!=null && planStudyAllowedRounds>0 && workStep==null &&
-                    checkNotNull(planCourseCost).balanceCoins<tuitionReserveCoins) {
+                    checkNotNull(planCourseBalance)<tuitionReserveCoins) {
                     return@ResourcePreflightPort ResourcePreflight.Insufficient("COURSE_SUFFIX_COINS_INSUFFICIENT")
                 }
                 if(studyStep!=null && planStudyAllowedRounds>0) {
-                    val cost=checkNotNull(planCourseCost)
                     val spendToday=computeConfirmedNetSpendToday()
-                    val decision=CoinSpendPolicy.evaluate(
-                        balanceCoins=cost.balanceCoins,
-                        tuitionCoins=cost.tuitionCoins,
-                        remainingRounds=planStudyAllowedRounds,
+                    // STR-09：轮换方案的学费按真实顺序合计，不拿最贵那门乘节数。
+                    val decision=CoinSpendPolicy.evaluatePlanned(
+                        balanceCoins=checkNotNull(planCourseBalance),
+                        plannedSpendCoins=tuitionReserveCoins.toLong(),
                         minCoinFloor=selected.minCoinFloor,
                         maxDailyNetSpend=selected.maxDailyNetSpend,
                         alreadySpentToday=spendToday)
@@ -427,8 +440,7 @@ class PetSessionController(context:Context,capture:HeadlessDisplayCapture,input:
                 }
                 val workMinutes=if(workStep==null || planSkipWork) 0 else WorkCatalog().all()
                     .single {it.id==workStep.workOptionId}.durationMinutes
-                val studyMinutes=if(studyStep==null) 0 else Math.multiplyExact(planStudyAllowedRounds,
-                    CourseTiming.resolve(plan,catalog,System.currentTimeMillis()).durationMinutes)
+                val studyMinutes=if(studyStep==null) 0 else StudyRotationPolicy.minutesTotal(lessons,planCourseMinutes)
                 val adventureStep=selected.steps.filterIsInstance<AdventureStep>().singleOrNull()
                 val adventureMinutes=if(adventureStep==null) 0 else Math.multiplyExact(adventureStep.rounds, adventureStep.mode.durationMinutes)
                 if(!checkNotNull(planAttemptBudget).canAfford(Math.addExact(workMinutes,Math.addExact(studyMinutes,adventureMinutes)),selected.dailyBudgetMinutes)) {
@@ -586,6 +598,9 @@ class PetSessionController(context:Context,capture:HeadlessDisplayCapture,input:
     /**
      * One plan STUDY step: the plan's own course and rounds, each lesson with its own budget
      * reservation and its own completion record. Health is observed, never a gate.
+     *
+     * STR-09：开了均衡的方案按轮换顺序上不同的课——第 1 节力量、第 2 节智力、第 3 节魅力，
+     * 第 4 节回到力量；单属性方案每一节仍是同一门课。
      */
     private suspend fun runPlanStudy(step:StudyStep):StepOutcome {
         // STR-08：今天还能上几节已经在预检里算好，这里只按允许的节数开课；一节都不剩就跳过。
@@ -594,21 +609,26 @@ class PetSessionController(context:Context,capture:HeadlessDisplayCapture,input:
             flow.emit("plan-study-skipped",result="DAILY_LIMIT_REACHED")
             return StepOutcome.Skipped(SkipReason.DAILY_LIMIT_REACHED)
         }
-        val derived=plan.copy(courseId=step.courseId,rounds=rounds)
+        val schedule=StudyRotationPolicy.schedule(step,rounds)
         var lessons=0
-        repeat(rounds) {index ->
+        schedule.forEachIndexed { index, lesson ->
+            val derived=plan.copy(courseId=lesson.courseId,rounds=rounds)
             pausePoint("第 ${index+1}/${rounds} 节 ${derived.courseName}")
             flow.round=index+1
             flow.state="SELECT_COURSE"
             snapshot=snapshot.copy(currentFlow="STUDY",nextStep="第 ${index+1}/${rounds} 节 ${derived.courseName}")
             val timing=CourseTiming.resolve(derived,catalog,System.currentTimeMillis())
             val ctx=checkNotNull(activePlanContext)
+            // STR-09：这一节页面上写明的属性收益，读不到就是未知，不猜。
+            var observedGain:CourseAttributeGain?=null
             val course=study.start(null,derived,timing,beforeStart={minutes ->
                 ctx.beforeConsumingInput(index+1,minutes)
             },ensureTuition={
-                val cost=readCourseCost()
-                check(cost.tuitionCoins==checkNotNull(planCourseCost).tuitionCoins) {"COURSE_TUITION_CHANGED"}
-                check(cost.balanceCoins>=cost.tuitionCoins) {"COURSE_COINS_INSUFFICIENT"}
+                val page=readCoursePage()
+                val expected=checkNotNull(planCourseCosts[lesson.courseId])
+                check(page.cost.tuitionCoins==expected.tuitionCoins) {"COURSE_TUITION_CHANGED"}
+                check(page.cost.balanceCoins>=page.cost.tuitionCoins) {"COURSE_COINS_INSUFFICIENT"}
+                observedGain=page.attributeGain
             })
             ctx.startConfirmed(index+1)
             val started=course.getLong("courseStartElapsedRealtime")
@@ -619,18 +639,35 @@ class PetSessionController(context:Context,capture:HeadlessDisplayCapture,input:
             ctx.completed(index+1,course.getInt("durationMinutes"))
             check(ledger.complete(flow.round)) {"DUPLICATE_ROUND_COMPLETION"}
             lessons++
+            recordStudyAttribute(lesson.attribute,observedGain)
             completed=ledger.completedCount
             snapshot=snapshot.copy(completedRounds=completed)
-            flow.emit("ROUND_RESULT_CONFIRMED",result="round=${flow.round} completed=$completed")
+            flow.emit("ROUND_RESULT_CONFIRMED",result="round=${flow.round} completed=$completed"+
+                (lesson.attribute?.let {" attribute=$it"} ?: ""))
             if(result.getBoolean("result_page")) navigation.returnHomeFromResult("result") else navigation.initialise()
         }
         snapshot=snapshot.copy(completedRounds=lessons)
         return StepOutcome.Completed()
     }
 
-    /** The plan's own course cost, read from the course detail page of [step]'s course. */
-    private suspend fun readPlanCourseCost(step:StudyStep):CourseCostReading {
-        val derived=plan.copy(courseId=step.courseId,rounds=step.rounds)
+    /**
+     * STR-09：记录这个属性这次上了几节、页面上写明一共加多少。
+     *
+     * 页面上写的收益和这一节练的属性对不上时，宁可记成未知，也不把别的属性的数字算进来。
+     */
+    private fun recordStudyAttribute(attribute:String?,gain:CourseAttributeGain?) {
+        if(attribute.isNullOrBlank()) return
+        val fact=studyAttributeFacts[attribute] ?: StudyAttributeFact(attribute,0,null,0)
+        val matched=gain?.takeIf { it.attribute==attribute }
+        studyAttributeFacts[attribute]=fact.copy(
+            rounds=fact.rounds+1,
+            gain=(fact.gain ?: 0)+(matched?.amount ?: 0),
+            lessonsWithGain=fact.lessonsWithGain+(if(matched==null) 0 else 1))
+    }
+
+    /** The plan's own course cost, read from the course detail page of [courseId]'s course. */
+    private suspend fun readPlanCourseCost(courseId:String):CourseCostReading {
+        val derived=plan.copy(courseId=courseId)
         navigation.enterOutdoor("plan-course-cost-outdoor")
         val selected=CourseSelector(flow,navigation,reader).select(derived)
         CourseTiming.resolve(derived,catalog,System.currentTimeMillis())
@@ -1265,7 +1302,15 @@ class PetSessionController(context:Context,capture:HeadlessDisplayCapture,input:
      * every attempt still fails leave the raw lines in the log so the next parser fix has
      * something to work from — same pattern as DeviceWorkPageReader.readRewardRow.
      */
-    private suspend fun readCourseCost():CourseCostReading {
+    private suspend fun readCourseCost():CourseCostReading = readCoursePage().cost
+
+    /**
+     * 课程详情页的一次读取：学费与余额，以及页面上写明的属性收益。
+     *
+     * 学费和属性收益写在同一页上，所以一次读页就够，不必再读一帧；
+     * 属性收益读不到就是 null（未知），不影响学费的判定。
+     */
+    private suspend fun readCoursePage():CoursePageReading {
         var lastLines:List<String> = emptyList()
         var attempts=0
         while(attempts<COURSE_COST_READ_ATTEMPTS) {
@@ -1275,7 +1320,9 @@ class PetSessionController(context:Context,capture:HeadlessDisplayCapture,input:
                 check(flow.score(frame,listOf(flow.profile.courseListProbe))>=flow.profile.matchThreshold) {"COURSE_COST_PAGE_UNCONFIRMED"}
                 val lines=reader.read(frame).sortedBy {it.bounds.top}
                 lastLines=lines.map {it.text}
-                CourseCostReading.parse(lines.joinToString(" ") {it.text})?.let { return it }
+                val text=lines.joinToString(" ") {it.text}
+                val cost=CourseCostReading.parse(text)
+                if(cost!=null) return CoursePageReading(cost,CourseAttributeGain.parse(text))
             } finally {frame.recycle()}
             attempts++
         }
@@ -1318,6 +1365,11 @@ class PetSessionController(context:Context,capture:HeadlessDisplayCapture,input:
             "studyRoundsCompleted" to (planRunSnapshot?.counts?.studyRoundsCompleted ?: ledger.completedCount),
             "targetAttribute" to (planV2?.steps?.filterIsInstance<StudyStep>()?.singleOrNull()?.targetAttribute
                 ?: plan.targetAttribute),
+            // STR-09：每个属性这次上了几节、页面上写明一共加多少（读不到就留 null，不猜）。
+            "studyAttributes" to studyAttributeFacts.mapValues { (_, fact) ->
+                mapOf<String, Any?>("rounds" to fact.rounds, "gain" to fact.gain,
+                    "lessonsWithGain" to fact.lessonsWithGain)
+            },
             "strategyActions" to value.strategyActions.map {
                 mapOf("label" to it.label,"outcome" to it.outcome.name,"reason" to it.reason)})
         File(evidence,"run-record.json").writeText(EventJson.encode(record))

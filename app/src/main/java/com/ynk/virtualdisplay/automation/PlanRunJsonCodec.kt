@@ -24,6 +24,9 @@ internal object PlanRunJsonCodec {
                 is StudyStep -> {
                     fields.putAll(obj("courseId" to s.courseId, "rounds" to s.rounds))
                     if (s.targetAttribute != null) fields["targetAttribute"] = s.targetAttribute
+                    // STR-09：均衡轮换写进运行快照，重放时还是同一串课。
+                    if (s.rotation.isNotEmpty()) fields["rotation"] = s.rotation.map {
+                        obj("attribute" to it.attribute, "courseId" to it.courseId) }
                 }
                 is AdventureStep -> fields.putAll(obj("mode" to s.mode.name, "rounds" to s.rounds, "maxDailyRounds" to s.maxDailyRounds))
             }
@@ -78,7 +81,11 @@ internal object PlanRunJsonCodec {
                     PlanStepType.WORK -> WorkStep(id, step.string("workOptionId"), enumValueOf(step.string("trigger")), step.int("shifts"))
                     PlanStepType.CARE -> CareStep(id, step.int("energyThreshold"), step.int("cleanlinessThreshold"))
                     PlanStepType.STUDY -> StudyStep(id, step.string("courseId"), step.int("rounds"),
-                        if (step.containsKey("targetAttribute")) step.string("targetAttribute") else null)
+                        if (step.containsKey("targetAttribute")) step.string("targetAttribute") else null,
+                        if (step.containsKey("rotation")) step.list("rotation").map { item ->
+                            val entry = item.objectValue()
+                            StudyRotation(entry.string("attribute"), entry.string("courseId"))
+                        } else emptyList())
                     PlanStepType.ADVENTURE -> AdventureStep(id, if (step.containsKey("mode")) enumValueOf<AdventureMode>(step.string("mode")) else AdventureMode.NEARBY_WALK, step.int("rounds"), if (step.containsKey("maxDailyRounds")) step.nullInt("maxDailyRounds") else null)
                 }
             }, enumValueOf(p.string("executionProfile")), p.nullString("legacySource"),

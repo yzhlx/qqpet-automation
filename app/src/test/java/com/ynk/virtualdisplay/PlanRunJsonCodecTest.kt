@@ -6,6 +6,7 @@ import com.ynk.virtualdisplay.automation.RunRequest
 import com.ynk.virtualdisplay.automation.RunSnapshot
 import com.ynk.virtualdisplay.automation.PlanRunJsonCodec
 import com.ynk.virtualdisplay.automation.StoredRun
+import com.ynk.virtualdisplay.automation.StudyRotation
 import com.ynk.virtualdisplay.automation.StudyStep
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -30,5 +31,18 @@ class PlanRunJsonCodecTest {
 
     @Test fun aPlanWithoutTheCapKeepsItOff() {
         assertNull(roundTrip(null).dailyStudyRoundCap)
+    }
+
+    @Test fun theBalancedRotationSurvivesTheRunStore() {
+        val rotation = listOf(
+            StudyRotation("力量", "study:蹦蹦跳跳体能课"),
+            StudyRotation("智力", "study:看图识世界课"),
+            StudyRotation("魅力", "study:闪亮自我表达课"))
+        val plan = PlanV2(planId = "p", name = "方案", dailyBudgetMinutes = 120,
+            steps = listOf(StudyStep("s", rotation.first().courseId, 3, null, rotation)))
+        val request = RunRequest("req", plan, "dev", 3, RunOrigin.PLAN, 1L)
+        val stored = StoredRun(RunSnapshot("run", request), emptyList(), emptyMap())
+        val decoded = PlanRunJsonCodec.decode(PlanRunJsonCodec.encode(stored)).snapshot.request.planSnapshot
+        assertEquals(rotation, (decoded.steps.single() as StudyStep).rotation)
     }
 }

@@ -354,3 +354,27 @@
 - 待验收：真实跑一轮「今天已学满 N 节 → 本轮跳过学习」的真机场景尚未执行（需要当天已有已确认学习记录的实际局面），该行为目前只有 JVM 测试覆盖；旧版托管参数路径（session-plan.json）不读停止线，只有方案页保存的 PlanV2 生效。
 - 提交与推送：feat(plan): 属性目标与今日停止线，今日学满即跳过 (STR-08)，推送 backup/feat/onboarding-troubleshooting-p0，更新 PR #4。
 - 下一步：第三阶段 STR-09 均衡属性目标（轮换力量/智力/魅力并记录每项变化）：StudyStep 目前只有单个 courseId，轮换需要每轮不同课程，预检的学费/时长/成本读取都要按属性分别取，工作量比 STR-08 大；run-record.json 已记下 targetAttribute 与 studyRoundsCompleted，可直接作为每项统计的原料。
+
+## 均衡属性目标（2026-11-03，feat/onboarding-troubleshooting-p0）
+- 目标：STR-09 均衡属性目标——轮换力量、智力、魅力，并记录每项变化。
+- 核实结论：
+  - 属性到课程的匹配早已具备（StudyAttribute.resolveCourse 按已解锁课程挑课）；缺的是「一课一属性、按节轮换」的载体和「每项变化」的记录。
+  - 宠物当前的属性数值读不到：房间页只公开体力/清洁/心情，学习流程不去职业小镇，phase00 文档已标注属性「明确不支持读取」。所以本轮不声称能读属性总量。
+  - 课程详情页写明该课的属性收益（MVP-VALIDATION Gate C 实测表：蹦蹦跳跳体能课 力量+2、看图识世界课 智力+2、闪亮自我表达课 魅力+2 等）。读学费时本来就要打开这一页，顺带解析同一帧文本即可，不额外读帧。
+- 改动：
+  - StudyRotation（PlanV2 层，新增）：一门轮换课 = 属性 + 课程。StudyStep 新增 rotation（默认空=单属性目标）与只读 courseIds；校验轮换不超过三项、属性不重复、课程不重复、第一节必须等于 step.courseId、均衡时不得同时写单属性目标。
+  - StudyRotationPolicy（新增，纯函数，JVM 可测）：schedule 按轮换顺序排出本次每一节上哪门课（第 4 节回到力量）；tuitionTotal 按真实顺序累加学费（不是最贵那门×节数）；maxTuition 供币值闸门用；minutesTotal 每节用它自己那门课的时长。读不到学费或时长直接失败，不当成 0。
+  - CourseAttributeGain（新增，纯函数）：从课程页文本解析「力量/智力/魅力 + N」，容忍 ML Kit 拆字空格和全角加号；体力不算属性；随机属性读不到就是 null。
+  - CourseCostReading.kt 新增 CoursePageReading（学费+余额+属性收益，一次读页拿全）；PetSessionController 的 readCoursePage 取代 readCourseCost 的读帧逻辑，旧调用点行为不变。
+  - PetSessionController 预检：courses 端口把轮换里每一门课都走一遍课程页读学费/时长（原实现只读第一门）；学费预留按真实顺序合计；币值闸门改用新增的 CoinSpendPolicy.evaluatePlanned（按真实合计判断，不拿最贵那门乘节数）；分钟预算按每节自己的时长累加。
+  - 执行：runPlanStudy 按 schedule 逐节换课，每节的 ensureTuition 对照该课预读到的学费，并把课程页写明的收益记下来；每完成一节累加该属性的节数与收益。
+  - 记录：run-record.json 新增 studyAttributes（属性 → 节数 / 收益合计 / 读到收益的节数）；SessionRunRecord 读回；记录页「动作与道具」逐条显示「力量属性 本轮 2 节 · +4」，读不到写「收益未读到」而不是编一个数字；原来那条「金币 / 属性 / 库存 · 不支持读取」改成只针对宠物当前属性数值，不再和新记录冲突。
+  - 方案页：培养目标属性卡片新增第 4 个芯片「均衡」（默认不选，新玩法不默认执行），选中后显示「均衡：力量 → 智力 → 魅力（每节课轮换一门）」和三门课的课程名；均衡模式下课程列表不可手动选，改回单属性会清空轮换。
+  - 使用攻略「配置托管方案」补充第 9 条「均衡目标」，写明轮换顺序、学费按每节计算、属性数值读不到。
+  - 单元测试：新增 StudyRotationPolicyTest（8 项）、CourseAttributeGainTest（4 项）、RecordsPresentationTest（3 项）；PlanV2Test 补 2 项（轮换保留 + 5 种非法轮换）、PlanV2StoreTest 补 1 项（轮换往返、关闭时不写键）、PlanRunJsonCodecTest 补 1 项（运行快照往返）、CoinSpendPolicyTest 补 1 项（按真实合计判断）；真机插桩 StrategyRecordJsonTest 补 1 项（studyAttributes 写读往返、读不到的收益保持未知）。
+- 验证结果：全量单元测试 108 套件 / 1000 项 100% PASS（0 failures, 0 errors, 3 skipped）；assembleDebug 构建通过；ADB 覆盖安装 DKS9K23420020242 成功，App 启动与各页切换无 FATAL；真机确认方案页出现「均衡」芯片，点选后高亮为选中色并显示三门轮换课，保存后 plan-v2.json 写入 rotation（力量/智力/魅力三门课）且不写 targetAttribute，重新进入方案页轮换说明与选中态恢复；使用攻略第 9 条「均衡目标」可见；记录页空态正常。
+- 待验收：
+  - 真机跑一轮三节轮换尚未执行——设备上 Shizuku 未授权，托管无法启动；轮换执行路径目前只有 JVM 测试覆盖。
+  - 课程页属性收益解析目前依据 Gate C 实测表与合成文本测试，尚未在真实课程详情页的 OCR 原始输出上验证；读不到时会记成未知，不会给出错误数字。
+- 提交与推送：feat(plan): 均衡属性目标，按节轮换并记录每项变化 (STR-09)，推送 backup/feat/onboarding-troubleshooting-p0，更新 PR #4。
+- 下一步：第三阶段剩余项——STR-06/07/10/11 需要可靠的课程与岗位收益数据，目前 Gate C 只有初级学园 7 门课的页面数值、岗位收益仍不完整；STR-12 疲劳/降效需要真实结算与预估对比。先做 STR-06 的课程收益比较（数据已有：分钟/金币/学分/属性四列），把「按收益选课」做成可解释的建议而不是默认替换。

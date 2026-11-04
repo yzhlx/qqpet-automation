@@ -61,6 +61,8 @@ import com.ynk.virtualdisplay.automation.PlanValidator
 import com.ynk.virtualdisplay.automation.RewardConfidence
 import com.ynk.virtualdisplay.automation.SessionPlan
 import com.ynk.virtualdisplay.automation.SessionPlanStore
+import com.ynk.virtualdisplay.automation.StudyAttribute
+import com.ynk.virtualdisplay.automation.StudyRotation
 import com.ynk.virtualdisplay.automation.StudyStep
 import com.ynk.virtualdisplay.automation.StudyDailyCapPolicy
 import com.ynk.virtualdisplay.automation.WorkCatalog
@@ -116,6 +118,8 @@ fun PetPlanSheetScreen(onClose: () -> Unit, onStarted: () -> Unit, displayId: In
     var transferOnBlock by remember { mutableStateOf(false) }
     var studyCapEnabled by remember { mutableStateOf(false) }
     var studyCapValue by remember { mutableStateOf(5) }
+    /** STR-09：均衡目标的三门课（力量 → 智力 → 魅力）；空表示单属性目标。 */
+    var balancedRotation by remember { mutableStateOf<List<StudyRotation>>(emptyList()) }
     var todayStudyRounds by remember { mutableStateOf(0) }
     var adventureMode by remember { mutableStateOf(com.ynk.virtualdisplay.automation.AdventureMode.NEARBY_WALK) }
     var adventureRounds by remember { mutableStateOf(1) }
@@ -174,8 +178,10 @@ fun PetPlanSheetScreen(onClose: () -> Unit, onStarted: () -> Unit, displayId: In
                 adventureRounds = adventure.rounds
                 adventureMaxDaily = adventure.maxDailyRounds ?: 5
             }
+            // STR-09：均衡方案恢复出三门轮换课，单属性方案恢复出目标属性。
+            balancedRotation = study?.rotation.orEmpty()
             plan = plan.copy(courseId = study?.courseId ?: plan.courseId, rounds = study?.rounds ?: plan.rounds,
-                targetAttribute = study?.targetAttribute ?: plan.targetAttribute,
+                targetAttribute = if (balancedRotation.isNotEmpty()) null else (study?.targetAttribute ?: plan.targetAttribute),
                 energyThreshold = care?.energyThreshold ?: plan.energyThreshold,
                 cleanlinessThreshold = care?.cleanlinessThreshold ?: plan.cleanlinessThreshold,
                 dailyBudgetMinutes = stored.dailyBudgetMinutes,
@@ -209,8 +215,8 @@ fun PetPlanSheetScreen(onClose: () -> Unit, onStarted: () -> Unit, displayId: In
         loading -> "正在读取方案…"
         !selectedSignIn && !selectedMailbox && !selectedLuckyBag && !selectedWork && !selectedCare && !selectedStudy && !selectedAdventure -> "请选择至少一个动作。"
         selectedWork && verified.none { it.id == plan.workOptionId } -> "请选择打工岗位。"
-        selectedStudy && !fresh && plan.targetAttribute == null && catalog == null -> "请先读取我的课程或选择上方目标属性。"
-        selectedStudy && plan.targetAttribute == null && selectedCourse?.durationMinutes == null -> "请选择一门时长已读出的课程。"
+        selectedStudy && !fresh && plan.targetAttribute == null && catalog == null && balancedRotation.isEmpty() -> "请先读取我的课程或选择上方目标属性。"
+        selectedStudy && balancedRotation.isEmpty() && plan.targetAttribute == null && selectedCourse?.durationMinutes == null -> "请选择一门时长已读出的课程。"
         else -> null
     }
     fun changed() { saved = false; lastSavedSnapshot = null; saveError = null }
@@ -232,7 +238,10 @@ fun PetPlanSheetScreen(onClose: () -> Unit, onStarted: () -> Unit, displayId: In
                         plan.energyThreshold, plan.cleanlinessThreshold))
                     if (selectedStudy) add(StudyStep(stepIds[PlanStepType.STUDY] ?: "$planId:study", plan.courseId, plan.rounds,
                         // 用户没点属性但选的就是该属性的课程时，按课程如实记下属性，运行记录里才分得清学的是什么。
-                        plan.targetAttribute ?: com.ynk.virtualdisplay.automation.StudyAttribute.forCourseId(plan.courseId)?.label))
+                        // 均衡目标没有单一属性：目标属性留空，由轮换本身说明练什么。
+                        if (balancedRotation.isNotEmpty()) null
+                        else plan.targetAttribute ?: StudyAttribute.forCourseId(plan.courseId)?.label,
+                        balancedRotation))
                     if (selectedAdventure) add(AdventureStep(stepIds[PlanStepType.ADVENTURE] ?: "$planId:adventure", adventureMode, adventureRounds, maxDailyRounds = adventureMaxDaily))
                 }
                 val snapshot = PlanV2(planId = planId, name = name, dailyBudgetMinutes = plan.dailyBudgetMinutes,
@@ -354,16 +363,17 @@ fun PetPlanSheetScreen(onClose: () -> Unit, onStarted: () -> Unit, displayId: In
                 PetSection("培养目标属性")
                 Spacer(Modifier.height(8.dp))
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    for (attr in com.ynk.virtualdisplay.automation.StudyAttribute.entries) {
-                        val isSelected = plan.targetAttribute == attr.label ||
-                            (plan.targetAttribute == null && com.ynk.virtualdisplay.automation.StudyAttribute.forCourseId(plan.courseId) == attr)
+                    for (attr in StudyAttribute.entries) {
+                        val isSelected = balancedRotation.isEmpty() && (plan.targetAttribute == attr.label ||
+                            (plan.targetAttribute == null && StudyAttribute.forCourseId(plan.courseId) == attr))
                         Box(
                             Modifier
                                 .weight(1f)
                                 .clip(RoundedCornerShape(PetTokens.ChipRadius))
                                 .background(if (isSelected) PetTokens.Blue else PetTokens.Surface)
                                 .clickable(enabled = !busy) {
-                                    val resolved = com.ynk.virtualdisplay.automation.StudyAttribute.resolveCourse(attr, catalog)
+                                    val resolved = StudyAttribute.resolveCourse(attr, catalog)
+                                    balancedRotation = emptyList()
                                     plan = plan.copy(targetAttribute = attr.label, courseId = resolved.id)
                                     changed()
                                 }
@@ -378,6 +388,37 @@ fun PetPlanSheetScreen(onClose: () -> Unit, onStarted: () -> Unit, displayId: In
                             )
                         }
                     }
+                    // STR-09 均衡：第 1 节力量、第 2 节智力、第 3 节魅力，第 4 节回到力量。
+                    val balancedSelected = balancedRotation.isNotEmpty()
+                    Box(
+                        Modifier
+                            .weight(1f)
+                            .clip(RoundedCornerShape(PetTokens.ChipRadius))
+                            .background(if (balancedSelected) PetTokens.Blue else PetTokens.Surface)
+                            .clickable(enabled = !busy) {
+                                val rotation = StudyAttribute.entries.map { attr ->
+                                    StudyRotation(attr.label, StudyAttribute.resolveCourse(attr, catalog).id)
+                                }
+                                balancedRotation = rotation
+                                plan = plan.copy(targetAttribute = null, courseId = rotation.first().courseId)
+                                changed()
+                            }
+                            .padding(vertical = 7.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            "均衡",
+                            fontSize = 13.sp,
+                            fontWeight = if (balancedSelected) FontWeight.Bold else FontWeight.Normal,
+                            color = if (balancedSelected) PetTokens.Surface else PetTokens.Ink,
+                        )
+                    }
+                }
+                if (balancedRotation.isNotEmpty()) {
+                    Spacer(Modifier.height(8.dp))
+                    PetNote("均衡：" + balancedRotation.joinToString(" → ") { it.attribute } +
+                        "（每节课轮换一门）\n" +
+                        balancedRotation.joinToString(" → ") { it.courseId.substringAfter(':', it.courseId) })
                 }
                 Spacer(Modifier.height(12.dp))
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
@@ -407,9 +448,12 @@ fun PetPlanSheetScreen(onClose: () -> Unit, onStarted: () -> Unit, displayId: In
                 if (!fresh) PetNote("需要 7 天内读取过的课表，请先读取。")
                 else if (unlocked.isEmpty()) PetNote("没有读到已解锁的课程。")
                 else unlocked.forEach { course ->
+                    val inRotation = balancedRotation.any { it.courseId == course.id }
                     ChoiceRow(course.name, course.durationMinutes?.let { "$it 分钟" } ?: "时长未读出",
-                        course.id == plan.courseId, !busy) { plan = plan.copy(courseId = course.id); changed() }
+                        inRotation || (balancedRotation.isEmpty() && course.id == plan.courseId),
+                        !busy && balancedRotation.isEmpty()) { plan = plan.copy(courseId = course.id); changed() }
                 }
+                if (balancedRotation.isNotEmpty()) PetNote("均衡模式下按上面三门课轮换，不手动选单门课。")
                 Spacer(Modifier.height(6.dp))
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     PetFootButton(if (runtime.running) "任务进行中" else "读取我的课程",

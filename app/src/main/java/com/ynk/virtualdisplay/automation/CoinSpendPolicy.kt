@@ -34,7 +34,27 @@ object CoinSpendPolicy {
         require(balanceCoins >= 0 && tuitionCoins >= 0 && remainingRounds in 0..10 && alreadySpentToday >= 0) {
             "COIN_SPEND_POLICY_INPUT_INVALID"
         }
-        val plannedSpend = tuitionCoins.toLong() * remainingRounds
+        return evaluatePlanned(balanceCoins, tuitionCoins.toLong() * remainingRounds,
+            minCoinFloor, maxDailyNetSpend, alreadySpentToday)
+    }
+
+    /**
+     * STR-09：按真实学费合计判断，而不是「单节课学费 × 节数」。
+     *
+     * 均衡轮换里每一节的学费可能不同（10 分钟课与 30 分钟课价格不同），
+     * 所以闸门要拿到真实合计，不能拿最贵那门乘节数，也不能拿最便宜那门乘节数。
+     */
+    fun evaluatePlanned(
+        balanceCoins: Int,
+        plannedSpendCoins: Long,
+        minCoinFloor: Int?,
+        maxDailyNetSpend: Int?,
+        alreadySpentToday: Int,
+    ): Decision {
+        require(balanceCoins >= 0 && plannedSpendCoins >= 0 && alreadySpentToday >= 0) {
+            "COIN_SPEND_POLICY_INPUT_INVALID"
+        }
+        val plannedSpend = plannedSpendCoins
 
         if (maxDailyNetSpend != null) {
             val projectedTotal = alreadySpentToday.toLong() + plannedSpend

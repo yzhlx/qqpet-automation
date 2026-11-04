@@ -89,6 +89,30 @@ class PlanV2Test {
         assertEquals("{old}", p.legacySource)
         assertEquals(ExecutionProfile.LEGACY_MANAGED, p.executionProfile)
     }
+    @Test fun aBalancedRotationKeepsItsOrderAndCourses() {
+        val rotation = listOf(
+            StudyRotation("力量", "study:蹦蹦跳跳体能课"),
+            StudyRotation("智力", "study:看图识世界课"),
+            StudyRotation("魅力", "study:闪亮自我表达课"))
+        val step = StudyStep("s", rotation.first().courseId, 3, null, rotation)
+        assertEquals(rotation.map { it.courseId }, step.courseIds)
+        assertEquals(listOf("力量", "智力", "魅力"), step.rotation.map { it.attribute })
+    }
+    @Test fun aBrokenRotationCannotBecomeARunnablePlan() {
+        val strength = StudyRotation("力量", "study:蹦蹦跳跳体能课")
+        val intellect = StudyRotation("智力", "study:看图识世界课")
+        val charm = StudyRotation("魅力", "study:闪亮自我表达课")
+        // 同一个属性出现两次。
+        invalid { StudyStep("s", strength.courseId, 3, null, listOf(strength, StudyRotation("力量", "study:田径运动课"))) }
+        // 超过三项。
+        invalid { StudyStep("s", strength.courseId, 3, null, listOf(strength, intellect, charm, StudyRotation("速度", "study:田径运动课"))) }
+        // 第一节的课和轮换的第一门对不上。
+        invalid { StudyStep("s", intellect.courseId, 3, null, listOf(strength, intellect)) }
+        // 均衡与单一目标属性同时存在。
+        invalid { StudyStep("s", strength.courseId, 3, "力量", listOf(strength, intellect)) }
+        // 同一门课出现两次。
+        invalid { StudyStep("s", strength.courseId, 3, null, listOf(strength, StudyRotation("智力", strength.courseId))) }
+    }
 }
 
 class PlanExecutionModelsTest {

@@ -231,6 +231,17 @@ object RecordsPresentation {
                 verdictTone = VerdictTone.PENDING,
             )
         }
+        // STR-09：每个属性这次上了几节、课程页写明一共加多少。读不到就是读不到，不补数字。
+        record?.studyAttributes.orEmpty().forEach { fact ->
+            val partial = fact.lessonsWithGain < fact.rounds
+            out += ActionOutcome(
+                label = "${fact.attribute}属性",
+                meta = "本轮 ${fact.rounds} 节 · 课程页写明的收益" +
+                    (if (partial) "（${fact.lessonsWithGain} 节读到）" else ""),
+                verdict = fact.gain?.let { "+$it" } ?: "收益未读到",
+                verdictTone = if (fact.gain != null && !partial) VerdictTone.CONFIRMED else VerdictTone.UNKNOWN,
+            )
+        }
         val coinBefore = record?.roomCoinsBefore
         val coinAfter = record?.roomCoinsAfter
         if (coinBefore != null && coinAfter != null) {
@@ -250,8 +261,8 @@ object RecordsPresentation {
                 verdictTone = VerdictTone.UNKNOWN,
             )
             out += ActionOutcome(
-                label = "金币 / 属性 / 库存",
-                meta = "本版本未接入读取器（NO_READER_IN_SLICE1）",
+                label = "金币 / 宠物属性数值",
+                meta = "房间页没有可稳定识别的属性栏，宠物当前属性数值读不到",
                 verdict = "不支持读取",
                 verdictTone = VerdictTone.UNKNOWN,
             )

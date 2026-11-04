@@ -38,17 +38,46 @@ data class CareStep(
     }
 }
 
+/** STR-09：均衡轮换里的一门课——练哪个属性、上哪门课。 */
+data class StudyRotation(val attribute: String, val courseId: String) {
+    init {
+        require(attribute.isNotBlank()) { "PLAN_ROTATION_ATTRIBUTE_BLANK" }
+        require(courseId.isNotBlank()) { "PLAN_ROTATION_COURSE_BLANK" }
+    }
+}
+
+/**
+ * 一个学习步骤。开了均衡（[rotation] 非空）时，[courseId] 是第一节上的课，
+ * 后面按 [rotation] 的顺序轮换；单属性目标时 [targetAttribute] 写明练哪个属性。
+ */
 data class StudyStep(
     override val stepId: String,
     val courseId: String,
     val rounds: Int = 1,
     val targetAttribute: String? = null,
+    val rotation: List<StudyRotation> = emptyList(),
 ) : PlanStep {
     override val type: PlanStepType get() = PlanStepType.STUDY
+
+    /** 本步骤会上的课：轮换时按轮换顺序，否则就是自己这一门。 */
+    val courseIds: List<String>
+        get() = if (rotation.isEmpty()) listOf(courseId) else rotation.map { it.courseId }
+
     init {
         require(stepId.isNotBlank()) { "PLAN_STEP_ID_BLANK" }
         require(courseId.isNotBlank()) { "PLAN_COURSE_BLANK" }
         require(rounds in 1..10) { "PLAN_STUDY_ROUNDS_OUT_OF_RANGE:$rounds" }
+        if (rotation.isNotEmpty()) {
+            require(rotation.size <= 3) { "PLAN_STUDY_ROTATION_TOO_LARGE:${rotation.size}" }
+            require(rotation.map { it.attribute }.distinct().size == rotation.size) {
+                "PLAN_STUDY_ROTATION_ATTRIBUTE_DUPLICATE"
+            }
+            require(rotation.map { it.courseId }.distinct().size == rotation.size) {
+                "PLAN_STUDY_ROTATION_COURSE_DUPLICATE"
+            }
+            require(rotation.first().courseId == courseId) { "PLAN_STUDY_ROTATION_FIRST_COURSE_MISMATCH" }
+            require(targetAttribute == null) { "PLAN_STUDY_ROTATION_TARGET_CONFLICT" }
+        }
     }
 }
 

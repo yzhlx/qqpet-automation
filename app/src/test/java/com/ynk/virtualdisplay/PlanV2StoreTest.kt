@@ -236,6 +236,24 @@ class PlanV2StoreTest {
         assertFalse(PlanV2JsonCodec.encode(off).contains("transferOnBlock"))
     }
 
+    @Test fun theBalancedRotationSurvivesReopeningAndIsOmittedWhenOff() {
+        val file = File(temporary.root, PlanV2Store.FILE_NAME)
+        val rotation = listOf(
+            StudyRotation("力量", "study:蹦蹦跳跳体能课"),
+            StudyRotation("智力", "study:看图识世界课"),
+            StudyRotation("魅力", "study:闪亮自我表达课"))
+        val expected = plan(listOf(StudyStep("s", rotation.first().courseId, 3, null, rotation)))
+        PlanV2Store(file).save(expected)
+        val loaded = PlanV2Store(file).load()
+        assertNotNull(loaded)
+        assertEquals(expected, loaded)
+        assertEquals(rotation, (loaded!!.steps.single() as StudyStep).rotation)
+
+        // 关掉均衡时这个键不写进文件。
+        PlanV2Store(file).save(plan())
+        assertFalse(file.readText().contains("rotation"))
+    }
+
     @Test fun luckyBagStepRoundtripsWithLimitsAndInterval() {
         val file = File(temporary.root, PlanV2Store.FILE_NAME)
         val p = plan(listOf(LuckyBagStep("lb-1", 10, 45)))

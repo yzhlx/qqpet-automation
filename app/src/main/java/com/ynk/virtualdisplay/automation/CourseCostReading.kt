@@ -57,3 +57,10 @@ data class CourseCostReading(val tuitionCoins: Int, val balanceCoins: Int) {
         }
     }
 }
+
+/**
+ * 课程详情页一次读取拿到的全部事实：学费与余额，加上页面上写明的属性收益（读不到就是 null）。
+ *
+ * 一次读页就够了：学费和属性收益写在同一页上，不必再读一帧。
+ */
+data class CoursePageReading(val cost: CourseCostReading, val attributeGain: CourseAttributeGain?)
