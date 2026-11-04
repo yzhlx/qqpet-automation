@@ -546,3 +546,21 @@
   - 真机：写入一条 startedAt 为前一天的测试记录后，记录页显示
     「昨天 · 学习 2 节 · 打工 2 班 · 签到 1 次 · 运行 45 分钟」；验证后已删除测试目录。
 - 提交：feat(records): 昨日汇总一行，跨零点保留前一天进度 (OBS-06)。
+
+### 2026-11-04 收尾：差距台账完成 / 提交与阻塞
+
+- 交付内容：
+  - 竞品清单 76 条全部按原编号标注状态与证据（代码 / 测试 / 真机历史），
+    把「部分实现」（OBS-02/05、MKA-07、CORE-20）和「暂缓」（STR-06/07/12、MKA-05、SKIP-*）
+    与已实现项分开；授权/诊断/预览关联到引导清单，避免两套实现。
+  - 「无法识别的页面安全停止」已勾选并写证据（领取流程不再盲点、未知结果记待确认）。
+- 提交：feat(records) 昨日汇总（OBS-06，79d528c）、docs 交接补充（5eab1ce）已在本地
+  feat/onboarding-troubleshooting-p0。
+- 阻塞：本机到 GitHub 的 HTTPS 与 SSH 均被网络拦（TLS 握手失败 / port 22 连接被关闭），
+  a685f91 / 79d528c / 5eab1ce 及 PR #4 说明更新都未能推送；网络恢复后先
+  git -C Z: push backup HEAD:backup/feat/onboarding-troubleshooting-p0 ，
+  再 gh pr edit 4 --repo yzhlx/qqpet-automation --body-file C:/tmp/pr_body.md 。
+- 待验收（需要能跑真实托管的设备）：签到/信箱/福袋真实领取分支、「开始被拦」提示、
+  通知点回 App、夜间暂停运行中自动停/续。
+- 下一步：网络恢复后推送 → 更新 PR 说明 → Shizuku 连接后补真实领取与开始拦截验收；
+  贯穿项 CORE-02/16~19 已在台账标注，等下一次真机回归确认后勾选。
