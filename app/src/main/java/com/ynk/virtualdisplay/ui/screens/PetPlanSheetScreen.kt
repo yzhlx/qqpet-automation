@@ -47,6 +47,9 @@ import com.ynk.virtualdisplay.automation.CourseCatalog
 import com.ynk.virtualdisplay.automation.CourseComparison
 import com.ynk.virtualdisplay.automation.CourseReading
 import com.ynk.virtualdisplay.automation.CourseReadingStore
+import com.ynk.virtualdisplay.automation.WorkReading
+import com.ynk.virtualdisplay.automation.WorkReadingStore
+import com.ynk.virtualdisplay.automation.WorkYieldComparison
 import com.ynk.virtualdisplay.automation.CourseCatalogStore
 import com.ynk.virtualdisplay.automation.DailyBudgetStore
 import com.ynk.virtualdisplay.automation.ExecutionProfile
@@ -132,6 +135,7 @@ fun PetPlanSheetScreen(onClose: () -> Unit, onStarted: () -> Unit, displayId: In
     var showCompatibilityNote by remember { mutableStateOf(false) }
     var catalog by remember { mutableStateOf<CourseCatalog?>(null) }
     var courseReadings by remember { mutableStateOf<Map<String, CourseReading>>(emptyMap()) }
+    var workReadings by remember { mutableStateOf<Map<String, WorkReading>>(emptyMap()) }
     var loading by remember { mutableStateOf(true) }
     var saving by remember { mutableStateOf(false) }
     var saved by remember { mutableStateOf(false) }
@@ -206,12 +210,18 @@ fun PetPlanSheetScreen(onClose: () -> Unit, onStarted: () -> Unit, displayId: In
         courseReadings = withContext(Dispatchers.IO) {
             runCatching { CourseReadingStore(context).load() }.getOrDefault(emptyMap())
         }
+        workReadings = withContext(Dispatchers.IO) {
+            runCatching { WorkReadingStore(context).load() }.getOrDefault(emptyMap())
+        }
         loading = false
     }
     LaunchedEffect(runtime.running, runtime.status) {
         catalog = withContext(Dispatchers.IO) { runCatching { CourseCatalogStore(context).load() }.getOrNull() }
         courseReadings = withContext(Dispatchers.IO) {
             runCatching { CourseReadingStore(context).load() }.getOrDefault(emptyMap())
+        }
+        workReadings = withContext(Dispatchers.IO) {
+            runCatching { WorkReadingStore(context).load() }.getOrDefault(emptyMap())
         }
     }
 
@@ -220,6 +230,7 @@ fun PetPlanSheetScreen(onClose: () -> Unit, onStarted: () -> Unit, displayId: In
     val busy = loading || saving
     val selectedCourse = unlocked.firstOrNull { it.id == plan.courseId }
     val courseComparison = CourseComparison.compare(unlocked, courseReadings, System.currentTimeMillis())
+    val workComparison = WorkYieldComparison.compare(WorkCatalog().all(), workReadings, System.currentTimeMillis())
     val selectedActionCount = listOf(selectedSignIn, selectedMailbox, selectedLuckyBag,
         selectedWork, selectedCare, selectedStudy, selectedAdventure).count { it }
     val validationMessage = when {
@@ -349,9 +360,26 @@ fun PetPlanSheetScreen(onClose: () -> Unit, onStarted: () -> Unit, displayId: In
                 Spacer(Modifier.height(8.dp))
                 if (verified.isEmpty()) PetNote("没有可用的岗位。")
                 verified.forEach { option ->
-                    ChoiceRow("${option.venue} · ${option.optionLabel}", "一班 ${option.durationMinutes} 分钟",
+                    val live = workComparison.liveRows.firstOrNull { it.optionId == option.id }
+                    val note = if (live != null)
+                        "一班 ${live.durationMinutes} 分钟 · ${live.coinReward} 金币 · ${live.workScoreReward} 工分（现场读取）"
+                    else
+                        "一班 ${option.durationMinutes} 分钟 · ${option.coinReward} 金币 · ${option.workScoreReward} 工分（目录）"
+                    ChoiceRow("${option.venue} · ${option.optionLabel}", note,
                         plan.workOptionId == option.id, !busy) { plan = plan.copy(workOptionId = option.id); changed() }
                 }
+                Spacer(Modifier.height(6.dp))
+                PetNote(workYieldSummary(workComparison))
+                Spacer(Modifier.height(6.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    PetFootButton(if (runtime.running) "任务进行中" else "读取岗位收益",
+                        if (displayId != null && !runtime.running && !busy) PetButtonTone.GHOST else PetButtonTone.DISABLED,
+                        { displayId?.let { startWorkReading(context, it) } }, Modifier.weight(1f))
+                    Spacer(Modifier.width(10.dp))
+                    PetNote("只读，不开工\n现场读金币/工分/消耗")
+                }
+                if (displayId == null) PetNote("后台画面未就绪，暂不能读取。")
+                if (runtime.status.startsWith("读取岗位收益") || runtime.status.startsWith("岗位收益")) PetNote(runtime.status)
                 if (selectedStudy) {
                     Row(Modifier.fillMaxWidth().padding(top = 6.dp), verticalAlignment = Alignment.CenterVertically) {
                         Column(Modifier.weight(1f)) {
@@ -697,6 +725,36 @@ private fun startCourseScan(context: Context, displayId: Int) {
 
 private fun startCourseReading(context: Context, displayId: Int) {
     ContextCompat.startForegroundService(context, PetAutomationService.readCourseGainsIntent(context, displayId))
+}
+
+private fun startWorkReading(context: Context, displayId: Int) {
+    ContextCompat.startForegroundService(context, PetAutomationService.readWorkGainsIntent(context, displayId))
+}
+
+/** STR-11：只写现场读到的数；没读过的岗位按未知处理，不参与推荐。 */
+private fun workYieldSummary(summary: WorkYieldComparison.Summary): String {
+    if (!summary.hasLive) {
+        return "岗位收益未读取。点「读取岗位收益」现场读取已开放岗位与不同时长档；读不到时保持安全默认岗位。"
+    }
+    val lines = summary.liveRows.map { row ->
+        val suffix = if (row.selectable) "" else " · 暂不可选（未闭环验证）"
+        val fee = if (row.entryFeeKnown) "" else "，未含入场费"
+        "${row.venue} · ${row.optionLabel}：${row.durationMinutes} 分钟 / ${row.coinReward} 金币 / " +
+            "${row.workScoreReward} 工分（${courseNumber(row.coinsPerMinute)} 金币/分、" +
+            "${courseNumber(row.workScorePerMinute)} 工分/分$fee）$suffix"
+    }
+    val head = "现场读取：" + "\n" + lines.joinToString("\n")
+    val ranking = if (summary.selectableLiveRows.size >= 2) {
+        val coins = summary.bestCoins?.let { "金币最快 ${it.optionLabel} ${courseNumber(it.coinsPerMinute)}/分" }
+        val score = summary.bestWorkScore?.let { "工分最快 ${it.optionLabel} ${courseNumber(it.workScorePerMinute)}/分" }
+        val energy = summary.leastEnergy?.let { "体力最省 ${it.optionLabel} ${courseNumber(it.energyPerMinute)}/分" }
+        val parts = listOfNotNull(coins, score, energy)
+        if (parts.isEmpty()) "" else "\n" + "比较：" + parts.joinToString(" · ")
+    } else {
+        "\n" + "当前可执行岗位不足两个，仍按安全默认岗位执行；上面列出其他时长档供参考。"
+    }
+    val catalogOnly = if (summary.rows.any { !it.live }) "\n" + "目录里还有未现场核对的岗位，不参与比较。" else ""
+    return head + ranking + catalogOnly
 }
 
 /** STR-10：只写读到的数；读不到就说明未知，不参与排名。 */

@@ -84,6 +84,11 @@ class PetAutomationService : Service() {
                 startForeground(NOTIFICATION_ID, notification("读取课程收益…"))
                 launchOwned(intent) { readCourseGains(displayId) }
             }
+            ACTION_READ_WORK_GAINS -> {
+                val displayId = intent.getIntExtra(EXTRA_DISPLAY_ID, -1)
+                startForeground(NOTIFICATION_ID, notification("读取岗位收益…"))
+                launchOwned(intent) { readWorkGains(displayId) }
+            }
             ACTION_START -> {
                 val displayId = intent.getIntExtra(EXTRA_DISPLAY_ID, -1)
                 startForeground(NOTIFICATION_ID, notification("正在初始化…"))
@@ -529,6 +534,145 @@ class PetAutomationService : Service() {
     }
 
     /**
+     * STR-11：逐家打开目录里已知的职业，选中每个时长档但绝不开工，现场读金币/工分/消耗。
+     *
+     * 只读：不点「去打工」，不花金币、不消耗体力。每读完一个岗位就落盘；
+     * 某一家职业没开放或没找到时记下原因继续下一家，读完一家都会安全走回房间。
+     * 一个岗位都没读到时以失败结束，界面仍保留原来的安全默认岗位。
+     */
+    private suspend fun readWorkGains(displayId: Int) {
+        if (displayId <= 0) return stopSession("拒绝默认/无效 displayId")
+        try {
+            withTimeout(7_000L) {
+                app.displayRepository.connectionStatus.first { it == ConnectionStatus.CONNECTED }
+                app.displayRepository.managedDisplayIds.first { displayId in it }
+            }
+            verifyDisplay(displayId)
+            acquireWakeLock()
+            PetRuntime.update { it.copy(running = true, runState = SessionRunState.RUNNING,
+                displayId = displayId, status = "读取岗位收益…") }
+            val capture = HeadlessDisplayCapture(app.displayRepository, displayId, profile.displayWidth, profile.displayHeight)
+            val input = PetInputController(app.displayRepository, displayId, profile.displayWidth, profile.displayHeight, capture.facts)
+            val evidence = File(getExternalFilesDir(null), "pet_mvp_session/${System.currentTimeMillis()}")
+            capture.start()
+            try {
+                val flow = PetFlowContext(this, capture, input, evidence, { verifyDisplay(displayId) }, ::logEvent)
+                val reader = MlKitCourseNameReader()
+                val workPageReader = DeviceWorkPageReader(flow, reader)
+                val navigation = PetNavigation(flow, workPageReader, roomExitReader = reader)
+                val workNavigation = PetWorkNavigation(flow.asWorkSink(), workPageReader,
+                    tap = { point, settle ->
+                        flow.safety()
+                        flow.input.tap(point.x, point.y)
+                        kotlinx.coroutines.delay(settle)
+                    },
+                    swipe = { x1, y1, x2, y2, ms ->
+                        flow.safety()
+                        val points = ArrayList<android.graphics.PointF>()
+                        for (i in 0..CourseScanFlow.FLING_STEPS) {
+                            val t = i.toFloat() / CourseScanFlow.FLING_STEPS
+                            points += android.graphics.PointF(x1 + (x2 - x1) * t, y1 + (y2 - y1) * t)
+                        }
+                        flow.input.drag(points, ms / CourseScanFlow.FLING_STEPS)
+                    })
+                flow.state = "INITIAL_NAVIGATION"
+                navigation.initialise()
+                val catalog = WorkCatalog()
+                val venues = catalog.all()
+                    .filter { it.confidence != RewardConfidence.UNKNOWN }
+                    .groupBy { it.venue }
+                check(venues.isNotEmpty()) { "WORK_CATALOG_EMPTY" }
+                val store = WorkReadingStore(this)
+                val readings = runCatching { store.load() }.getOrDefault(emptyMap()).toMutableMap()
+                val failures = mutableListOf<String>()
+                var readNow = 0
+                for ((venue, entries) in venues) {
+                    PetRuntime.update { it.copy(status = "读取岗位收益：$venue") }
+                    navigation.enterOutdoor("work-gain-outdoor")
+                    workNavigation.enterCareerTown()
+                    try {
+                        workNavigation.navigateToVenue(venue)
+                        for (entry in entries) {
+                            PetRuntime.update { it.copy(status = "读取岗位收益：$venue · ${entry.optionLabel}") }
+                            val selected = workNavigation.selectWorkOption(venue, entry.optionLabel, entry.durationMinutes)
+                            val row = selected.rewardRow
+                            if (row.unreadFields.isNotEmpty()) {
+                                failures += "${entry.optionLabel}（${row.unreadFields.joinToString("、")}）"
+                                continue
+                            }
+                            readings[entry.id] = WorkReading(
+                                optionId = entry.id,
+                                venue = venue,
+                                optionLabel = entry.optionLabel,
+                                durationMinutes = row.durationMinutes,
+                                coinReward = row.pageCoinReward,
+                                workScoreReward = row.pageWorkScoreReward,
+                                energyCost = row.pageEnergyCost,
+                                cleanlinessCost = row.pageCleanlinessCost,
+                                readAtMs = System.currentTimeMillis(),
+                            )
+                            store.save(readings.values)
+                            readNow++
+                        }
+                    } catch (ce: CancellationException) {
+                        throw ce
+                    } catch (t: Throwable) {
+                        failures += "$venue：${workGainVenueReason(t)}"
+                        flow.emit("work-gain-venue-failed", result = "FAIL", reason = "$venue:${t.message}")
+                    } finally {
+                        // A failed walk-back must not throw away the venues already read; record
+                        // it and let the next venue try (it reports its own reason if stuck).
+                        try {
+                            navigation.leaveTownAfterRefusedWork()
+                        } catch (ce: CancellationException) {
+                            throw ce
+                        } catch (t: Throwable) {
+                            failures += "$venue：页面没能安全回到房间（${workGainVenueReason(t)}）"
+                        }
+                    }
+                }
+                if (readNow == 0) {
+                    stopSession("读取岗位收益失败：没有读到任何岗位（${failures.joinToString("；")}）。可重试")
+                } else {
+                    stopReason = "岗位收益读取完成 $readNow 个" +
+                        if (failures.isEmpty()) "" else "；未读到：${failures.joinToString("；")}"
+                }
+            } finally { capture.stop() }
+        } catch (ce: CancellationException) {
+            throw ce
+        } catch (t: Throwable) {
+            Log.e(TAG, "work gains failed", t)
+            stopSession(workGainFailureText(t))
+        }
+    }
+
+    private fun workGainVenueReason(t: Throwable): String {
+        val m = t.message.orEmpty()
+        return when {
+            m.contains("CAREER_VENUE_NAVIGATION_FAILED") -> "没找到这家职业（可能未开放）"
+            m.contains("WORK_OPTION_CARD_NOT_FOUND") -> "没找到岗位卡片"
+            m.contains("WORK_OPTION_NOT_SELECTED") -> "岗位卡片没有选中"
+            m.contains("WORK_DETAIL_PAGE_UNCONFIRMED") -> "岗位详情页未确认"
+            m.contains("WORK_REWARD_ROW_UNREAD") -> "奖励行没读全"
+            else -> m.ifEmpty { t.javaClass.simpleName }.take(80)
+        }
+    }
+
+    /** 用户能照着做的失败原因；原始异常名只留在日志里。 */
+    private fun workGainFailureText(t: Throwable): String {
+        val m = t.message.orEmpty()
+        return when {
+            m.contains("PHONE_LOCKED") -> "读取岗位收益失败：手机处于锁屏状态。解锁后重新读取，并把自动锁屏时间调长"
+            m.contains("not managed") || m.contains("disappeared") ->
+                "读取岗位收益失败：后台画面不可用，请到「设置 → 后台画面」重新创建"
+            m.contains("CAREER_TOWN_ENTRY_NOT_FOUND") || m.contains("CAREER_TOWN_PAGE_UNCONFIRMED") ->
+                "读取岗位收益失败：没找到职业小镇入口。请确认 QQ 已停在宠物房间后重试"
+            t is TimeoutCancellationException -> "读取岗位收益失败：等待后台画面超时，请确认 Shizuku 已启动"
+            else -> "读取岗位收益失败：${m.ifEmpty { t.javaClass.simpleName }}。已读到的岗位会保留，可重试"
+        }
+    }
+
+    /**
      * The effective legacy-shaped plan for a saved plan (方案).
      *
      * The plan's own steps decide the course, the lesson count, the care thresholds and the work
@@ -857,6 +1001,7 @@ class PetAutomationService : Service() {
         private const val ACTION_PAUSE = "com.ynk.virtualdisplay.pet.PAUSE"
         private const val ACTION_SCAN_COURSES = "com.ynk.virtualdisplay.pet.SCAN_COURSES"
         private const val ACTION_READ_COURSE_GAINS = "com.ynk.virtualdisplay.pet.READ_COURSE_GAINS"
+        private const val ACTION_READ_WORK_GAINS = "com.ynk.virtualdisplay.pet.READ_WORK_GAINS"
         private const val MAX_WAKELOCK_MS = 8L * 60L * 60L * 1000L
 
         /** What the foreground notification shows while a session runs, per mode. */
@@ -887,5 +1032,10 @@ class PetAutomationService : Service() {
         fun readCourseGainsIntent(context: Context, displayId: Int) =
             Intent(context, PetAutomationService::class.java)
                 .setAction(ACTION_READ_COURSE_GAINS).putExtra(EXTRA_DISPLAY_ID, displayId)
+
+        /** A read-only pass over the known jobs' reward rows. It never starts work. */
+        fun readWorkGainsIntent(context: Context, displayId: Int) =
+            Intent(context, PetAutomationService::class.java)
+                .setAction(ACTION_READ_WORK_GAINS).putExtra(EXTRA_DISPLAY_ID, displayId)
     }
 }

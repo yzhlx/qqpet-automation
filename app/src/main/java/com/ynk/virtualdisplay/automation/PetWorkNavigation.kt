@@ -105,7 +105,21 @@ class PetWorkNavigation(
      */
     suspend fun selectWorkOption(venue: String, optionLabel: String, expectedMinutes: Int): SelectedOption = with(flow) {
         state = "SELECT_WORK_OPTION"
-        val card = reader.locateWorkOptionCard(venue, optionLabel)
+        var card = reader.locateWorkOptionCard(venue, optionLabel)
+        if (card == null) {
+            // Reading several options in one visit leaves the page scrolled down to the reward
+            // block. Scroll back to the card strip before giving up, but only after proving we are
+            // still on the venue detail page. No work is started by this gesture.
+            val page = reader.readDetailPage()
+            check(page.identityMatched) { "WORK_DETAIL_PAGE_UNCONFIRMED_BEFORE_CARD_SCROLL" }
+            var scrolls = 0
+            while (card == null && scrolls < CARD_SCROLL_ATTEMPTS) {
+                swipe(DETAIL_SCROLL_FROM_X, CARD_SCROLL_FROM_Y, DETAIL_SCROLL_TO_X, CARD_SCROLL_TO_Y, CARD_SCROLL_MS)
+                delay(OPTION_SETTLE_MS)
+                card = reader.locateWorkOptionCard(venue, optionLabel)
+                scrolls++
+            }
+        }
         check(card != null) { "WORK_OPTION_CARD_NOT_FOUND:$venue/$optionLabel" }
         tap(card, OPTION_SETTLE_MS)
 
@@ -254,6 +268,14 @@ class PetWorkNavigation(
         const val DETAIL_SCROLL_FROM_Y = 1100
         const val DETAIL_SCROLL_TO_Y = 600
         const val DETAIL_SCROLL_MS = 400L
+
+        /** How many downward swipes may bring the option cards back into view. */
+        const val CARD_SCROLL_ATTEMPTS = 2
+
+        /** Card-strip recovery: swipe DOWN (larger Y) so the cards above scroll back into view. */
+        const val CARD_SCROLL_FROM_Y = 600
+        const val CARD_SCROLL_TO_Y = 1100
+        const val CARD_SCROLL_MS = 400L
     }
 }
 
