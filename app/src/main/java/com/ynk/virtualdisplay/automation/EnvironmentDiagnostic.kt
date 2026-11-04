@@ -1,10 +1,12 @@
 package com.ynk.virtualdisplay.automation
 
 import android.content.Context
-import android.content.pm.PackageManager
 import android.os.Build
 import com.ynk.virtualdisplay.data.model.ShizukuState
 import com.ynk.virtualdisplay.data.repository.IDisplayRepository
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 enum class DiagnosticLevel(val label: String) {
     BASE("基础状态"),
@@ -18,6 +20,8 @@ data class DiagnosticItem(
     val passed: Boolean,
     val message: String,
     val remedy: String? = null,
+    /** 能确认“正在运行”，但无法确认用户真正需要的那一步（例如宠物房间）时为 true。 */
+    val unknown: Boolean = false,
 )
 
 data class DiagnosticReport(
@@ -25,11 +29,15 @@ data class DiagnosticReport(
     val androidVersion: String = "Android " + Build.VERSION.RELEASE + " (API " + Build.VERSION.SDK_INT + ")",
     val manufacturer: String = Build.MANUFACTURER + " " + Build.MODEL,
     val items: List<DiagnosticItem>,
+    /** true 表示本次沿用了上次已通过的能力检测，没有重复创建测试屏幕。 */
+    val capabilityChecksReused: Boolean = false,
 ) {
     val allBasePassed: Boolean get() = items.filter { it.level == DiagnosticLevel.BASE }.all { it.passed }
     val allCapabilitiesPassed: Boolean get() = items.filter { it.level == DiagnosticLevel.CAPABILITY }.all { it.passed }
     val isReadyForAutomation: Boolean get() = allBasePassed && allCapabilitiesPassed
-    val firstBlocker: DiagnosticItem? get() = items.firstOrNull { !it.passed }
+
+    /** 只把明确的失败当作阻塞；待核对项给出下一步，但不冒充失败。 */
+    val firstBlocker: DiagnosticItem? get() = items.firstOrNull { !it.passed && !it.unknown }
 }
 
 /**
@@ -37,24 +45,40 @@ data class DiagnosticReport(
  * 覆盖：
  * 1. 基础状态：工具安装、服务可达性与授权
  * 2. 实际能力：服务握手、虚拟屏创建、截图捕获；自检过程及时释放测试虚拟屏，不留多余垃圾
- * 3. QQ 准备状态：区分「工具设置完成」与「QQ 宠物准备完成」
+ * 3. QQ 准备状态：区分「QQ 已启动」「宠物房间已识别」与「无法确认」
+ *
+ * 同一启动周期、同一安装版本内，已通过的能力检测会复用，避免每次打开设置都创建测试屏；
+ * 设备重启、应用升级或 Shizuku 断连后自动重查。
  */
 class EnvironmentDiagnostic(
     private val packageInstalled: (String) -> Boolean,
     private val repository: IDisplayRepository,
+    private val identity: EnvironmentIdentity = EnvironmentIdentity.UNKNOWN,
+    private val capabilityCache: CapabilityCheckCache? = null,
 ) {
     companion object {
         fun defaultPackageChecker(context: Context): (String) -> Boolean = { pkg ->
             runCatching { context.packageManager.getPackageInfo(pkg, 0) }.isSuccess
         }
+
+        private fun formatPassedAt(millis: Long): String =
+            SimpleDateFormat("MM-dd HH:mm", Locale.getDefault()).format(Date(millis))
     }
 
     constructor(context: Context, repository: IDisplayRepository) : this(
         packageInstalled = defaultPackageChecker(context),
         repository = repository,
+        identity = EnvironmentIdentity.read(context),
+        capabilityCache = SharedPreferencesCapabilityCheckCache(context),
     )
-    suspend fun runCheck(shizukuState: ShizukuState): DiagnosticReport {
+
+    suspend fun runCheck(
+        shizukuState: ShizukuState,
+        forceCapabilities: Boolean = false,
+    ): DiagnosticReport {
         val items = mutableListOf<DiagnosticItem>()
+        var capabilityChecksReused = false
+
         // ── 第一层：基础状态 ──
         val shizukuInstalled = packageInstalled("moe.shizuku.privileged.api")
         items.add(
@@ -114,50 +138,96 @@ class EnvironmentDiagnostic(
             )
 
             if (serviceAvailable) {
-                var testDisplayId: Int? = null
-                var displayCreated = false
-                var captureOk = false
-                try {
-                    // 自有虚拟屏测试创建
-                    val createResult = repository.createDisplay("crab_diag_test", 720, 1280, 320)
-                    testDisplayId = createResult.getOrNull()
-                    displayCreated = testDisplayId != null && testDisplayId > 0
-
-                    if (displayCreated && testDisplayId != null) {
-                        // 针对测试屏进行帧捕获验证
-                        val captureResult = repository.captureDisplay(testDisplayId)
-                        val frame = captureResult.getOrNull()
-                        captureOk = frame != null && frame.byteCount > 0
+                val cached = if (!forceCapabilities && identity.isStable) {
+                    capabilityCache?.load()?.takeIf {
+                        it.bootCount == identity.bootCount && it.appUpdatedAt == identity.appUpdatedAt
                     }
-                } catch (_: Exception) {
-                    // 仅记录状态，不崩溃
-                } finally {
-                    // 临时测试资源必须及时释放，绝不留下多余虚拟屏！
-                    testDisplayId?.let { id ->
-                        repository.releaseDisplay(id)
-                    }
+                } else {
+                    null
                 }
 
-                items.add(
-                    DiagnosticItem(
-                        level = DiagnosticLevel.CAPABILITY,
-                        title = "虚拟显示器创建",
-                        passed = displayCreated,
-                        message = if (displayCreated) "测试虚拟屏幕创建成功并已自动释放" else "系统限制或创建虚拟屏幕失败",
-                        remedy = if (!displayCreated) "请检查系统开发者选项是否限制副屏，或重启手机后再试" else null,
+                if (cached != null) {
+                    capabilityChecksReused = true
+                    items.add(
+                        DiagnosticItem(
+                            level = DiagnosticLevel.CAPABILITY,
+                            title = "虚拟显示器创建",
+                            passed = true,
+                            message = "上次检测已通过（" + formatPassedAt(cached.passedAt) + "），环境未变化，本次未重复创建测试屏幕",
+                        )
                     )
-                )
+                    items.add(
+                        DiagnosticItem(
+                            level = DiagnosticLevel.CAPABILITY,
+                            title = "后台画面捕获能力",
+                            passed = true,
+                            message = "上次检测已通过（" + formatPassedAt(cached.passedAt) + "），环境未变化，本次未重复截屏",
+                        )
+                    )
+                } else {
+                    var testDisplayId: Int? = null
+                    var displayCreated = false
+                    var captureOk = false
+                    try {
+                        // 自有虚拟屏测试创建
+                        val createResult = repository.createDisplay("crab_diag_test", 720, 1280, 320)
+                        testDisplayId = createResult.getOrNull()
+                        displayCreated = testDisplayId != null && testDisplayId > 0
 
-                items.add(
-                    DiagnosticItem(
-                        level = DiagnosticLevel.CAPABILITY,
-                        title = "后台画面捕获能力",
-                        passed = captureOk,
-                        message = if (captureOk) "画面传输与帧捕获正常" else "无法读取后台显示器画面",
-                        remedy = if (!captureOk) "请检查 Shizuku 权限与系统多显示器支持" else null,
+                        if (displayCreated && testDisplayId != null) {
+                            // 针对测试屏进行帧捕获验证
+                            val captureResult = repository.captureDisplay(testDisplayId)
+                            val frame = captureResult.getOrNull()
+                            captureOk = frame != null && frame.byteCount > 0
+                        }
+                    } catch (_: Exception) {
+                        // 仅记录状态，不崩溃
+                    } finally {
+                        // 临时测试资源必须及时释放，绝不留下多余虚拟屏！
+                        testDisplayId?.let { id ->
+                            repository.releaseDisplay(id)
+                        }
+                    }
+
+                    if (displayCreated && captureOk && identity.isStable) {
+                        capabilityCache?.save(
+                            CapabilityCheckPass(
+                                bootCount = identity.bootCount,
+                                appUpdatedAt = identity.appUpdatedAt,
+                                passedAt = System.currentTimeMillis(),
+                            )
+                        )
+                    } else {
+                        // 没通过就不能留下“上次已通过”的记录，下一次必须重新检测。
+                        capabilityCache?.clear()
+                    }
+
+                    items.add(
+                        DiagnosticItem(
+                            level = DiagnosticLevel.CAPABILITY,
+                            title = "虚拟显示器创建",
+                            passed = displayCreated,
+                            message = if (displayCreated) "测试虚拟屏幕创建成功并已自动释放" else "系统限制或创建虚拟屏幕失败",
+                            remedy = if (!displayCreated) "请检查系统开发者选项是否限制副屏，或重启手机后再试" else null,
+                        )
                     )
-                )
+
+                    items.add(
+                        DiagnosticItem(
+                            level = DiagnosticLevel.CAPABILITY,
+                            title = "后台画面捕获能力",
+                            passed = captureOk,
+                            message = if (captureOk) "画面传输与帧捕获正常" else "无法读取后台显示器画面",
+                            remedy = if (!captureOk) "请检查 Shizuku 权限与系统多显示器支持" else null,
+                        )
+                    )
+                }
+            } else {
+                // 服务断开后，旧的能力通过记录不再可信，下一次连接时重新检测。
+                capabilityCache?.clear()
             }
+        } else {
+            capabilityCache?.clear()
         }
 
         // ── 第三层：QQ 准备状态 ──
@@ -171,13 +241,23 @@ class EnvironmentDiagnostic(
         items.add(
             DiagnosticItem(
                 level = DiagnosticLevel.TARGET_APP,
-                title = "QQ 宠物后台运行状态",
+                title = "QQ 后台运行状态",
                 passed = qqRunning,
-                message = if (qqRunning) "QQ 已在后台虚拟屏 (ID: " + displayListStr + ") 中启动" else "QQ 尚未在后台虚拟屏中启动",
-                remedy = if (!qqRunning) "工具设置已完成。请在主页点击「一键创建」或在后台画面中启动 QQ 宠物" else null,
+                message = if (qqRunning) {
+                    "QQ 已在后台虚拟屏 (ID: " + displayListStr + ") 中启动；宠物房间和登录账号尚未核对"
+                } else {
+                    "QQ 尚未在后台虚拟屏中启动"
+                },
+                remedy = if (qqRunning) {
+                    "开始任务前会再识别一次宠物房间；若画面停在登录页，请在 QQ 内自行登录，蟹啦不读取账号或密码"
+                } else {
+                    "工具设置已完成。请在主页点击「一键创建」或在后台画面中启动 QQ；登录由你在 QQ 内完成，蟹啦不读取账号或密码"
+                },
+                // QQ 进程存在不等于宠物房间已打开。只有开始任务时的画面识别才能确认房间。
+                unknown = qqRunning,
             )
         )
 
-        return DiagnosticReport(items = items)
+        return DiagnosticReport(items = items, capabilityChecksReused = capabilityChecksReused)
     }
 }

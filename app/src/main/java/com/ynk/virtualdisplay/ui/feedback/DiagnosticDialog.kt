@@ -37,11 +37,11 @@ fun DiagnosticDialog(
     var report by remember { mutableStateOf<DiagnosticReport?>(null) }
     var checking by remember { mutableStateOf(true) }
 
-    fun runDiag() {
+    fun runDiag(forceCapabilities: Boolean = false) {
         checking = true
         scope.launch {
             val diag = EnvironmentDiagnostic(context, repository)
-            report = diag.runCheck(shizukuState)
+            report = diag.runCheck(shizukuState, forceCapabilities = forceCapabilities)
             checking = false
         }
     }
@@ -84,12 +84,21 @@ fun DiagnosticDialog(
                             color = PetTokens.Ink3
                         )
                         Spacer(Modifier.height(10.dp))
+                        if (rep.capabilityChecksReused) {
+                            Text(
+                                "本次沿用上次已通过的能力检测，没有重复创建测试屏幕。重启、升级或 Shizuku 断连后会自动重查；也可以点「重新检测」。",
+                                fontSize = 11.sp,
+                                lineHeight = 16.sp,
+                                color = PetTokens.Ink3,
+                            )
+                            Spacer(Modifier.height(10.dp))
+                        }
 
                         // 分层展示
                         val groups = listOf(
                             DiagnosticLevel.BASE to "一、基础状态",
                             DiagnosticLevel.CAPABILITY to "二、实际能力（自检不留残留）",
-                            DiagnosticLevel.TARGET_APP to "三、QQ 准备状态",
+                            DiagnosticLevel.TARGET_APP to "三、QQ 状态（房间在开始任务时核对）",
                         )
 
                         for ((lvl, label) in groups) {
@@ -100,11 +109,26 @@ fun DiagnosticDialog(
                                 Spacer(Modifier.height(6.dp))
                                 Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                                     for (item in items) {
+                                        val chipText = when {
+                                            item.unknown -> "待核对"
+                                            item.passed -> "正常"
+                                            else -> "异常"
+                                        }
+                                        val chipBg = when {
+                                            item.unknown -> PetTokens.AmberSoft
+                                            item.passed -> PetTokens.GreenSoft
+                                            else -> PetTokens.RedSoft
+                                        }
+                                        val chipFg = when {
+                                            item.unknown -> PetTokens.AmberInk
+                                            item.passed -> PetTokens.GreenInk
+                                            else -> PetTokens.RedInk
+                                        }
                                         Box(
                                             Modifier
                                                 .fillMaxWidth()
                                                 .clip(RoundedCornerShape(8.dp))
-                                                .background(if (item.passed) PetTokens.GreenSoft else PetTokens.AmberSoft)
+                                                .background(chipBg)
                                                 .padding(horizontal = 10.dp, vertical = 8.dp)
                                         ) {
                                             Column {
@@ -117,27 +141,23 @@ fun DiagnosticDialog(
                                                         item.title,
                                                         fontSize = 13.sp,
                                                         fontWeight = FontWeight.Medium,
-                                                        color = if (item.passed) PetTokens.GreenInk else PetTokens.AmberInk
+                                                        color = chipFg
                                                     )
-                                                    PetChip(
-                                                        if (item.passed) "正常" else "异常",
-                                                        if (item.passed) PetTokens.GreenSoft else PetTokens.RedSoft,
-                                                        if (item.passed) PetTokens.GreenInk else PetTokens.RedInk,
-                                                    )
+                                                    PetChip(chipText, chipBg, chipFg)
                                                 }
                                                 Spacer(Modifier.height(2.dp))
                                                 Text(
                                                     item.message,
                                                     fontSize = 12.sp,
-                                                    color = if (item.passed) PetTokens.Ink2 else PetTokens.AmberInk
+                                                    color = chipFg
                                                 )
-                                                if (!item.passed && item.remedy != null) {
+                                                if ((!item.passed || item.unknown) && item.remedy != null) {
                                                     Spacer(Modifier.height(4.dp))
                                                     Text(
-                                                        "解决建议：" + item.remedy,
+                                                        "下一步：" + item.remedy,
                                                         fontSize = 11.sp,
                                                         lineHeight = 16.sp,
-                                                        color = PetTokens.RedInk
+                                                        color = chipFg
                                                     )
                                                 }
                                             }
@@ -157,7 +177,7 @@ fun DiagnosticDialog(
         },
         dismissButton = {
             if (!checking) {
-                TextButton(onClick = { runDiag() }) {
+                TextButton(onClick = { runDiag(forceCapabilities = true) }) {
                     Text("重新检测", color = PetTokens.Ink2)
                 }
             }
