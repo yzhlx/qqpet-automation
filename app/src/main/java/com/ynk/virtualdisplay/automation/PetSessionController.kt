@@ -440,7 +440,8 @@ class PetSessionController(context:Context,capture:HeadlessDisplayCapture,input:
             planRunSnapshot=result
             completed=result.counts.studyRoundsCompleted + result.counts.adventureCompleted
             stopReason=result.stopReason
-            snapshot=snapshot.copy(completedRounds=completed,nextStep=if(result.state==RunState.COMPLETED) "方案完成" else "方案停止")
+            snapshot=snapshot.copy(completedRounds=completed,nextStep=if(result.state==RunState.COMPLETED) "方案完成" else "方案停止",
+                strategyActions=StrategyExplanation.actionsOf(selected,result))
             File(evidence,"plan-run.json").writeText(PlanRunJsonCodec.encode(StoredRun(result,
                 store.attempts(result.runId),emptyMap())))
             return if(result.state==RunState.COMPLETED) "PLAN_PASS" else "STOPPED"
@@ -449,6 +450,9 @@ class PetSessionController(context:Context,capture:HeadlessDisplayCapture,input:
             planRunSnapshot=store.load(flow.capture.facts.events.sessionId)
             val c = planRunSnapshot?.counts
             completed = if (c != null) c.studyRoundsCompleted + c.adventureCompleted else completed
+            // STR-16: every action gets its real outcome, on the normal path and on the stopped path.
+            // A store that cannot be read back must not erase what the run already proved.
+            planRunSnapshot?.let { snapshot=snapshot.copy(strategyActions=StrategyExplanation.actionsOf(selected,it)) }
         }
     }
 
@@ -1271,7 +1275,9 @@ class PetSessionController(context:Context,capture:HeadlessDisplayCapture,input:
             "mailboxCompleted" to (planRunSnapshot?.counts?.mailboxCompleted ?: 0),
             "luckyBagCompleted" to (planRunSnapshot?.counts?.luckyBagCompleted ?: 0),
             "roomCoinsBefore" to sessionRoomCoinsBefore,
-            "roomCoinsAfter" to sessionRoomCoinsAfter)
+            "roomCoinsAfter" to sessionRoomCoinsAfter,
+            "strategyActions" to value.strategyActions.map {
+                mapOf("label" to it.label,"outcome" to it.outcome.name,"reason" to it.reason)})
         File(evidence,"run-record.json").writeText(EventJson.encode(record))
     }
 }

@@ -24,6 +24,8 @@ data class ManagedRuntimeState(
     val energy:ObservedValue<Int> = ObservedValue.Unknown("NOT_OBSERVED",0,"session not started"),
     val cleanliness:ObservedValue<Int> = ObservedValue.Unknown("NOT_OBSERVED",0,"session not started"),
     val mood:ObservedValue<Int> = ObservedValue.Unknown("NOT_OBSERVED",0,"session not started"),
+    /** STR-16: the real outcome and reason of every action of this round, for the "why" explanation. */
+    val strategyActions:List<StrategyExplanation.Action> = emptyList(),
 ) {
     fun at(wall:Long,elapsed:Long)=copy(energy=energy.at(wall,60000),cleanliness=cleanliness.at(wall,60000),
         mood=mood.at(wall,60000),runtimeMs=startedElapsedMs?.let {(elapsed-it).coerceAtLeast(0)} ?: 0)

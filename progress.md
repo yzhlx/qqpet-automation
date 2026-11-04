@@ -305,3 +305,17 @@
 - 验证结果：全量单元测试 99 套件 / 942 项 100% PASS（0 failures, 0 errors, 3 skipped）；assembleDebug 构建通过；ADB 覆盖安装 DKS9K23420020242 成功。
 - 提交与推送：feat(plan): 任务间隔与失败冷却，避免高频空转 (STR-15)，推送 backup/feat/onboarding-troubleshooting-p0，更新 PR #4。
 - 下一步：第三阶段 STR-16 策略解释（展示本轮为什么选学习/打工/冒险以及排除其他选项的原因），或 STR-08/09 属性目标与均衡目标。
+
+## 策略解释（2026-11-03，feat/onboarding-troubleshooting-p0）
+- 目标：STR-16 向用户说明为什么选择或跳过某个任务；并落实「完成、失败、跳过和待确认分别记录，不能混为成功」。
+- 改动：
+  - StrategyExplanation（新增，automation 层纯函数，JVM 可测）：把方案勾选的动作与本轮真实执行结果翻译成逐个动作的事实——完成 / 跳过(带原因) / 被阻断 / 失败 / 无法确认 / 未勾选 / 未执行。没勾选与没跑到都不会被写成已完成；前一步失败后没轮到的动作写成「前一步没有完成」，预检就挡住时写成「本轮没有开始执行」。
+  - ManagedRuntimeState 新增 strategyActions；PetSessionController 在方案正常结束与中途停止两条路径上都按执行记录发布该字段，读回失败时不会覆盖已经证明的结果。
+  - run-record.json 持久化 strategyActions(label/outcome/reason)，SessionRunRecord 读回，认不出的条目直接丢弃不猜。
+  - StrategyPresentation（新增，ui 层纯 JVM）：把事实翻译成中文短句，认不出的原因码原样显示，不编造解释。
+  - 主页新增「本轮策略 / 上一轮策略」卡片，逐条列出做了什么、跳过了什么及原因、哪些没勾选；记录页历史卡片单独一行显示同一句摘要（不再挤进会被截断的详情行）。
+  - 使用攻略「配置托管方案」补充第 6 条「本轮策略说明」。
+  - 单元测试：新增 StrategyExplanationTest（7 项）与 StrategyPresentationTest（5 项）；真机插桩测试新增 StrategyRecordJsonTest（3 项，org.json 只在设备可用，覆盖写读往返）。
+- 验证结果：全量单元测试 101 套件 / 954 项 100% PASS（0 failures, 0 errors, 3 skipped）；assembleDebug 构建通过（APK 45.9MB）；ADB 覆盖安装 DKS9K23420020242 成功，App 启动无崩溃；真机插桩测试 3 项 PASS（0 failures, 0 errors）。主页与历史卡片上的策略说明尚未在真机上跑过一轮真实方案，待验收。
+- 提交与推送：feat(plan): 策略解释，展示本轮选择与排除原因 (STR-16)，推送 backup/feat/onboarding-troubleshooting-p0，更新 PR #4。
+- 下一步：第三阶段剩余 STR-08/09 属性目标与均衡目标（StudyStep.targetAttribute 已存在），或 STR-01/02 学习优先与打工优先模式。

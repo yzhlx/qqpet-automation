@@ -63,6 +63,9 @@ import com.ynk.virtualdisplay.automation.SessionPlanStore
 import com.ynk.virtualdisplay.automation.StudyStep
 import com.ynk.virtualdisplay.automation.WorkStep
 import com.ynk.virtualdisplay.data.model.ShizukuState
+import com.ynk.virtualdisplay.ui.StrategyDisplayLine
+import com.ynk.virtualdisplay.ui.StrategyLineTone
+import com.ynk.virtualdisplay.ui.StrategyPresentation
 import com.ynk.virtualdisplay.ui.data.LogEntry
 import com.ynk.virtualdisplay.ui.data.PetEvidenceRepository
 import com.ynk.virtualdisplay.ui.data.SessionEvidence
@@ -183,6 +186,11 @@ fun PetHomeScreen(
     val manualHeld = runtime.running && manualPause == ManualPauseState.HELD
     val progress = RoundProgressPresentation.of(managed.totalRounds, managed.completedRounds)
     val budgetCap = minOf(plan.dailyBudgetMinutes, DailyBudgetStore.HARD_STOP_MINUTES)
+    // STR-16：运行中的说明来自实时状态，结束后来自最近一次会话记录。
+    val strategyActions = if (managed.strategyActions.isNotEmpty()) managed.strategyActions
+        else latest?.record?.strategyActions.orEmpty()
+    val strategyLines = StrategyPresentation.lines(strategyActions)
+    val strategySummary = StrategyPresentation.summary(strategyActions)
 
     var dialog by remember { mutableStateOf<HomeDialog?>(null) }
 
@@ -237,6 +245,7 @@ fun PetHomeScreen(
 
             if (runtime.running) {
                 CurrentTaskCard(managedView, progress, manualHeld)
+                StrategyCard("本轮策略", strategyLines, strategySummary)
                 HomeLogCard(logRows, onOpenLogs)
             } else {
                 if (!controls.startEnabled || !catalogFresh) {
@@ -260,6 +269,7 @@ fun PetHomeScreen(
                     )
                 }
                 TodayProgressCard(budgetUsed, budgetCap)
+                StrategyCard("上一轮策略", strategyLines, strategySummary)
                 // Separate entries, one per capability: reading the pet must never also spend coins
                 // or the shared daily budget.
                 SessionModeRow(
@@ -597,6 +607,41 @@ private fun CurrentTaskCard(view: ManagedRuntimeView, progress: RoundProgress, m
                 Text("下一步", fontSize = 11.5.sp, color = PetTokens.Ink3)
                 Spacer(Modifier.width(10.dp))
                 Text(view.nextStepText, fontSize = 13.5.sp, fontWeight = FontWeight.Bold, color = PetTokens.Ink)
+            }
+        }
+    }
+}
+
+/** STR-16：这一轮做成了什么、跳过了什么、哪些是方案里没勾选的。 */
+@Composable
+private fun StrategyCard(title: String, lines: List<StrategyDisplayLine>, summary: String) {
+    if (lines.isEmpty()) return
+    PetCard {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            PetIcon(PetGlyph.Info, 18.dp)
+            Spacer(Modifier.width(8.dp))
+            PetSection(title)
+        }
+        Spacer(Modifier.height(6.dp))
+        Text(summary, fontSize = 12.5.sp, color = PetTokens.Ink2)
+        Spacer(Modifier.height(6.dp))
+        lines.forEach { line ->
+            Row(Modifier.fillMaxWidth().padding(vertical = 2.dp), verticalAlignment = Alignment.Top) {
+                PetIcon(
+                    when (line.tone) {
+                        StrategyLineTone.DONE -> PetGlyph.Check
+                        StrategyLineTone.SKIPPED -> PetGlyph.Clock
+                        StrategyLineTone.NOT_DONE -> PetGlyph.Info
+                    },
+                    13.dp,
+                    when (line.tone) {
+                        StrategyLineTone.DONE -> PetTokens.Green
+                        StrategyLineTone.SKIPPED -> PetTokens.AmberStrong
+                        StrategyLineTone.NOT_DONE -> PetTokens.Ink3
+                    },
+                )
+                Spacer(Modifier.width(7.dp))
+                Text(line.text, fontSize = 12.sp, color = PetTokens.Ink2, lineHeight = 17.sp)
             }
         }
     }

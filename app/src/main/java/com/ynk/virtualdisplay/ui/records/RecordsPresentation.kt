@@ -1,5 +1,6 @@
 package com.ynk.virtualdisplay.ui.records
 
+import com.ynk.virtualdisplay.ui.StrategyPresentation
 import com.ynk.virtualdisplay.ui.data.CareStats
 import com.ynk.virtualdisplay.ui.data.HealthSnapshot
 import com.ynk.virtualdisplay.ui.data.RoundRecord
@@ -63,6 +64,8 @@ data class SessionHistoryRow(
     val outcomeTone: VerdictTone,
     val detail: String,
     val screenshots: Int,
+    /** STR-16: what this round did and what it skipped, shown on its own line. */
+    val strategySummary: String = "",
 )
 
 object RecordsPresentation {
@@ -301,6 +304,8 @@ object RecordsPresentation {
                 "${record.runtimeMs / 60_000L} 分钟 · 护理 ${record.care?.total ?: 0} 次" +
                 (record.stopReason?.let { " · ${stopReasonText(it)}" } ?: ""),
             screenshots = ev.screenshots.size,
+            strategySummary = if (record.strategyActions.isEmpty()) ""
+                else StrategyPresentation.summary(record.strategyActions),
         )
     }
 

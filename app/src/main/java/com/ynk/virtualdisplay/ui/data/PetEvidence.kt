@@ -1,6 +1,8 @@
 package com.ynk.virtualdisplay.ui.data
 
 import android.content.Context
+import com.ynk.virtualdisplay.automation.StrategyExplanation
+import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
 import java.text.SimpleDateFormat
@@ -138,6 +140,8 @@ data class SessionRunRecord(
     val luckyBagCompleted: Int? = null,
     val roomCoinsBefore: Int? = null,
     val roomCoinsAfter: Int? = null,
+    /** STR-16: the real outcome and reason of every action, shown in the history detail. */
+    val strategyActions: List<StrategyExplanation.Action> = emptyList(),
 ) {
     val succeeded get() = terminalState == "COMPLETED"
 
@@ -171,6 +175,7 @@ data class SessionRunRecord(
                 luckyBagCompleted = o.intOrNull("luckyBagCompleted"),
                 roomCoinsBefore = o.intOrNull("roomCoinsBefore"),
                 roomCoinsAfter = o.intOrNull("roomCoinsAfter"),
+                strategyActions = parseStrategyActions(o.optJSONArray("strategyActions")),
             )
         }.getOrNull()
     }
@@ -337,3 +342,18 @@ private fun JSONObject.longOrNull(key: String): Long? =
 
 private fun JSONObject.optLongOrNull(key: String): Long? =
     if (has(key) && !isNull(key)) optLong(key) else null
+
+/** STR-16: read back the per-action facts. An unreadable entry is dropped, never guessed. */
+private fun parseStrategyActions(array: JSONArray?): List<StrategyExplanation.Action> {
+    if (array == null) return emptyList()
+    val out = mutableListOf<StrategyExplanation.Action>()
+    for (index in 0 until array.length()) {
+        val item = array.optJSONObject(index) ?: continue
+        val label = item.optString("label").takeIf { it.isNotEmpty() } ?: continue
+        val outcome = runCatching { StrategyExplanation.Outcome.valueOf(item.optString("outcome")) }
+            .getOrNull() ?: continue
+        val reason = item.optString("reason").takeIf { it.isNotEmpty() && it != "null" }
+        out.add(StrategyExplanation.Action(label, outcome, reason))
+    }
+    return out
+}

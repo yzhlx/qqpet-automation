@@ -4,6 +4,8 @@ import com.ynk.virtualdisplay.automation.ManagedRuntimeState
 import com.ynk.virtualdisplay.automation.ObservedValue
 import com.ynk.virtualdisplay.automation.PetRuntime
 import com.ynk.virtualdisplay.automation.SessionRunState
+import com.ynk.virtualdisplay.ui.StrategyDisplayLine
+import com.ynk.virtualdisplay.ui.StrategyPresentation
 
 /**
  * Read-only presentation mapping for the managed session snapshot.
@@ -78,6 +80,9 @@ data class ManagedRuntimeView(
     /** States only which readings are current observations; never a course-readiness verdict. */
     val confirmedReadingsText: String,
     val health: List<HealthDisplayLine>,
+    /** STR-16: why every action of this round was done or left out. */
+    val strategyLines: List<StrategyDisplayLine>,
+    val strategySummary: String,
 ) {
     /**
      * Parses the "轮次：N/M" line back into a pair for headline composition. Null when the snapshot
@@ -143,6 +148,8 @@ object ManagedRuntimePresentation {
             nextStepText = managed.nextStep,
             confirmedReadingsText = confirmedReadingsText(aged, currentSession),
             health = health,
+            strategyLines = StrategyPresentation.lines(aged.strategyActions),
+            strategySummary = StrategyPresentation.summary(aged.strategyActions),
         )
     }
 

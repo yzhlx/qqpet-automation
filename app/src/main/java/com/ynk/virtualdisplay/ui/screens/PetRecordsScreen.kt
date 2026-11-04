@@ -203,6 +203,10 @@ private fun HistoryCard(history: List<SessionHistoryRow>) {
                     Text(row.whenText, fontSize = 13.5.sp, fontWeight = FontWeight(650), color = PetTokens.Ink)
                     Spacer(Modifier.height(3.dp))
                     Text(row.detail, fontSize = 11.sp, color = PetTokens.Ink3, maxLines = 2)
+                    if (row.strategySummary.isNotEmpty()) {
+                        Spacer(Modifier.height(2.dp))
+                        Text(row.strategySummary, fontSize = 11.sp, color = PetTokens.BlueInk, maxLines = 2)
+                    }
                 }
                 Spacer(Modifier.width(8.dp))
                 when (row.outcomeTone) {
