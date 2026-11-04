@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
@@ -297,5 +298,23 @@ fun PetPlaceholderFilm(modifier: Modifier = Modifier) {
     Box(modifier.background(Brush.linearGradient(listOf(PetTokens.FilmTop, PetTokens.FilmBottom))),
         contentAlignment = Alignment.Center) {
         PetIcon(PetGlyph.Cam, 20.dp, alpha = 0.5f)
+    }
+}
+
+
+/**
+ * MKA-08「减少动效」：开启后等待指示不再旋转，用静态文字代替；关闭时是常规 spinner。
+ * 全应用的等待指示都走这一个入口，开关一处生效。
+ */
+@Composable
+fun CalmSpinner(
+    context: android.content.Context,
+    modifier: Modifier = Modifier,
+    color: Color = PetTokens.Ink2,
+) {
+    if (com.ynk.virtualdisplay.ui.theme.AppearancePrefs.reduceMotion(context)) {
+        Text("处理中…", fontSize = 13.sp, color = color, modifier = modifier)
+    } else {
+        CircularProgressIndicator(modifier = modifier, color = color)
     }
 }

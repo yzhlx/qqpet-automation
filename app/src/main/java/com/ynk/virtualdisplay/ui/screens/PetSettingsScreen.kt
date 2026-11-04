@@ -101,6 +101,8 @@ fun PetSettingsScreen(
     /** STR-17：夜间暂停窗口。每次回到这一页都重新读一次，托管侧最多半分钟读到改动。 */
     var quietWindow by remember { mutableStateOf(QuietWindowStore(context).load()) }
     var showQuietWindow by remember { mutableStateOf(false) }
+    /** MKA-08：减少动效开关。读一次，切换即写回 prefs。 */
+    var reduceMotion by remember { mutableStateOf(com.ynk.virtualdisplay.ui.theme.AppearancePrefs.reduceMotion(context)) }
 
     if (showFeedback) FeedbackDialog(onDismiss = { showFeedback = false })
     if (showQuietWindow) QuietWindowDialog(initial = quietWindow,
@@ -254,6 +256,34 @@ fun PetSettingsScreen(
                     PetNote("Shizuku 未就绪时不能开始托管。")
                 }
             }
+        }
+        Spacer(Modifier.height(11.dp))
+
+        // ── 外观 ──
+        PetCard(pad0 = true) {
+            GroupHeader("外观", PetGlyph.Brush)
+            PetListRow(
+                tileBg = PetTokens.GraySoft,
+                icon = { PetIcon(PetGlyph.Grip, 17.dp, PetTokens.Ink2) },
+                title = "减少动效",
+                sub = if (reduceMotion) "等待时用静态文字，不再旋转" else "等待时显示旋转指示",
+                trailing = {
+                    androidx.compose.material3.Switch(
+                        checked = reduceMotion,
+                        onCheckedChange = { checked ->
+                            reduceMotion = checked
+                            com.ynk.virtualdisplay.ui.theme.AppearancePrefs.setReduceMotion(context, checked)
+                        },
+                    )
+                },
+            )
+            PetListRow(
+                tileBg = PetTokens.GraySoft,
+                icon = { PetIcon(PetGlyph.Display, 17.dp, PetTokens.Ink2) },
+                title = "深色主题",
+                sub = "界面是固定浅色设计；深色主题做好前不提供切换，避免显示错误的颜色",
+                trailing = { PetChip("未提供", PetTokens.GraySoft, PetTokens.Ink2) },
+            )
         }
         Spacer(Modifier.height(11.dp))
 

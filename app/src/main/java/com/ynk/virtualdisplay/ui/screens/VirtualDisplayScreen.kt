@@ -411,11 +411,15 @@ fun VirtualDisplayScreen(
                                 enabled = !uiState.isLoading
                             ) {
                                 if (uiState.isLoading) {
-                                    CircularProgressIndicator(
-                                        modifier = Modifier.size(18.dp),
-                                        strokeWidth = 2.dp,
-                                        color = MaterialTheme.colorScheme.onPrimary
-                                    )
+                                    if (com.ynk.virtualdisplay.ui.theme.AppearancePrefs.reduceMotion(context)) {
+                                        Text("…", color = MaterialTheme.colorScheme.onPrimary)
+                                    } else {
+                                        CircularProgressIndicator(
+                                            modifier = Modifier.size(18.dp),
+                                            strokeWidth = 2.dp,
+                                            color = MaterialTheme.colorScheme.onPrimary
+                                        )
+                                    }
                                 } else {
                                     Text("创建并启动", fontWeight = FontWeight.Bold)
                                 }

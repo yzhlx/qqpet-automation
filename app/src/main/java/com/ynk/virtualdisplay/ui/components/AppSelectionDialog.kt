@@ -63,7 +63,7 @@ fun AppSelectionDialog(onDismiss: () -> Unit, onAppSelected: (AppInfo) -> Unit) 
                 Spacer(modifier = Modifier.height(16.dp))
                 if (isLoading) {
                     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        CircularProgressIndicator()
+                        com.ynk.virtualdisplay.ui.kit.CalmSpinner(context)
                     }
                 } else {
                     LazyColumn {

@@ -27,6 +27,7 @@ import com.ynk.virtualdisplay.automation.DiagnosticReport
 import com.ynk.virtualdisplay.automation.EnvironmentDiagnostic
 import com.ynk.virtualdisplay.data.model.ShizukuState
 import com.ynk.virtualdisplay.data.repository.IDisplayRepository
+import com.ynk.virtualdisplay.ui.kit.CalmSpinner
 import com.ynk.virtualdisplay.ui.kit.PetChip
 import com.ynk.virtualdisplay.ui.theme.PetTokens
 import kotlinx.coroutines.launch
@@ -80,7 +81,7 @@ fun DiagnosticDialog(
                         contentAlignment = Alignment.Center
                     ) {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            CircularProgressIndicator(color = PetTokens.Blue)
+                            CalmSpinner(context, color = PetTokens.Blue)
                             Spacer(Modifier.height(12.dp))
                             Text("正在分层检测基础状态与虚拟屏能力…", fontSize = 13.sp, color = PetTokens.Ink2)
                         }

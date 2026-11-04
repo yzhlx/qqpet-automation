@@ -104,7 +104,7 @@ class MainActivity : ComponentActivity() {
                             // Polling from the guide passes through Checking, which must not flash a spinner.
                             state is ShizukuState.Checking && guideProgress.completed -> Box(
                                 Modifier.fillMaxSize(), contentAlignment = Alignment.Center,
-                            ) { CircularProgressIndicator() }
+                            ) { com.ynk.virtualdisplay.ui.kit.CalmSpinner(this@MainActivity) }
 
                             showGuide -> OnboardingScreen(
                                 state = state,
@@ -147,7 +147,7 @@ class MainActivity : ComponentActivity() {
 
                         if (uiState.isLoading) {
                             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                                CircularProgressIndicator()
+                                com.ynk.virtualdisplay.ui.kit.CalmSpinner(this@MainActivity)
                             }
                         }
                     }
