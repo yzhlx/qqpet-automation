@@ -59,6 +59,7 @@ fun PetRecordsScreen() {
 
     val repo = remember { PetEvidenceRepository(context) }
     var today by remember { mutableStateOf<List<SessionEvidence>>(emptyList()) }
+    var yesterday by remember { mutableStateOf<List<SessionEvidence>>(emptyList()) }
     var history by remember { mutableStateOf<List<SessionHistoryRow>>(emptyList()) }
     var loaded by remember { mutableStateOf(false) }
 
@@ -70,6 +71,7 @@ fun PetRecordsScreen() {
     LaunchedEffect(runtime.running, managed.sessionId) {
         suspend fun reload() = withContext(Dispatchers.IO) {
             today = repo.todaySessions()
+            yesterday = repo.yesterdaySessions()
             history = RecordsPresentation.history(
                 repo.sessionDirectories(limit = 40).map { repo.read(it) },
                 timeFormatter, dateFormatter,
@@ -85,6 +87,7 @@ fun PetRecordsScreen() {
     }
 
     val summary = RecordsPresentation.summary(today, timeFormatter, dateFormatter)
+    val yesterdayLine = RecordsPresentation.dailyLine(yesterday.mapNotNull { it.record })
     val focus = today.firstOrNull()
     val changes = focus?.let { RecordsPresentation.changes(it.rounds, it.record) }.orEmpty()
 
@@ -104,6 +107,11 @@ fun PetRecordsScreen() {
             Spacer(Modifier.height(11.dp))
             if (changes.any { it.beforeText != "—" || it.afterText != "—" }) ChangesCard(changes)
             else PetNote("这次运行没有成对的前后读数，所以不显示变化。")
+        }
+
+        if (yesterdayLine != null) {
+            Spacer(Modifier.height(9.dp))
+            PetNote("昨天 · " + yesterdayLine)
         }
 
         if (history.isNotEmpty()) {

@@ -150,6 +150,33 @@ object RecordsPresentation {
     }
 
     /**
+     * OBS-06：一天的合计，用在「昨天」这一行。只列真实确认过的数字；
+     * 一条记录都没有就返回 null，让页面不显示这一行。
+     */
+    fun dailyLine(records: List<SessionRunRecord>): String? {
+        if (records.isEmpty()) return null
+        val parts = buildList {
+            val courses = records.sumOf { it.completedRounds }
+            if (courses > 0) add("学习 " + courses + " 节")
+            val work = records.sumOf { it.workCompleted ?: 0 }
+            if (work > 0) add("打工 " + work + " 班")
+            val adventure = records.sumOf { it.adventureCompleted ?: 0 }
+            if (adventure > 0) add("冒险 " + adventure + " 轮")
+            val care = records.sumOf { it.care?.total ?: 0 }
+            if (care > 0) add("护理 " + care + " 次")
+            val signIn = records.sumOf { it.signInCompleted ?: 0 }
+            if (signIn > 0) add("签到 " + signIn + " 次")
+            val mailbox = records.sumOf { it.mailboxCompleted ?: 0 }
+            if (mailbox > 0) add("信箱 " + mailbox + " 次")
+            val luckyBag = records.sumOf { it.luckyBagCompleted ?: 0 }
+            if (luckyBag > 0) add("福袋 " + luckyBag + " 个")
+            val minutes = records.sumOf { it.runtimeMs } / 60_000L
+            if (minutes > 0) add("运行 " + minutes + " 分钟")
+        }
+        return parts.joinToString(" · ").takeIf { it.isNotEmpty() }
+    }
+
+    /**
      * Health changes across the rounds of one session, deduced from the before → after readings the
      * controller itself recorded. A round whose readings are missing contributes nothing.
      */

@@ -299,6 +299,17 @@ class PetEvidenceRepository(private val context: Context) {
     }
 
     /** Sessions whose record's local start date is today, newest first. */
+    /** OBS-06：前一天（按本地日期）开始的会话，跨零点后仍能看到昨天做了什么。 */
+    fun yesterdaySessions(nowMs: Long = System.currentTimeMillis()): List<SessionEvidence> {
+        val cal = java.util.Calendar.getInstance().apply {
+            timeInMillis = nowMs
+            add(java.util.Calendar.DAY_OF_YEAR, -1)
+        }
+        val day = dayKey(cal.timeInMillis)
+        return sessionDirectories().map { read(it) }
+            .filter { ev -> ev.record?.startedAtMs?.let { dayKey(it) == day } ?: false }
+    }
+
     fun todaySessions(nowMs: Long = System.currentTimeMillis()): List<SessionEvidence> {
         val day = dayKey(nowMs)
         return sessionDirectories().map { read(it) }

@@ -56,4 +56,26 @@ class RecordsPresentationTest {
     @Test fun aDayWithoutDailyClaimsShowsNoLine() {
         assertNull(RecordsPresentation.dailyRewardsText(summary()))
     }
+
+    /** OBS-06：昨天这一行只写确认过的数字，没做的分项不出现。 */
+    private fun day(
+        courses: Int = 0, work: Int = 0, adventure: Int = 0, care: Int = 0,
+        signIn: Int = 0, mailbox: Int = 0, luckyBag: Int = 0, minutes: Long = 0,
+    ) = SessionRunRecord(
+        sessionId = "d", terminalState = "COMPLETED", runner = "PetSessionController",
+        rounds = courses, completedRounds = courses, pauseCount = 0, startedAtMs = 1L,
+        runtimeMs = minutes * 60_000L, stopReason = null, moodPolicy = null, energy = null,
+        cleanliness = null, mood = null, care = null, encouragementSent = 0, courseStarts = courses,
+        requestedRounds = courses, workCompleted = work, adventureCompleted = adventure,
+        signInCompleted = signIn, mailboxCompleted = mailbox, luckyBagCompleted = luckyBag)
+
+    @Test fun yesterdayLineListsOnlyConfirmedNumbers() {
+        assertEquals("学习 2 节 · 打工 1 班 · 签到 1 次 · 运行 45 分钟",
+            RecordsPresentation.dailyLine(listOf(day(courses = 2, work = 1, signIn = 1, minutes = 45))))
+        assertEquals("福袋 1 个", RecordsPresentation.dailyLine(listOf(day(luckyBag = 1))))
+    }
+
+    @Test fun aYesterdayWithoutRecordsHasNoLine() {
+        assertNull(RecordsPresentation.dailyLine(emptyList()))
+    }
 }
