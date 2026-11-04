@@ -161,16 +161,34 @@ fun PetSettingsScreen(
                     },
                 )
             }
-            PetListRow(
-                tileBg = PetTokens.BlueSoft,
-                icon = { PetIcon(PetGlyph.Shield, 17.dp) },
-                title = "Shizuku",
-                sub = if (shizukuReady) "后台画面和操作已授权" else "未授权，托管无法启动",
-                trailing = {
-                    if (shizukuReady) PetChip("已授权", PetTokens.GreenSoft, PetTokens.GreenInk)
-                    else PetChip("未授权", PetTokens.RedSoft, PetTokens.RedInk)
-                },
-            )
+            Column(
+                Modifier.clickable(enabled = !shizukuReady) { context.openShizuku() }
+            ) {
+                PetListRow(
+                    tileBg = if (shizukuReady) PetTokens.GreenSoft else PetTokens.AmberSoft,
+                    icon = { PetIcon(PetGlyph.Shield, 17.dp) },
+                    title = "Shizuku",
+                    sub = when {
+                        shizukuReady -> "后台画面和操作已授权"
+                        uiState.shizukuState is ShizukuState.PermissionDenied ->
+                            "已运行但未授权：点这里打开 Shizuku 勾选蟹啦"
+                        uiState.shizukuState is ShizukuState.NotRunning ->
+                            "服务已停止：点这里打开 Shizuku 点「启动」"
+                        else -> "正在检查 Shizuku 状态"
+                    },
+                    trailing = {
+                        when {
+                            shizukuReady -> PetChip("已授权", PetTokens.GreenSoft, PetTokens.GreenInk)
+                            uiState.shizukuState is ShizukuState.PermissionDenied ->
+                                PetChip("去授权", PetTokens.BlueSoft, PetTokens.BlueInk)
+                            uiState.shizukuState is ShizukuState.NotRunning ->
+                                PetChip("去恢复", PetTokens.BlueSoft, PetTokens.BlueInk)
+                            else -> PetChip("检查中", PetTokens.GraySoft, PetTokens.Ink2)
+                        }
+                    },
+                    showChevron = !shizukuReady,
+                )
+            }
             Column(Modifier.clickable { onOpenConsole() }) {
                 PetListRow(
                     tileBg = PetTokens.GreenSoft,
