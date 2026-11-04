@@ -86,4 +86,13 @@ class OnboardingFlowTest {
         assertFalse(OnboardingFlow.satisfied(OnboardingStep.WELCOME, ready))
         assertFalse(OnboardingFlow.satisfied(OnboardingStep.FINISH, ready))
     }
+
+    @Test fun userConfirmedStartLetsTheGuidePastPairingWithoutPretendingTheServiceIsReady() {
+        val paired = OnboardingFacts(shizukuInstalled = true, shizukuRunning = false)
+        assertEquals(OnboardingStep.START_SHIZUKU, OnboardingFlow.current(paired, true, emptySet()))
+        val confirmed = paired.copy(userConfirmedKeys = setOf("shizuku_started_by_pairing"))
+        assertTrue(OnboardingFlow.satisfied(OnboardingStep.START_SHIZUKU, confirmed))
+        assertEquals(OnboardingStep.GRANT_SHIZUKU, OnboardingFlow.current(confirmed, true, emptySet()))
+        assertFalse(confirmed.shizukuGranted)
+    }
 }

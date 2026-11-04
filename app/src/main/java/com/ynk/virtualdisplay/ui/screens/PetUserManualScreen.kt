@@ -146,12 +146,18 @@ fun PetUserManualScreen(
                     ManualStepItem(
                         step = "2",
                         title = "无线调试配对（Android 11+）",
-                        body = "进入手机设置 → 开发者选项 → 开启无线调试 → 点击「使用配对码配对」；在 Shizuku 弹出的通知栏中输入 6 位配对码即可。配对仅需一次，日常只需在 Shizuku 点「启动」。",
+                        body = "进入手机设置 → 开发者选项 → 开启无线调试；在 Shizuku 点「配对」，" +
+                            "6 位配对码显示在系统的「使用配对码配对设备」弹窗里，下拉通知栏把数字填入 Shizuku 的配对通知。" +
+                            "看到「配对成功」只代表配对完成，还要回 Shizuku 点「启动」，显示「已启动」才算可用。",
                     )
                     ManualStepItem(
                         step = "3",
                         title = "手机没有无线调试？（Android 10 或无 Wi-Fi）",
-                        body = "Android 10 系统未内置无线调试，需要通过电脑数据线连接手机，运行一次官方 ADB 启动脚本即可启动 Shizuku。如果设备已 Root，则可直接一键授权启动。",
+                        body = "Android 10 或无线调试一直失败时，用 USB 数据线连接电脑：手机开启 USB 调试，" +
+                            "电脑装好 platform-tools（Android 开发者网站可下载）后执行\n" +
+                            "adb shell sh /sdcard/Android/data/moe.shizuku.privileged.api/start.sh\n" +
+                            "看到 Shizuku「已启动」即可。已 Root 可直接在 Shizuku 点「启动」；" +
+                            "没有电脑且未 Root 时无法启动，只能先浏览功能。",
                     )
                     ManualStepItem(
                         step = "4",
@@ -355,6 +361,14 @@ fun PetUserManualScreen(
                         body = "上一次任务中途被息屏、回收或打断，那一步到底有没有扣费、有没有开课蟹啦并不知道。"
                         + "它不会替你猜，也不会直接再来一次：请到「运行方案」页的「待确认动作」里选「已经做完」或「没有发生」，"
                         + "确认后就能正常开始。若游戏里那一节其实还在上课，请等它上完再确认。",
+                    )
+                    ManualStepItem(
+                        step = "症状",
+                        title = "配对后一直没启动 / 找不到配对码通知",
+                        body = "配对成功不等于 Shizuku 已启动：回到 Shizuku 主界面点「启动」，看到「已启动」才算完成。" +
+                            "找不到输入配对码的通知：下拉通知栏找「使用配对码配对设备」；仍没有就回无线调试页面" +
+                            "重新点「使用配对码配对设备」，再在 Shizuku 点「配对」。配对码过期只重做这一步，" +
+                            "不用重装；蟹啦不会读取或保存配对码。",
                     )
                     ManualStepItem(
                         step = "排查",

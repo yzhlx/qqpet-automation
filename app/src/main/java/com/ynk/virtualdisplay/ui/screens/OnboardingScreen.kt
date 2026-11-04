@@ -240,19 +240,32 @@ private fun startShizukuPage(facts: OnboardingFacts, completedBefore: Boolean): 
     }
 
     return GuidePage(
-        title = "启动 Shizuku",
-        intro = "首次使用需要完成无线配对。无线调试已开启，请保持 Wi-Fi 连接。",
+        title = "配对并启动 Shizuku",
+        intro = "配对成功只是让 Shizuku 拿到无线调试的钥匙，服务还没启动；还要回到 Shizuku 点「启动」，" +
+            "本页才会自动继续。请保持 Wi-Fi 连接；之前已经配对过的，直接点「启动」即可，配对码只有首次需要。",
         steps = listOf(
-            "点下面的「打开 Shizuku」",
-            "在「通过无线调试启动」区域点「配对」，按手机提示在通知栏输入配对码",
-            "配对成功后，返回 Shizuku 界面点击「启动」",
-            "启动成功后切回蟹啦继续",
+            "点下面的「打开 Shizuku」，进入「通过无线调试启动」区域",
+            "点「配对」。6 位配对码显示在系统的「使用配对码配对设备」弹窗里；下拉通知栏，" +
+                "在配对通知的输入框填入这 6 位数字",
+            "看到「配对成功」后返回 Shizuku 主界面，点「启动」",
+            "看到 Shizuku 显示「已启动」再切回蟹啦；只有服务真的运行，这里才会继续",
         ),
-        note = "配对码仅单次有效。如遇超时或配对通知未弹出，重新在 Shizuku 点「配对」即可。配对码不会上传。",
+        note = "配对状态本身无法自动读取。蟹啦只认「Shizuku 服务已启动」：只配对成功但没点「启动」，" +
+            "这里会一直等待，这是正常的，不是配对失败。\n\n" +
+            "找不到输入配对码的通知：下拉通知栏找「使用配对码配对设备」；还是没有，就回无线调试页面点" +
+            "「使用配对码配对设备」，再在 Shizuku 点一次「配对」。不要把它和蟹啦的「托管运行中」通知弄混。\n\n" +
+            "配对码过期或输错，只重做这一步：重新点「配对」拿新码即可，不用重装 Shizuku，也不用重开引导。" +
+            "蟹啦不读取、不保存，也不会要求你发送配对码。\n\n" +
+            "无线调试一直失败时可用电脑：手机开启 USB 调试并用数据线连电脑，电脑装好 platform-tools（Android 开发者网站可下载）后执行\n" +
+            "adb shell sh /sdcard/Android/data/moe.shizuku.privileged.api/start.sh\n" +
+            "看到 Shizuku「已启动」再回到这里。没有电脑且未 Root 时无法启动 Shizuku；" +
+            "可以先点「先去主页看看」，但托管要等激活后才能用，步骤随时可在设置的使用攻略里查。",
         action = "打开 Shizuku",
         waiting = "正在等待 Shizuku 启动…",
         appExitTarget = "Shizuku",
         appExitAction = "完成配对并点击启动",
+        confirmKey = "shizuku_started_by_pairing",
+        confirmLabel = "Shizuku 已显示「已启动」，仍在这里等待",
     )
 }
 

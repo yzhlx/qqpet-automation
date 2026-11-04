@@ -85,7 +85,8 @@ object OnboardingFlow {
     fun satisfied(step: OnboardingStep, facts: OnboardingFacts): Boolean = when (step) {
         OnboardingStep.WELCOME, OnboardingStep.FINISH -> false
         OnboardingStep.INSTALL_SHIZUKU -> facts.shizukuInstalled || facts.shizukuRunning
-        OnboardingStep.START_SHIZUKU -> facts.shizukuRunning
+        OnboardingStep.START_SHIZUKU ->
+            facts.shizukuRunning || "shizuku_started_by_pairing" in facts.userConfirmedKeys
         OnboardingStep.GRANT_SHIZUKU -> facts.shizukuGranted
         OnboardingStep.OVERLAY -> facts.overlayGranted
         OnboardingStep.NOTIFICATION -> facts.notificationGranted
