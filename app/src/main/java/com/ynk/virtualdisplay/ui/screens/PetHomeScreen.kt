@@ -249,6 +249,9 @@ fun PetHomeScreen(
         }
     }
 
+    // 第 2、3 步要等第 1 步就绪。用户提前点「一键创建」时在这里说明缺哪一步、下一步点哪里，
+    // 只展示一次：点到就位后不再弹，也不打断已经能点的情况。
+    var blockedTap by remember { mutableStateOf<String?>(null) }
     Column(Modifier.fillMaxSize()) {
         if (runtime.running) {
             PetTitleBar(
@@ -310,7 +313,13 @@ fun PetHomeScreen(
                         catalogReady = catalogFresh,
                         calibrationBlocker = profileErrors.firstOrNull(),
                         onOpenDisplay = {
-                            viewModel.createPetDisplay { displayId ->
+                            val blocked = stepBlockedMessage(uiState.shizukuState)
+                            if (blocked != null) {
+                                blockedTap = blocked
+                                android.widget.Toast.makeText(
+                                    context, blocked, android.widget.Toast.LENGTH_LONG,
+                                ).show()
+                            } else viewModel.createPetDisplay { displayId ->
                                 android.widget.Toast.makeText(
                                     context, "虚拟屏已创建，打开宠物界面即可",
                                     android.widget.Toast.LENGTH_LONG,
@@ -324,6 +333,15 @@ fun PetHomeScreen(
                         shizukuState = uiState.shizukuState,
                         onOpenShizuku = { context.openShizuku() },
                     )
+                }
+                blockedTap?.let { msg ->
+                    PetCard {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            PetChip("先做第 1 步", PetTokens.AmberSoft, PetTokens.AmberInk)
+                            Spacer(Modifier.width(8.dp))
+                            Text(msg, fontSize = 12.5.sp, color = PetTokens.Ink2)
+                        }
+                    }
                 }
                 // MKA-07：坐标只在一台真机上量过。其他机型先如实说明，再由页面识别兜底。
                 DeviceSupport.homeWarningTitle()?.let { title ->

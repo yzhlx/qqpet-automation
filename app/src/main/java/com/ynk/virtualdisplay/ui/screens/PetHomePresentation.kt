@@ -304,3 +304,16 @@ fun shizukuSetupHint(state: ShizukuState): ShizukuSetupHint = when (state) {
     ShizukuState.Ready -> ShizukuSetupHint("已连接", null, null)
     ShizukuState.Checking -> ShizukuSetupHint("检查中…", null, null)
 }
+
+/**
+ * 第 2、3 步都要等第 1 步就绪。用户提前点「一键创建」时，必须一句话说明为什么没反应、
+ * 下一步点哪里：静默失败会让人以为按钮坏了，也可能把「未知」误当成已完成。
+ */
+fun stepBlockedMessage(state: ShizukuState): String? = when (state) {
+    ShizukuState.PermissionDenied ->
+        "先完成第 1 步：Shizuku 还没允许蟹啦使用。点上面的「去授权」，在弹窗里选「始终允许」。"
+    ShizukuState.NotRunning ->
+        "先完成第 1 步：Shizuku 服务没在运行。点上面的「去恢复」，在 Shizuku 里点「启动」。"
+    ShizukuState.Checking -> "正在检查 Shizuku 状态，稍等一秒再点。"
+    ShizukuState.Ready -> null
+}

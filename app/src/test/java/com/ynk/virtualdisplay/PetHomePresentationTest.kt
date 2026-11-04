@@ -22,7 +22,9 @@ import com.ynk.virtualdisplay.ui.screens.StatusPillPresentation
 import com.ynk.virtualdisplay.ui.screens.StatusPillTone
 import com.ynk.virtualdisplay.ui.screens.StudyStepTrack
 import com.ynk.virtualdisplay.ui.screens.shizukuSetupHint
+import com.ynk.virtualdisplay.ui.screens.stepBlockedMessage
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -413,5 +415,24 @@ class PetHomePresentationTest {
         assertEquals("检查中…", checking.stateLabel)
         assertNull(checking.actionLabel)
         assertNull(checking.message)
+    }
+
+    @Test
+    fun tappingAFutureStepWithoutAuthorisationSaysWhichStepIsMissing() {
+        val denied = stepBlockedMessage(ShizukuState.PermissionDenied)
+        assertNotNull("未授权时不能静默失败", denied)
+        assertTrue(denied!!.contains("第 1 步"))
+        assertTrue(denied.contains("去授权"))
+
+        val stopped = stepBlockedMessage(ShizukuState.NotRunning)
+        assertNotNull(stopped)
+        assertTrue(stopped!!.contains("去恢复"))
+        assertTrue("两种阻塞的恢复动作不能混用", !stopped.contains("去授权"))
+
+        val checking = stepBlockedMessage(ShizukuState.Checking)
+        assertNotNull(checking)
+        assertTrue(checking!!.contains("稍等"))
+
+        assertNull("已就绪时不应拦截", stepBlockedMessage(ShizukuState.Ready))
     }
 }
