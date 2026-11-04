@@ -107,7 +107,7 @@
 - 阻塞项：无静态审查阻塞。
 
 - 已完成（收尾）：按 A逐行、B删除行为、C调用链、复用、简化、效率、根因层次、约定八角度顺序完成单上下文审查；仅合并重复候选，未运行 verifier、构建或消耗性设备验收。未找到适用的仓库/祖先 CLAUDE.md、CLAUDE.local.md、AGENTS.md；遵循用户全局规则。
-- 证据：ADB 指定 DKS9K23420020242 只读读取 pet_mvp.log；最近会话 1792450029666 在 06:47:19 读到体力24/清洁3，06:47:33 读到金币1/学费22/护理估算53，06:47:58 在启动前页面身份检查停止。该旧身份判据源码已修，不作为当前缺陷；未进行新闭环。
+- 证据：ADB 指定 华为 FOA-AL00 只读读取 pet_mvp.log；最近会话 1792450029666 在 06:47:19 读到体力24/清洁3，06:47:33 读到金币1/学费22/护理估算53，06:47:58 在启动前页面身份检查停止。该旧身份判据源码已修，不作为当前缺陷；未进行新闭环。
 - 当前状态：审查完成，交付 JSON 候选及最小修复建议。重点为余额读取、护理资金分支、工作后旧健康值、护理次数上限、单场收益不足、预检未绑定课程、启动健康读数过期、工资页首帧过早失败。清理类未占用正确性问题名额。
 - 验收对照：八角度/具体代码位置与场景/排除两项指定旧问题/不修改业务源码——通过；新版完整真机闭环——未定，本段没有执行。
 - 下一步：按交付问题先修前置资金与读数契约，再修到账及护理衔接；以实际24/3/1前置状态评估可执行方案，完整真机通过前不得引用历史P5.1为新版通过证据。
@@ -225,7 +225,7 @@
   2. HEALTH_STALE 根因（session 1792513340455 / events `9e7a742e-…`）：prework 选课读学费约 61s，超过 60s 健康新鲜度后仍把旧 `before` 交给护理。`earnTuitionAndCareFundsBeforeCare` 无班/学费够用路径改为 `returnHome()` 后 `care.readHealth("prework-fresh")`；有班路径仍 `after-work`。证据目录 `.build-tmp/device-acceptance/s20-workstudy-rerun/`（verdict HEALTH_STALE；当时 coins=101≥tuition+care，未进打工）。
   3. 新包已签未装：`.build-tmp/qqpet-prework-fresh-20261021.apk`（SHA-256 18573e0a…；证书 a63a2254…cf77）。JVM 再跑 `OK (396 tests)`。`aidl.exe` 已还原原件。
 - 当前方案（设备上上次读取）：study:田径运动课 ×1 / 100/100 / 480 / workBeforeStudy=true / 帮武馆跑腿。
-- 当前状态：代码侧两项阻塞已修；adb 显示 `DKS9K23420020242 offline`，用户要求先写 progress 停下，不做安装/托管。
+- 当前状态：代码侧两项阻塞已修；adb 显示 `华为 FOA-AL00 offline`，用户要求先写 progress 停下，不做安装/托管。
 - 下一步（设备上线后）：
   1. `adb install -r .build-tmp/qqpet-prework-fresh-20261021.apk`（TEMP/TMP 指 `.foreman/tmp`）。
   2. 确认 VD4 宠物在 display 4；若黑屏则 force-stop QQ + 搜索入口拉回。
@@ -250,7 +250,7 @@
 - 验证结果：
   - 单元测试：95 个测试套件、913 项单元测试 100% PASS（0 failures, 0 errors）。
   - 构建打包：assembleDebug 成功，生成 app-debug.apk（47.9MB）。
-  - 真机安装：通过 ADB 成功覆盖安装至真机 DKS9K23420020242（Success）。
+  - 真机安装：通过 ADB 成功覆盖安装至真机 华为 FOA-AL00（Success）。
 - 提交与推送：提交 feat(daily): 增加每日签到、信箱待领与冒险上限控制 (SOC-03, SOC-04, STR-14)，推送到远端 backup/feat/onboarding-troubleshooting-p0，更新 PR #4。
 - 下一步：实现第二阶段 SOC-05 福袋任务（独立开关、扫描间隔、每日上限），或进入第三阶段任务目标策略排班（STR-01~05）。
 
@@ -274,7 +274,7 @@
 - 验证结果：
   - 单元测试：96 个测试套件、924 项单元测试 100% PASS（0 failures, 0 errors）。
   - 构建打包：assembleDebug 构建通过，APK 45.8MB。
-  - 真机安装：通过 ADB 成功覆盖安装至真机 DKS9K23420020242（Success）。
+  - 真机安装：通过 ADB 成功覆盖安装至真机 华为 FOA-AL00（Success）。
 - 提交与推送：提交 feat(daily): 增加福袋任务、每日上限控制与失败安全跳过 (SOC-05)，推送到远端 backup/feat/onboarding-troubleshooting-p0，更新 PR #4。
 - 下一步：实现第二阶段剩余的每日完成次数及收益记录汇总呈现（OBS-03~06），或进入第三阶段任务目标策略排班（STR-01~05）。
 
@@ -287,7 +287,7 @@
   - PetSessionController：ResourcePreflightPort 内学习步骤执行前接入 CoinSpendPolicy，命中即 ResourcePreflight.Insufficient（安全停止，不去扣费）；computeConfirmedNetSpendToday 仅从当日已确认 run-record（roomCoinsBefore/After 都已读出）求和，未知记录按 0 处理，不把未知当成功。
   - PetPlanSheetScreen：学习开启时展示「金币保护（STR-13）」卡片，金币底线/每日花费上限各自带 Switch（默认关）+ 数值参数行，沿用既有 Switch 风格。
   - 单元测试：新增 CoinSpendPolicyTest（6 项），PlanV2StoreTest 增加字段往返与省略校验。
-- 验证结果：全量单元测试 97 套件 / 931 项 100% PASS（0 failures, 0 errors, 3 skipped）；assembleDebug 构建通过（APK 约 45.8MB）；ADB 覆盖安装 DKS9K23420020242 成功。
+- 验证结果：全量单元测试 97 套件 / 931 项 100% PASS（0 failures, 0 errors, 3 skipped）；assembleDebug 构建通过（APK 约 45.8MB）；ADB 覆盖安装 华为 FOA-AL00 成功。
 - 提交与推送：feat(plan): 金币底线与每日学习花费上限门禁 (STR-13)，推送 backup/feat/onboarding-troubleshooting-p0，更新 PR #4。
 - 下一步：第三阶段 STR-15 任务间隔与冷却（失败后合理冷却、不高频空转），或 STR-16 策略解释（展示本轮选择/排除原因）。
 
@@ -302,7 +302,7 @@
   - PetPlanSheetScreen：新增「任务节奏（STR-15）」卡片，步骤最小间隔与失败后冷却各自带 Switch（默认关）+ 数值行。
   - PetUserManualScreen：使用攻略补充「金币底线与花费上限」「任务节奏：间隔与失败冷却」两条说明。
   - 单元测试：新增 FailureCooldownPolicyTest（7 项）、PlanRunnerIntervalTest（3 项），PlanV2StoreTest 增加字段往返与省略校验。
-- 验证结果：全量单元测试 99 套件 / 942 项 100% PASS（0 failures, 0 errors, 3 skipped）；assembleDebug 构建通过；ADB 覆盖安装 DKS9K23420020242 成功。
+- 验证结果：全量单元测试 99 套件 / 942 项 100% PASS（0 failures, 0 errors, 3 skipped）；assembleDebug 构建通过；ADB 覆盖安装 华为 FOA-AL00 成功。
 - 提交与推送：feat(plan): 任务间隔与失败冷却，避免高频空转 (STR-15)，推送 backup/feat/onboarding-troubleshooting-p0，更新 PR #4。
 - 下一步：第三阶段 STR-16 策略解释（展示本轮为什么选学习/打工/冒险以及排除其他选项的原因），或 STR-08/09 属性目标与均衡目标。
 
@@ -316,7 +316,7 @@
   - 主页新增「本轮策略 / 上一轮策略」卡片，逐条列出做了什么、跳过了什么及原因、哪些没勾选；记录页历史卡片单独一行显示同一句摘要（不再挤进会被截断的详情行）。
   - 使用攻略「配置托管方案」补充第 6 条「本轮策略说明」。
   - 单元测试：新增 StrategyExplanationTest（7 项）与 StrategyPresentationTest（5 项）；真机插桩测试新增 StrategyRecordJsonTest（3 项，org.json 只在设备可用，覆盖写读往返）。
-- 验证结果：全量单元测试 101 套件 / 954 项 100% PASS（0 failures, 0 errors, 3 skipped）；assembleDebug 构建通过（APK 45.9MB）；ADB 覆盖安装 DKS9K23420020242 成功，App 启动无崩溃；真机插桩测试 3 项 PASS（0 failures, 0 errors）。主页与历史卡片上的策略说明尚未在真机上跑过一轮真实方案，待验收。
+- 验证结果：全量单元测试 101 套件 / 954 项 100% PASS（0 failures, 0 errors, 3 skipped）；assembleDebug 构建通过（APK 45.9MB）；ADB 覆盖安装 华为 FOA-AL00 成功，App 启动无崩溃；真机插桩测试 3 项 PASS（0 failures, 0 errors）。主页与历史卡片上的策略说明尚未在真机上跑过一轮真实方案，待验收。
 - 提交与推送：feat(plan): 策略解释，展示本轮选择与排除原因 (STR-16)，推送 backup/feat/onboarding-troubleshooting-p0，更新 PR #4。
 - 下一步：第三阶段剩余 STR-08/09 属性目标与均衡目标（StudyStep.targetAttribute 已存在），或 STR-01/02 学习优先与打工优先模式。
 
@@ -332,7 +332,7 @@
   - 使用攻略「配置托管方案」补充第 7 条「优先模式与受阻转移」。
   - 顺带修掉两个既有缺陷：PlanRunJsonCodec 之前不保存 StudyStep.targetAttribute（属性目标会在运行记录里丢失），PlanV2.hashCode 之前漏算 failureCooldownMinutes。
   - 单元测试：新增 StepTransferPolicyTest（6 项）、PlanRunnerTransferTest（6 项）；另补 StrategyExplanationTest、StrategyPresentationTest、PlanV2Test、PlanV2StoreTest 共 5 项。
-- 验证结果：全量单元测试 103 套件 / 971 项 100% PASS（0 failures, 0 errors, 3 skipped）；assembleDebug 构建通过（APK 49.1MB）；ADB 覆盖安装 DKS9K23420020242 成功，App 启动无崩溃；真机确认方案页出现「优先与转移（STR-01/02）」卡片、开关可打开并写入 plan-v2.json（transferOnBlock:true），重新进入方案页开关恢复为开启。
+- 验证结果：全量单元测试 103 套件 / 971 项 100% PASS（0 failures, 0 errors, 3 skipped）；assembleDebug 构建通过（APK 49.1MB）；ADB 覆盖安装 华为 FOA-AL00 成功，App 启动无崩溃；真机确认方案页出现「优先与转移（STR-01/02）」卡片、开关可打开并写入 plan-v2.json（transferOnBlock:true），重新进入方案页开关恢复为开启。
 - 待验收：真实跑一轮「打工受阻 → 转护理/学习」的真机场景尚未执行（需要体力不足或金币不够的实际局面），该行为目前只有 JVM 测试覆盖。
 - 提交与推送：feat(plan): 学习优先与打工优先，受阻时按规则转移 (STR-01/02)，推送 backup/feat/onboarding-troubleshooting-p0，更新 PR #4。
 - 下一步：第三阶段 STR-08 属性目标（今日停止线）与 STR-09 均衡属性目标（轮换力量/智力/魅力并记录每项变化）；需先核实属性数值能否读取，目前打工详情页只读到属性名，读不到数值。
@@ -350,7 +350,7 @@
   - 用户没点属性但选的就是该属性课程时按课程如实记下属性，运行记录里才分得清学的是什么。
   - 使用攻略「配置托管方案」补充第 8 条「属性目标与今日停止线」。
   - 单元测试：新增 StudyDailyCapPolicyTest（5 项）、PlanRunJsonCodecTest（2 项），PlanV2Test 与 PlanV2StoreTest 各补 1 项；真机插桩 StrategyRecordJsonTest 补 3 项（org.json 只在设备可用，覆盖新字段写读往返、旧记录保持未知）。
-- 验证结果：全量单元测试 105 套件 / 980 项 100% PASS（0 failures, 0 errors, 3 skipped）；assembleDebug 构建通过（APK 49.2MB）；ADB 覆盖安装 DKS9K23420020242 成功，App 启动无崩溃；真机确认方案页出现「今日停止线」开关与「今日上限（节）」数值行，勾选力量并保存后 plan-v2.json 写入 dailyStudyRoundCap:5、study 步骤带 targetAttribute:力量，重新进入方案页开关与数值恢复。
+- 验证结果：全量单元测试 105 套件 / 980 项 100% PASS（0 failures, 0 errors, 3 skipped）；assembleDebug 构建通过（APK 49.2MB）；ADB 覆盖安装 华为 FOA-AL00 成功，App 启动无崩溃；真机确认方案页出现「今日停止线」开关与「今日上限（节）」数值行，勾选力量并保存后 plan-v2.json 写入 dailyStudyRoundCap:5、study 步骤带 targetAttribute:力量，重新进入方案页开关与数值恢复。
 - 待验收：真实跑一轮「今天已学满 N 节 → 本轮跳过学习」的真机场景尚未执行（需要当天已有已确认学习记录的实际局面），该行为目前只有 JVM 测试覆盖；旧版托管参数路径（session-plan.json）不读停止线，只有方案页保存的 PlanV2 生效。
 - 提交与推送：feat(plan): 属性目标与今日停止线，今日学满即跳过 (STR-08)，推送 backup/feat/onboarding-troubleshooting-p0，更新 PR #4。
 - 下一步：第三阶段 STR-09 均衡属性目标（轮换力量/智力/魅力并记录每项变化）：StudyStep 目前只有单个 courseId，轮换需要每轮不同课程，预检的学费/时长/成本读取都要按属性分别取，工作量比 STR-08 大；run-record.json 已记下 targetAttribute 与 studyRoundsCompleted，可直接作为每项统计的原料。
@@ -372,7 +372,7 @@
   - 方案页：培养目标属性卡片新增第 4 个芯片「均衡」（默认不选，新玩法不默认执行），选中后显示「均衡：力量 → 智力 → 魅力（每节课轮换一门）」和三门课的课程名；均衡模式下课程列表不可手动选，改回单属性会清空轮换。
   - 使用攻略「配置托管方案」补充第 9 条「均衡目标」，写明轮换顺序、学费按每节计算、属性数值读不到。
   - 单元测试：新增 StudyRotationPolicyTest（8 项）、CourseAttributeGainTest（4 项）、RecordsPresentationTest（3 项）；PlanV2Test 补 2 项（轮换保留 + 5 种非法轮换）、PlanV2StoreTest 补 1 项（轮换往返、关闭时不写键）、PlanRunJsonCodecTest 补 1 项（运行快照往返）、CoinSpendPolicyTest 补 1 项（按真实合计判断）；真机插桩 StrategyRecordJsonTest 补 1 项（studyAttributes 写读往返、读不到的收益保持未知）。
-- 验证结果：全量单元测试 108 套件 / 1000 项 100% PASS（0 failures, 0 errors, 3 skipped）；assembleDebug 构建通过；ADB 覆盖安装 DKS9K23420020242 成功，App 启动与各页切换无 FATAL；真机确认方案页出现「均衡」芯片，点选后高亮为选中色并显示三门轮换课，保存后 plan-v2.json 写入 rotation（力量/智力/魅力三门课）且不写 targetAttribute，重新进入方案页轮换说明与选中态恢复；使用攻略第 9 条「均衡目标」可见；记录页空态正常。
+- 验证结果：全量单元测试 108 套件 / 1000 项 100% PASS（0 failures, 0 errors, 3 skipped）；assembleDebug 构建通过；ADB 覆盖安装 华为 FOA-AL00 成功，App 启动与各页切换无 FATAL；真机确认方案页出现「均衡」芯片，点选后高亮为选中色并显示三门轮换课，保存后 plan-v2.json 写入 rotation（力量/智力/魅力三门课）且不写 targetAttribute，重新进入方案页轮换说明与选中态恢复；使用攻略第 9 条「均衡目标」可见；记录页空态正常。
 - 待验收：
   - 真机跑一轮三节轮换尚未执行——设备上 Shizuku 未授权，托管无法启动；轮换执行路径目前只有 JVM 测试覆盖。
   - 课程页属性收益解析目前依据 Gate C 实测表与合成文本测试，尚未在真实课程详情页的 OCR 原始输出上验证；读不到时会记成未知，不会给出错误数字。
@@ -420,7 +420,7 @@
 - 验证结果：
   - 全量单元测试 110 套件 / 1014 项 100% PASS（0 failures, 0 errors, 3 skipped）。
   - assembleDebug 构建通过。
-  - 真机：ADB 恢复后覆盖安装 DKS9K23420020242 成功，App 启动无 FATAL；方案页勾选「打工」确认卡片显示目录值、未读取说明与「读取岗位收益」按钮（标注只读不开工），后台画面未就绪时给出「暂不能读取」；使用攻略「配置托管方案」第 11 条可见。
+  - 真机：ADB 恢复后覆盖安装 华为 FOA-AL00 成功，App 启动无 FATAL；方案页勾选「打工」确认卡片显示目录值、未读取说明与「读取岗位收益」按钮（标注只读不开工），后台画面未就绪时给出「暂不能读取」；使用攻略「配置托管方案」第 11 条可见。
 - 待验收：
   - 真机点「读取岗位收益」逐家读取奖励行（需 Shizuku 授权与后台画面可用；本机 Shizuku 显示未连接）。
   - 岗位页面 OCR 读数尚未在真实页面上核对。
@@ -454,7 +454,7 @@
     确认后分钟与天数不变、确认没发生可重做、已结算不可再确认）。
 - 验证结果：
   - 全量单元测试：111 套件 / 1022 项通过（0 失败、0 错误、3 跳过）；assembleDebug 构建成功并已覆盖安装到设备。
-  - 真机（设备 DKS9K23420020242，已装本轮 APK）：按账本二进制格式造一条「结果未知」的学习尝试写入设备后——
+  - 真机（设备 华为 FOA-AL00，已装本轮 APK）：按账本二进制格式造一条「结果未知」的学习尝试写入设备后——
     主页出现「有 1 个待确认动作 · 去确认」；方案页出现「待确认动作」卡片（学习 · 10 分钟 · 2026-11-04）；
     点「已经做完」卡片消失，账本该尝试变为 COMPLETED 且原因带 USER_CONFIRMED_DONE；
     换成 RECONCILED_STOPPED+OUTCOME_REMAINS_UNKNOWN 的尝试点「没有发生」后，账本变为 RECONCILED_STOPPED
@@ -495,7 +495,7 @@
     文案与跨零点判断、时钟取分钟、越界分钟被拒、开始闸门拦下与放行、健康检查不被拦）。
 - 验证结果：
   - 全量单元测试：112 套件 / 1033 项 100% PASS（0 failures, 0 errors, 3 skipped）。
-  - assembleDebug 构建成功（4m55s），APK 已覆盖安装到设备 DKS9K23420020242（install: Success）。
+  - assembleDebug 构建成功（4m55s），APK 已覆盖安装到设备 华为 FOA-AL00（install: Success）。
   - 真机（设置页）：「设置 → 夜间暂停」一行显示「未开启：夜里不会开始新的托管」；点开对话框能打开开关，
     出现「开始 23:00 / 结束 07:00」两行时间，− 键把开始时间改成 22:30，保存后该行变成
     「每天 22:30–07:00 不托管」。
@@ -526,7 +526,7 @@
 - 验证结果：
   - 全量单元测试：113 套件 / 1048 项 100% PASS（0 failures, 0 errors, 3 skipped），
     新增 3 项 claimConfirmed 测试。
-  - assembleDebug 构建成功，APK 覆盖安装到设备 DKS9K23420020242（install: Success），启动正常。
+  - assembleDebug 构建成功，APK 覆盖安装到设备 华为 FOA-AL00（install: Success），启动正常。
   - 真机（记录页）：用测试记录验证「今天」卡片显示「签到 2 次 · 信箱 1 次 · 福袋 3 个」；
     验证后已删除测试目录，设备恢复原状。
 - 待验收：
@@ -542,7 +542,7 @@
   - 数据来自本机已有会话目录，按本地日期取前一天；没有记录就不显示这一行。
 - 验证结果：
   - 全量单元测试：113 套件 / 1050 项 100% PASS（新增 2 项 dailyLine 测试）。
-  - assembleDebug 成功，APK 覆盖安装到 DKS9K23420020242（install: Success）。
+  - assembleDebug 成功，APK 覆盖安装到 华为 FOA-AL00（install: Success）。
   - 真机：写入一条 startedAt 为前一天的测试记录后，记录页显示
     「昨天 · 学习 2 节 · 打工 2 班 · 签到 1 次 · 运行 45 分钟」；验证后已删除测试目录。
 - 提交：feat(records): 昨日汇总一行，跨零点保留前一天进度 (OBS-06)。
@@ -591,7 +591,7 @@
     RecordsPresentationTest 增加 3 项时间线用例。
 - 验证结果：
   - 全量单元测试：113 套件 / 1053 项 PASS（0 failures, 0 errors, 3 skipped），assembleDebug 成功。
-  - 真机（DKS9K23420020242）：用测试会话记录与事件日志验证记录页显示
+  - 真机（华为 FOA-AL00）：用测试会话记录与事件日志验证记录页显示
     「16:30 本轮结束 · 已完成」「15:55 这一步没完成 · 候选打工岗位均未达到开工条件」
     「15:48 学习已确认 · 第 1 节」「15:47 开始上课 · 第 1 节 · 蹦蹦跳跳体能课 · 约 10 分钟」
     「15:45 开始托管 · 计划 2 节」；验证后已删除测试目录与文件。
@@ -631,7 +631,7 @@
   - 新增 StartSummaryPresentation（纯函数）与 5 项单测。
 - 验证结果：
   - 全量单元测试 114 套件 / 1062 项 PASS（0 failures, 0 errors, 3 skipped）。
-  - assembleDebug 成功；APK 覆盖安装到 DKS9K23420020242 并正常启动，首页渲染正常，
+  - assembleDebug 成功；APK 覆盖安装到 华为 FOA-AL00 并正常启动，首页渲染正常，
     Shizuku 未授权时仍显示「还不能开始：先完成以下 3 步」与灰色开始按钮。
 - 待验收：摘要弹窗与确认开始需要 Shizuku 授权后才能真机点开（当前 App 的 Shizuku 权限未授权，
   开始按钮不可用）；未实际开始会话，避免消耗金币。
@@ -657,7 +657,7 @@
   - 新增 1 项 OnboardingFlowTest：用户确认后从配对步骤进入授权步骤，且不把确认当成已授权。
 - 验证结果：
   - 相关单测 OnboardingFlowTest 10 项 + OnboardingStoreTest 6 项全部通过，assembleDebug 成功。
-  - 真机（DKS9K23420020242）：引导页可滚动展示配对与启动全文，步骤、提示与按钮均可见；
+  - 真机（华为 FOA-AL00）：引导页可滚动展示配对与启动全文，步骤、提示与按钮均可见；
     验证后已恢复设备引导设置原状。
 - 待验收：真实配对流程（配对码输入、通知找回、启动成功自动继续）需真机走一遍完整配对。
 - 下一步：检查第六节厂商特殊设置与第七节自有测试页剩余项。
@@ -674,10 +674,36 @@
     点击直达 Shizuku，不再让用户误以为全部功能损坏或必须重跑引导。
 - 验证结果：
   - 相关单测编译、assembleDebug 均通过（等待全量回归结果）。
-  - 真机（DKS9K23420020242）：覆盖安装成功，首页在 Shizuku 未连接时仍显示三步检查卡。
+  - 真机（华为 FOA-AL00）：覆盖安装成功，首页在 Shizuku 未连接时仍显示三步检查卡。
 - 待验收：Shizuku 被停止状态下点击「去恢复」跳转到 Shizuku 的真机链路，
   需在真机上主动停止 Shizuku 后验证。
 - 下一步：核实第七节自有测试页与 QQ 登录/房间识别剩余项，评估是否需要最小实现。
 - 提交与推送：6d0bd43 已推送到 feat/onboarding-troubleshooting-p0 与 backup 分支，PR #4 head 已对齐。
 - 下一条具体动作：核实第七节自有测试页（截图/点击自检）与 QQ 登录/房间识别剩余项，
   若工程量可控则实现最小版本，否则在台账标注暂缓原因。
+
+### 2026-11-04 能力检测复用与房间待核对（引导清单第七节）
+
+- 交付内容：
+  - 「检查运行环境」的能力层增加通过记录：同一启动周期、同一安装版本内复用上次通过的
+    虚拟屏创建与截图检测，不再每次打开设置都创建测试屏；设备重启、应用升级或
+    Shizuku 断连后自动失效重查；「重新检测」强制复查。
+  - 通过记录只存 boot_count、应用 lastUpdateTime 与通过时间，不包含配对码、账号或截图。
+  - QQ 已在后台启动但未识别宠物房间时，第三层标为「待核对」而不是「正常 / 准备完成」；
+    开始任务前会再识别房间，避免把 QQ 进程存在当成房间就绪。
+  - 引导完成页与使用攻略明确：登录由用户在 QQ 内完成，蟹啦不读取账号或密码；
+    无法确认账号或房间时不替用户猜测。
+- 验证结果：
+  - EnvironmentDiagnosticTest 10 项通过（新增 5 项：复用、重启/升级失效、断连清理、
+    房间待核对、QQ 未启动登录说明）。
+  - 全量 114 套件 / 1068 项 PASS（0 failures, 0 errors, 3 skipped），assembleDebug 成功。
+  - 真机 华为 FOA-AL00：APK 覆盖安装成功并启动；设置 →「检查运行环境」可打开，
+    显示基础状态与「QQ 状态（房间在开始任务时核对）」；当前 Shizuku 未授权，
+    能力层未执行，属预期。
+- 待验收：
+  - 能力检测复用/失效需 Shizuku 授权后真机验证（重启、升级、断连三种）。
+  - 「待核对」状态需 QQ 在托管画面中运行后确认。
+- 提交与推送：2377e4b 已推送到 feat/onboarding-troubleshooting-p0 与 backup 分支；
+  PR #4 head 已对齐。
+- 下一条具体动作：推进第九节「图文步骤优先 / 攻略版本一致性」，
+  再处理第十节「更新保留数据 / 开始前快速检查」。
