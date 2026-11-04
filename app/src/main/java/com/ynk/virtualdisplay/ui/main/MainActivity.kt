@@ -109,6 +109,7 @@ class MainActivity : ComponentActivity() {
                             showGuide -> OnboardingScreen(
                                 state = state,
                                 completedBefore = guideProgress.completed,
+                                repository = viewModel.repository,
                                 permissionError = permissionError,
                                 onCheck = { viewModel.checkShizukuStatus(this@MainActivity) },
                                 onRequestPermission = {

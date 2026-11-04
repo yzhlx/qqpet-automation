@@ -30,7 +30,9 @@ import androidx.compose.ui.unit.sp
 import androidx.core.app.NotificationManagerCompat
 import com.ynk.virtualdisplay.R
 import com.ynk.virtualdisplay.data.model.ShizukuState
+import com.ynk.virtualdisplay.data.repository.IDisplayRepository
 import com.ynk.virtualdisplay.floating.OverlayPermission
+import com.ynk.virtualdisplay.ui.feedback.DiagnosticDialog
 import com.ynk.virtualdisplay.ui.theme.PetTokens
 import kotlinx.coroutines.delay
 
@@ -388,6 +390,7 @@ fun OnboardingScreen(
     onFinish: () -> Unit,
     onPreview: (() -> Unit)? = null,
     onOpenTutorial: (() -> Unit)? = null,
+    repository: IDisplayRepository? = null,
 ) {
     val context = LocalContext.current
     val store = remember { OnboardingStore(context) }
@@ -431,6 +434,7 @@ fun OnboardingScreen(
     }
 
     var backTo by remember { mutableStateOf<OnboardingStep?>(null) }
+    var showDiagnostic by remember { mutableStateOf(false) }
     val current = OnboardingFlow.current(facts, welcomed, setAside)
     val step = backTo ?: current
 
@@ -652,7 +656,20 @@ Text("本次动作：" + page.appExitAction + "。\n完成后请通过多任务�
             }
         }
 
+        // 引导没走完也能生成诊断报告：设备、版本、授权与检测状态一次看全。
+        if (repository != null && step != OnboardingStep.WELCOME) {
+            TextAction("生成诊断报告") { showDiagnostic = true }
+        }
+
         Spacer(Modifier.height(16.dp))
+    }
+
+    if (showDiagnostic && repository != null) {
+        DiagnosticDialog(
+            repository = repository,
+            shizukuState = state,
+            onDismiss = { showDiagnostic = false },
+        )
     }
 }
 

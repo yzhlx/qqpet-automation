@@ -1,5 +1,8 @@
 package com.ynk.virtualdisplay.ui.feedback
 
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Intent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -14,9 +17,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.ynk.virtualdisplay.BuildConfig
 import com.ynk.virtualdisplay.automation.DiagnosticLevel
 import com.ynk.virtualdisplay.automation.DiagnosticReport
 import com.ynk.virtualdisplay.automation.EnvironmentDiagnostic
@@ -36,6 +41,7 @@ fun DiagnosticDialog(
     val scope = rememberCoroutineScope()
     var report by remember { mutableStateOf<DiagnosticReport?>(null) }
     var checking by remember { mutableStateOf(true) }
+    var showReport by remember { mutableStateOf(false) }
 
     fun runDiag(forceCapabilities: Boolean = false) {
         checking = true
@@ -48,6 +54,10 @@ fun DiagnosticDialog(
 
     LaunchedEffect(Unit) {
         runDiag()
+    }
+
+    val reportText = report?.let {
+        DiagnosticReportText.build(it, BuildConfig.VERSION_NAME, BuildConfig.GIT_HASH)
     }
 
     AlertDialog(
@@ -177,10 +187,82 @@ fun DiagnosticDialog(
         },
         dismissButton = {
             if (!checking) {
-                TextButton(onClick = { runDiag(forceCapabilities = true) }) {
-                    Text("重新检测", color = PetTokens.Ink2)
+                Row {
+                    TextButton(onClick = { showReport = true }, enabled = reportText != null) {
+                        Text("查看报告", color = PetTokens.Blue)
+                    }
+                    TextButton(onClick = { runDiag(forceCapabilities = true) }) {
+                        Text("重新检测", color = PetTokens.Ink2)
+                    }
                 }
             }
         }
+    )
+
+    if (showReport && reportText != null) {
+        DiagnosticReportPreview(
+            text = reportText,
+            onDismiss = { showReport = false },
+        )
+    }
+}
+
+/** 分享前先整段展示，用户确认内容后才复制或发给别人。 */
+@Composable
+private fun DiagnosticReportPreview(text: String, onDismiss: () -> Unit) {
+    val context = LocalContext.current
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text("诊断报告预览", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = PetTokens.Ink)
+        },
+        text = {
+            Column(
+                Modifier
+                    .fillMaxWidth()
+                    .heightIn(max = 420.dp)
+                    .verticalScroll(rememberScrollState())
+            ) {
+                Text(
+                    text,
+                    fontSize = 11.sp,
+                    lineHeight = 17.sp,
+                    fontFamily = FontFamily.Monospace,
+                    color = PetTokens.Ink2,
+                )
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    "报告不含截图。需要附带画面时，请单独在「问题反馈」中选择。",
+                    fontSize = 11.sp,
+                    lineHeight = 16.sp,
+                    color = PetTokens.Ink3,
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = {
+                val send = Intent(Intent.ACTION_SEND).apply {
+                    type = "text/plain"
+                    putExtra(Intent.EXTRA_TEXT, text)
+                }
+                context.startActivity(Intent.createChooser(send, "分享诊断报告"))
+            }) {
+                Text("分享", color = PetTokens.Blue)
+            }
+        },
+        dismissButton = {
+            Row {
+                TextButton(onClick = {
+                    context.getSystemService(ClipboardManager::class.java)
+                        .setPrimaryClip(ClipData.newPlainText("蟹啦诊断报告", text))
+                    android.widget.Toast.makeText(context, "已复制诊断报告", android.widget.Toast.LENGTH_SHORT).show()
+                }) {
+                    Text("复制", color = PetTokens.Ink2)
+                }
+                TextButton(onClick = onDismiss) {
+                    Text("返回", color = PetTokens.Ink2)
+                }
+            }
+        },
     )
 }
