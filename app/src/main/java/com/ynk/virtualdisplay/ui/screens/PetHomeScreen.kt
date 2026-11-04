@@ -304,10 +304,10 @@ fun PetHomeScreen(
             } else {
                 if (!controls.startEnabled || !catalogFresh) {
                     SetupChecklistCard(
-                        startReady = controls.startEnabled,
                         shizukuReady = uiState.shizukuState is ShizukuState.Ready,
                         displayReady = readyDisplay != null && readyDisplay.id in managedIds,
                         catalogReady = catalogFresh,
+                        calibrationBlocker = profileErrors.firstOrNull(),
                         onOpenDisplay = {
                             viewModel.createPetDisplay { displayId ->
                                 android.widget.Toast.makeText(
@@ -554,45 +554,65 @@ private fun StartManagedButton(enabled: Boolean, onClick: () -> Unit) {
  */
 @Composable
 private fun SetupChecklistCard(
-    startReady: Boolean,
     shizukuReady: Boolean,
     displayReady: Boolean,
     catalogReady: Boolean,
+    calibrationBlocker: String?,
     onOpenDisplay: () -> Unit,
     onOpenPlanSheet: () -> Unit,
-    /** Shizuku 服务曾被授权但已停止（如手机重启）；只提示恢复，不算失败。 */
+    /** Shizuku 服务曾被授权但已停止（如手机重启或服务被系统停止）；只提示恢复，不算失败。 */
     shizukuStopped: Boolean = false,
     onOpenShizuku: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val missingCount = listOf(shizukuReady, displayReady, catalogReady).count { !it }
+    if (missingCount == 0 && calibrationBlocker == null) return
+
     PetCard(modifier) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Text(
-                if (startReady) "还差一步：读取课表后才能上课/托管"
-                else "还不能开始：先完成以下 3 步",
+                when {
+                    calibrationBlocker != null -> "还不能开始：先处理下面的问题"
+                    missingCount > 1 -> "还不能开始：先完成以下 $missingCount 步"
+                    !catalogReady -> "还差一步：读取课表后才能上课/托管"
+                    else -> "还差一步：完成下面这项就能开始"
+                },
                 fontSize = 14.sp, fontWeight = FontWeight.Bold, color = PetTokens.Ink,
                 modifier = Modifier.weight(1f),
             )
             PetChip(
-                if (startReady) "差课表" else "未就绪",
+                if (calibrationBlocker == null && missingCount == 1) "还差 1 步" else "未就绪",
                 PetTokens.AmberSoft, PetTokens.AmberInk,
             )
         }
         Spacer(Modifier.height(8.dp))
-        SetupStepRow(
-            index = "1", title = "Shizuku",
-            state = if (shizukuReady) "已连接" else "未连接", done = shizukuReady,
-        )
-        SetupStepRow(
-            index = "2", title = "后台画面",
-            state = if (displayReady) "已托管" else "未托管", done = displayReady,
-            actionText = "一键创建", onAction = onOpenDisplay,
-        )
-        SetupStepRow(
-            index = "3", title = "课表已读取",
-            state = if (catalogReady) "已完成" else "未完成", done = catalogReady,
-            actionText = "去刷新", onAction = onOpenPlanSheet,
-        )
+        if (!shizukuReady) {
+            SetupStepRow(
+                index = "1", title = "Shizuku",
+                state = "未连接", done = false,
+            )
+        }
+        if (!displayReady) {
+            SetupStepRow(
+                index = "2", title = "后台画面",
+                state = "未托管", done = false,
+                actionText = "一键创建", onAction = onOpenDisplay,
+            )
+        }
+        if (!catalogReady) {
+            SetupStepRow(
+                index = "3", title = "课表已读取",
+                state = "未完成", done = false,
+                actionText = "去刷新", onAction = onOpenPlanSheet,
+            )
+        }
+        if (calibrationBlocker != null) {
+            Spacer(Modifier.height(6.dp))
+            Text(
+                "虚拟屏校准未通过：$calibrationBlocker",
+                fontSize = 12.sp, lineHeight = 18.sp, color = PetTokens.AmberInk,
+            )
+        }
         Spacer(Modifier.height(6.dp))
         if (shizukuStopped && !shizukuReady) {
             Row(
@@ -602,7 +622,7 @@ private fun SetupChecklistCard(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(
-                    "Shizuku 已停止：打开 Shizuku 点「启动」即可恢复，无需重新配对；方案与进度已保存。",
+                    "Shizuku 已停止：打开 Shizuku 点「启动」即可恢复，通常无需重新配对；若系统清除了无线调试授权，按 Shizuku 页面提示重新配对。方案与进度已保存。",
                     fontSize = 12.sp, lineHeight = 18.sp, color = PetTokens.AmberInk,
                     modifier = Modifier.weight(1f),
                 )

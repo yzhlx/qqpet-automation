@@ -98,7 +98,6 @@ class MainActivity : ComponentActivity() {
                         val state = uiState.shizukuState
                         val showGuide = showGuideManual || OnboardingFlow.shown(
                             completedBefore = guideProgress.completed,
-                            shizukuReady = state is ShizukuState.Ready,
                             previewMode = guideProgress.previewMode
                         )
                         when {

@@ -143,13 +143,13 @@ private fun startShizukuPage(facts: OnboardingFacts, completedBefore: Boolean): 
     if (completedBefore) {
         return GuidePage(
             title = "Shizuku 需要重新启动",
-            intro = "手机重启后 Shizuku 会自动停止，这是系统的正常限制。打开 Shizuku 再点一次「启动」即可，无需重新配对。",
+            intro = "手机重启、系统清理后台或手动停止，都可能让 Shizuku 退出，这是系统的正常限制。打开 Shizuku 再点一次「启动」即可；通常不用重新配对，若系统清除了无线调试授权，按页面提示重新配对。",
             steps = listOf(
                 "打开手机的「无线调试」（Android 10 需连电脑运行启动脚本）",
                 "打开 Shizuku，点击「启动」",
                 "完成后切回蟹啦继续",
             ),
-            note = "如果未重启但提示断连，请先确认后台没有被系统杀死。",
+            note = "如果提示断连但手机没有重启，先确认 Shizuku 还在运行、后台没有被系统清理。",
             action = "打开 Shizuku",
             secondary = "打开开发者选项",
             waiting = "正在等待 Shizuku 启动…",

@@ -107,11 +107,13 @@ object OnboardingFlow {
 
     /**
      * 判断是否展示全屏引导。
+     * 已完成引导的用户即使 Shizuku 停止，也回首页走恢复入口，不重跑首次教程；
+     * 用户仍可从设置「重新打开新手引导」手动进入。
      * 若用户主动选择「先看产品」（previewMode = true），则不强制阻塞，允许先进入主界面查看功能。
      */
-    fun shown(completedBefore: Boolean, shizukuReady: Boolean, previewMode: Boolean = false): Boolean {
+    fun shown(completedBefore: Boolean, previewMode: Boolean = false): Boolean {
         if (previewMode) return false
-        return !completedBefore || !shizukuReady
+        return !completedBefore
     }
 
     /** Returning users skip the welcome and every optional step they already passed once. */

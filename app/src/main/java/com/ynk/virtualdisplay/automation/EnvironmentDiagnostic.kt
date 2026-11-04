@@ -98,7 +98,7 @@ class EnvironmentDiagnostic(
                 title = "Shizuku 运行状态",
                 passed = shizukuRunning,
                 message = if (shizukuRunning) "服务已启动" else "服务未启动",
-                remedy = if (!shizukuRunning) "请打开 Shizuku 应用点击「启动」，手机重启后需要重新启动" else null,
+                remedy = if (!shizukuRunning) "请打开 Shizuku 应用点击「启动」；手机重启、系统清理后台或手动停止都可能让服务退出，通常无需重新配对" else null,
             )
         )
 

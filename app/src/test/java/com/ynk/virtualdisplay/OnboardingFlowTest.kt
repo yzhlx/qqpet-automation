@@ -37,18 +37,22 @@ class OnboardingFlowTest {
         assertEquals(OnboardingStep.START_SHIZUKU, OnboardingFlow.current(ready.copy(shizukuRunning = false), true, aside))
     }
 
-    @Test fun afterARebootOnlyTheStoppedShizukuIsAskedAgain() {
-        assertFalse(OnboardingFlow.shown(completedBefore = true, shizukuReady = true))
-        assertTrue(OnboardingFlow.shown(completedBefore = true, shizukuReady = false))
-        val rebooted = OnboardingFacts(shizukuInstalled = true)
-        assertEquals(OnboardingStep.START_SHIZUKU, OnboardingFlow.current(rebooted, true, OnboardingFlow.setAsideFor(true)))
+    @Test fun completedOnboardingIsNotReplayedWhenShizukuStops() {
+        assertFalse(OnboardingFlow.shown(completedBefore = true))
+        assertTrue("首次使用仍应进入引导", OnboardingFlow.shown(completedBefore = false))
+        val stopped = OnboardingFacts(shizukuInstalled = true)
+        assertEquals(
+            "用户手动重新打开引导时仍定位到启动 Shizuku",
+            OnboardingStep.START_SHIZUKU,
+            OnboardingFlow.current(stopped, true, OnboardingFlow.setAsideFor(true)),
+        )
     }
 
     @Test fun previewModeAllowsViewingProductBeforeCompletingOnboarding() {
         // 当用户选择「先看看功能」（previewMode = true），不强制死锁在全屏引导，允许进入主界面查看
-        assertFalse(OnboardingFlow.shown(completedBefore = false, shizukuReady = false, previewMode = true))
+        assertFalse(OnboardingFlow.shown(completedBefore = false, previewMode = true))
         // 未开启 previewMode 且未完成设置时正常显示全屏引导
-        assertTrue(OnboardingFlow.shown(completedBefore = false, shizukuReady = false, previewMode = false))
+        assertTrue(OnboardingFlow.shown(completedBefore = false, previewMode = false))
     }
 
     @Test fun android10DoesNotSupportWirelessDebugging() {
