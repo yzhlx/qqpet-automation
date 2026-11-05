@@ -258,6 +258,7 @@ fun PetFootButton(
     val enabled = tone != PetButtonTone.DISABLED
     Box(
         modifier = modifier
+            .fillMaxWidth()
             .height(PetTokens.BtnHeight)
             .background(bg, shape)
             .then(if (border != Color.Transparent) Modifier.border(1.5.dp, border, shape) else Modifier)
