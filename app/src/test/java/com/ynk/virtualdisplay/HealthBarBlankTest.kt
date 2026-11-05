@@ -39,6 +39,31 @@ class HealthBarBlankTest {
         assertEquals(0, PetHealthCheck.barValue(PetHealthCheck.BAR_LEFT_EDGE - 1))
     }
 
+    /**
+     * The boundary is the bar's own length, not a shade of grey: one pixel short of the minimum is
+     * a scene patch, one pixel more is a bar. Built from the measured colours (track 214,208,197,
+     * panel white 252,246,231, beige wallpaper 237,208,151).
+     */
+    @Test
+    fun `the blank bar gate sits between the patch and the track`() {
+        val track = 0xFFD6C9C5.toInt()
+        fun rowWith(trackPx: Int) = IntArray(505 - PetHealthCheck.BAR_CAP_LEFT + 1) {
+            if (it >= 2 && it < 2 + trackPx) track else 0xFFF6F6E7.toInt()
+        }
+        assertTrue(PetHealthCheck.barPresent(rowWith(PetHealthCheck.BAR_TRACK_MIN_PX), 0xFF8000))
+        assertFalse(PetHealthCheck.barPresent(rowWith(PetHealthCheck.BAR_TRACK_MIN_PX - 1), 0xFF8000))
+        // A grey that starts after the cap is a scene patch, not a bar's left end.
+        val late = IntArray(505 - PetHealthCheck.BAR_CAP_LEFT + 1) {
+            if (it > PetHealthCheck.BAR_CAP_RIGHT - PetHealthCheck.BAR_CAP_LEFT) track else 0xFFF6F6E7.toInt()
+        }
+        assertFalse(PetHealthCheck.barPresent(late, 0xFF8000))
+        // The white panel and the beige wallpaper are never a track.
+        assertFalse(PetHealthCheck.blankTrack(0xFFF9EFDE.toInt()))
+        assertFalse(PetHealthCheck.blankTrack(0xFFFFFFFA.toInt()))
+        assertTrue(PetHealthCheck.blankTrack(0xFFD6C9C5.toInt()))
+        assertTrue(PetHealthCheck.blankTrack(0xFFCCC8BE.toInt()))
+    }
+
     @Test
     fun `the filled bars on the same frame still read their own colour`() {
         val image = frame("/health-panel/panel-room-display44-empty-mood.png")
