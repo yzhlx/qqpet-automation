@@ -15,7 +15,8 @@ import java.io.File
  *
  * Hard stops (no input is ever sent after one of these):
  *  - EXCHANGE_BUDGET_EXHAUSTED      session purchase/coin budget exhausted (checked before dialog)
- *  - EXCHANGE_DIALOG_UNCONFIRMED    dialog identity not matched after the entry tap
+ *  - EXCHANGE_DIALOG_UNCONFIRMED    dialog identity not matched, or its body has not finished
+ *                                   rendering, after the entry tap
  *  - EXCHANGE_PRODUCT_UNCONFIRMED   expected product not the selected row
  *  - EXCHANGE_QUANTITY_BELOW        stepper went past the target (clamped at 1)
  *  - EXCHANGE_QUANTITY_STEPS        stepper did not reach the target within the step bound
@@ -69,6 +70,23 @@ class PetExchangeFlow(private val flow: PetFlowContext, private val navigation: 
     private fun sceneProbe(item: Consumable) = if (item == Consumable.COOKIE) flow.foodScene else flow.bath
     fun unitPrice(item: Consumable) = if (item == Consumable.COOKIE) 5 else 2
 
+    /**
+     * The pay button band of the exchange sheet (720x1600). It is the LAST element of the sheet
+     * to be painted, and the pay total is read from it, so a painted band proves the dialog body
+     * has finished rendering. Measured 2026-11-04 on DKS9K23420020242 (virtual display 39): the
+     * blank phase leaves 0/58500 painted pixels in this band, the complete phase 55096/58500.
+     */
+    private val payBand = Rect(ExchangeDialogRenderPolicy.BAND_LEFT, ExchangeDialogRenderPolicy.BAND_TOP,
+        ExchangeDialogRenderPolicy.BAND_RIGHT, ExchangeDialogRenderPolicy.BAND_BOTTOM)
+
+    /** True when the exchange sheet's body has finished painting on this frame. */
+    private fun bodyRendered(frame: Bitmap): Boolean {
+        val w = payBand.width(); val h = payBand.height()
+        val px = IntArray(w * h)
+        frame.getPixels(px, 0, w, payBand.left, payBand.top, w, h)
+        return ExchangeDialogRenderPolicy.rendered(px)
+    }
+
     private fun titleScore(frame: Bitmap, item: Consumable): Double =
         flow.matcher.match(frame, titleProbe(item), 0.5).score
 
@@ -82,20 +100,33 @@ class PetExchangeFlow(private val flow: PetFlowContext, private val navigation: 
         return try { titleScore(f, item) >= 0.90 } finally { f.recycle() }
     }
 
-    /** True while the exchange dialog is verifiably on screen. */
-    private suspend fun awaitDialog(item: Consumable): Bitmap = with(flow) {
-        val deadline = System.currentTimeMillis() + 8000
-        var last = 0.0
-        while (System.currentTimeMillis() < deadline) {
-            val f = frame(latest = true)
-            try {
-                last = titleScore(f, item)
-                if (last >= 0.95) { save(f, "exchange-dialog-open"); return f }
-            } catch (t: Throwable) { f.recycle(); throw t }
-            f.recycle()
-            delay(400)
+    /**
+     * Waits for a frame where the exchange dialog is identifiable AND its body has finished
+     * painting. The title match alone is NOT enough: QQ paints the sheet in two phases and the
+     * title is already there (0.9961) in the blank one, so a title-only wait let a half-drawn
+     * frame through and the quantity read failed with DIALOG_DIGITS_ABSENT.
+     */
+    private suspend fun renderedDialog(item: Consumable, timeoutMs: Long, failure: String): Bitmap =
+        with(flow) {
+            val deadline = System.currentTimeMillis() + timeoutMs
+            var last = 0.0
+            while (System.currentTimeMillis() < deadline) {
+                val f = frame(latest = true)
+                try {
+                    last = titleScore(f, item)
+                    if (last >= 0.95 && bodyRendered(f)) return f
+                } catch (t: Throwable) { f.recycle(); throw t }
+                f.recycle()
+                delay(400)
+            }
+            error(if (last >= 0.95) "$failure:$last:body-blank" else "$failure:$last")
         }
-        error("EXCHANGE_DIALOG_UNCONFIRMED:$last")
+
+    /** True while the exchange dialog is verifiably on screen, with its body fully painted. */
+    private suspend fun awaitDialog(item: Consumable): Bitmap {
+        val f = renderedDialog(item, 8000, "EXCHANGE_DIALOG_UNCONFIRMED")
+        flow.save(f, "exchange-dialog-open")
+        return f
     }
 
     private fun readField(frame: Bitmap, l: Int, t: Int, r: Int, b: Int, bright: Boolean,
@@ -128,7 +159,9 @@ class PetExchangeFlow(private val flow: PetFlowContext, private val navigation: 
         var steps = 0
         flow.apply {
             while (true) {
-                val f = frame(latest = true)
+                // A blank sheet is a rendering race, not a digit failure: wait for the body to
+                // finish painting instead of failing the round on a half-drawn frame.
+                val f = this@PetExchangeFlow.renderedDialog(item, 4000, "EXCHANGE_DIALOG_UNCONFIRMED")
                 val reading = try { readQuantity(f).also { if (it.known) save(f, "exchange-qty-" + it.text) } } finally { f.recycle() }
                 if (reading.known) {
                     val v = reading.value()
@@ -192,7 +225,7 @@ class PetExchangeFlow(private val flow: PetFlowContext, private val navigation: 
             // Any recovery/navigation must precede the final same-frame payment proof.
             safety()
             val payObservationStartedMs=System.currentTimeMillis()
-            val f = frame(latest = true)
+            val f = renderedDialog(item, 5000, "EXCHANGE_DIALOG_UNCONFIRMED_BEFORE_PAY")
             val qtyRead: Int; val totalRead: Int; val wallet: ObservedValue<Int>
             try {
                 check(f.width==720 && f.height==1600) { "EXCHANGE_DISPLAY_UNSUPPORTED" }

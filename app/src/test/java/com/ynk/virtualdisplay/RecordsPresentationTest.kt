@@ -116,4 +116,13 @@ class RecordsPresentationTest {
     @Test fun aYesterdayWithoutRecordsHasNoLine() {
         assertNull(RecordsPresentation.dailyLine(emptyList()))
     }
+    /** 兑换面板的失败必须告诉用户该怎么做，不能只说“中途停止”。 */
+    @Test fun exchangeDialogFailuresSayWhatToDo() {
+        assertEquals("兑换面板上的数字没看清，请重新打开兑换面板再试一次",
+            RecordsPresentation.stopReasonText("EXCHANGE_QUANTITY_UNREADABLE:DIALOG_DIGITS_ABSENT"))
+        assertEquals("兑换面板没有显示完整，请先回到宠物房间再重新打开兑换",
+            RecordsPresentation.stopReasonText("EXCHANGE_DIALOG_UNCONFIRMED:0.9961:body-blank"))
+        assertEquals("兑换面板里选中的商品不对，已停止购买，请重新进入兑换",
+            RecordsPresentation.stopReasonText("EXCHANGE_PRODUCT_UNCONFIRMED:0.88"))
+    }
 }

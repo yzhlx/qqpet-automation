@@ -89,6 +89,9 @@ object RecordsPresentation {
         reason.startsWith("TOWN_EXIT", true) -> "没能回到宠物房间"
         reason.startsWith("PLAN_", true) -> "方案条件不满足"
         reason.contains("QQ_NOT_READY", true) || reason.contains("ROOM_UNCONFIRMED", true) -> "QQ 宠物未处于房间状态，请先在后台拉起 QQ"
+        reason.contains("EXCHANGE_DIALOG_UNCONFIRMED", true) -> "兑换面板没有显示完整，请先回到宠物房间再重新打开兑换"
+        reason.contains("EXCHANGE_QUANTITY_UNREADABLE", true) || reason.contains("EXCHANGE_TOTAL_UNREADABLE", true) -> "兑换面板上的数字没看清，请重新打开兑换面板再试一次"
+        reason.contains("EXCHANGE_PRODUCT_UNCONFIRMED", true) -> "兑换面板里选中的商品不对，已停止购买，请重新进入兑换"
         reason.contains("BUDGET", true) -> "今天蟹累了，明天再来"
         else -> "中途停止"
     }
