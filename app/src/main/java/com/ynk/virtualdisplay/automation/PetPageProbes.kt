@@ -33,14 +33,24 @@ object PetPageProbes {
      * leaks: it measures 0.9738..0.9888 on the FOOD page, above the shipping gate of 0.95, so
      * room only avoided misclassifying food because `initialise` tests foodScene first.
      *
-     * The scene region is static furniture with no chrome and no state-dependent pixels. Replay
-     * of the shipping matcher over 85 recorded frames (every state the app ever proved, the room
-     * page under the health sheet, the 22:57 abort frames, and the four room-* fixtures):
-     *   1.0000 on ALL 29 room frames (worst foreign 0.8097 bath, 0.7936 food, 0.8089 academy,
-     *   0.7957 outdoor, 0.7591 QQ message list) - a 0.19 margin under the 0.95 gate and 0.16
-     *   under the 0.97 the identity test asserts, versus the old region's 0.01 and its leak.
-     * Asset provenance: pet_experimental/room.json (exact raw-pixel crop of a verified
-     * `round-0:initial-home` PASS frame at this ROI, so the rescale branch is skipped).
+     * THE TEMPLATE IS SKIN-BOUND, THE ROI IS NOT. The shipped room.png is an exact raw-pixel
+     * crop of the CURRENT pet skin at this ROI, so the rescale branch is skipped. When the game
+     * changes skin the template has to be re-cropped from a real room frame of that skin, or
+     * every managed session dies with INITIAL_PAGE_UNKNOWN while the pet room is open.
+     *
+     * This bit the halloween skin (2026-11-06): the shipped template was still cropped from an
+     * older skin (a blue bed and a cat), so it scored 0.68 against the real halloween room. The
+     * recalibration that was supposed to fix it had cropped the template from a fixture that
+     * was NOT the room at all but a QQ message list, which is why the template matched its own
+     * source perfectly and still never matched the room.
+     *
+     * The template is now cropped from the live halloween room frame at this ROI
+     * (app/src/test/resources/health-panel/room-live-display46.png, captured 2026-11-06 on
+     * virtual display 46; crop sha256 3a55367f8cebaf29f660422ee79d2a44105c4a1ff5e5132f80dbaa201076340a).
+     * Replay of the shipping matcher over the recorded frames:
+     *   1.0000 on the live room and on the room with the health sheet open,
+     *   0.7138 worst QQ message list, 0.8097 bath - clear of the 0.95 gate.
+     * RoomPageProbeSkinTest locks all of this, including that the ROI did not move.
      */
     val room = experimental("room", 20, 720, 120, 840)
     val healthPanel = experimental("health", 169, 228, 250, 415).copy(exactDrift = true)

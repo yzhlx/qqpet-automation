@@ -1313,18 +1313,23 @@ class PetNavigation(private val flow: PetFlowContext, private val workReader: Wo
      *
      * The mini-program is hosted by QQ, so closing it leaves QQ's search page on the display.
      * That page lists the pet mini-program itself, and one tap on its orange icon re-opens the
-     * mini-program on the pet ROOM page (measured on the device, 2026-10-21: a single tap at
-     * (209,506) after the mini-program closed landed on the room again). The tap is only allowed
-     * after the QQ host page itself was positively matched, so no input is ever sent into the
-     * pet app by mistake.
+     * mini-program on the pet ROOM page. The tap is only allowed after the QQ host page itself
+     * was positively matched, so no input is ever sent into the pet app by mistake.
+     *
+     * The tap target is the orange pet icon in the search result row, measured on the device
+     * 2026-11-06 on virtual display 46: the icon sits at [46,450,150,554) and its centre is
+     * (98,502). The older target (224,617) was the ROW LABEL on a different QQ search layout;
+     * on the current layout that pixel is blank white, so the re-entry silently did nothing and
+     * every managed session died with INITIAL_PAGE_UNKNOWN after the pet app had been closed
+     * by its own back arrow.
      */
     suspend fun reenterPetApp(label: String) = with(flow) {
         val current=frame()
         val host=try {score(current,listOf(qqHostSearch,qqSearchPetRow))>=profile.matchThreshold} finally {current.recycle()}
         check(host) { "PET_APP_NOT_EXITED:$label" }
         emit("$label-reenter-pet-app",null,"QQ_HOST_PAGE")
-        // Search 宠物 result page: the 宠物 - 功能 row's label (verified on the device 2026-11-03).
-        safety();input.tap(224f,617f);delay(profile.pageSettleMs)
+                // The orange pet icon in the search result row (measured 2026-11-06).
+        safety();input.tap(98f,502f);delay(profile.pageSettleMs)
         verifySettled(listOf(room),"$label-reenter-pet-app-after")
     }
     /**
