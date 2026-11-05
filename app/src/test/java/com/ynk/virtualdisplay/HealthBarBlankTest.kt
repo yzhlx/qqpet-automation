@@ -44,6 +44,24 @@ class HealthBarBlankTest {
      * a scene patch, one pixel more is a bar. Built from the measured colours (track 214,208,197,
      * panel white 252,246,231, beige wallpaper 237,208,151).
      */
+    /**
+     * The device record for this frame (runtime-state.json, session f853acaa) lists the game's own
+     * digits as 87 / 23 / 0; the bar estimate now agrees on all three, where before it refused the
+     * empty mood bar and the whole reading collapsed to BAR_UNCONFIRMED.
+     */
+    @Test
+    fun `the bars agree with the digits the device recorded`() {
+        val image = frame("/health-panel/panel-room-display44-empty-mood.png")
+        val read = listOf(Triple(244, 0x0099FF, 87), Triple(320, 0x64C900, 23), Triple(396, 0xFF8000, 0))
+            .map { (y, color, expected) ->
+                val pixels = row(image, y)
+                assertTrue("no bar on row $y", PetHealthCheck.barPresent(pixels, color))
+                val end = PetHealthCheck.fillEnd(pixels, color)
+                PetHealthCheck.barValue(if (end == null) PetHealthCheck.BAR_LEFT_EDGE - 1 else PetHealthCheck.BAR_CAP_LEFT + end)
+            }
+        assertEquals(listOf(87, 23, 0), read)
+    }
+
     @Test
     fun `the blank bar gate sits between the patch and the track`() {
         val track = 0xFFD6C9C5.toInt()
