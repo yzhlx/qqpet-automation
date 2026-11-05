@@ -109,15 +109,20 @@ object ExchangeWalletParser {
     const val COIN_TOP = 848
     const val COIN_BOTTOM = 915
 
-    fun roiBounds() = android.graphics.Rect(COIN_LEFT, COIN_TOP, COIN_RIGHT, COIN_BOTTOM)
+    /**
+     * The coin counter of the sheet, moved with the sheet drift: on virtual display 40 the
+     * digits sit at 849..868 instead of 870..890 (2026-11-05).
+     */
+    fun roiBounds(drift: Int = 0) =
+        android.graphics.Rect(COIN_LEFT, COIN_TOP + drift, COIN_RIGHT, COIN_BOTTOM + drift)
     fun parse(lines: List<TextLine>, frameWidth: Int, frameHeight: Int, observedAt: Long,
-        evidence: String, pageIdentityVerified: Boolean): ObservedValue<Int> {
+        evidence: String, pageIdentityVerified: Boolean, drift: Int = 0): ObservedValue<Int> {
         if (!pageIdentityVerified) return ObservedValue.Unknown("WALLET_DIALOG_UNCONFIRMED",observedAt,evidence)
         if(frameWidth!=720 || frameHeight!=1600)
             return ObservedValue.Unknown("WALLET_FRAME_SIZE_INVALID",observedAt,evidence)
         val candidates=lines.filter { line ->
             val b=line.bounds
-            b.left>COIN_LEFT && b.right<COIN_RIGHT && b.top>COIN_TOP && b.bottom<COIN_BOTTOM &&
+            b.left>COIN_LEFT && b.right<COIN_RIGHT && b.top>COIN_TOP+drift && b.bottom<COIN_BOTTOM+drift &&
                 b.left<b.right && b.top<b.bottom && Regex("^[0-9]{1,6}$").matches(line.text.trim())
         }.mapNotNull { it.text.trim().toIntOrNull() }
         return when(candidates.size) {
@@ -136,7 +141,7 @@ class DeviceWalletReader(private val reader: CourseNameReader) : WalletReader {
         }
 
     fun readExchange(openedFrame: Bitmap, observedAt: Long, evidence: String,
-        pageIdentityVerified: Boolean): ObservedValue<Int> {
+        pageIdentityVerified: Boolean, drift: Int = 0): ObservedValue<Int> {
         if(!pageIdentityVerified) return ObservedValue.Unknown("WALLET_DIALOG_UNCONFIRMED",observedAt,evidence)
         if(openedFrame.width!=720 || openedFrame.height!=1600)
             return ObservedValue.Unknown("WALLET_FRAME_SIZE_INVALID",observedAt,evidence)
@@ -145,7 +150,7 @@ class DeviceWalletReader(private val reader: CourseNameReader) : WalletReader {
         // wallet crop of "36"). Room identity is still rejected by the dialog ROI.
         return try {
             ExchangeWalletParser.parse(reader.read(openedFrame),openedFrame.width,openedFrame.height,
-                observedAt,evidence,true)
+                observedAt,evidence,true,drift)
         } catch(t: Exception) {
             if(t is kotlinx.coroutines.CancellationException) throw t
             ObservedValue.Unknown("WALLET_OCR_FAILED:${t.javaClass.simpleName}",observedAt,evidence)
