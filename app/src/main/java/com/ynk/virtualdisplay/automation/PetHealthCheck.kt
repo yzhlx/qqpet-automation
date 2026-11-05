@@ -45,6 +45,19 @@ object PetHealthCheck {
     }
 
     /**
+     * The colour a bar's track blends to when the bar is EMPTY, over any scene. Measured on
+     * FOA_AL00 2026-11-05: 214,208,197 on virtual display 44, where the mood bar sat at 0 and the
+     * old [neutral] range rejected it by one unit of blue, and 204,200,190 at the right end of the
+     * full blue bar. Low chroma and mid brightness separate it from both the white panel
+     * (252,246,231) and the beige wallpaper (237,208,151).
+     */
+    internal fun blankTrack(pixel: Int): Boolean {
+        val mx = maxOf(red(pixel), green(pixel), blue(pixel))
+        val mn = minOf(red(pixel), green(pixel), blue(pixel))
+        return mx in 170..245 && mx - mn <= 26
+    }
+
+    /**
      * True when the row carries a bar. The proof is the bar's LEFT CAP: a filled bar shows its own
      * colour there and an empty one its grey cap. The old check demanded 8 px of fill anywhere on
      * the row, which a low bar cannot satisfy (心情 5 is 7 px of fill, and the session died in
@@ -62,7 +75,25 @@ object PetHealthCheck {
                 if (run >= BAR_CAP_RUN_PX) return true
             } else run = 0
         }
-        return false
+        return blankBar(row)
+    }
+
+    /**
+     * A bar that is present and EMPTY: the game draws no fill of its own colour at all, only the
+     * track, so the cap rule above can never prove it - there is no own-colour pixel to sit next
+     * to. Measured 2026-11-05 on virtual display 44 with 心情 0: the session stopped at
+     * BAR_UNCONFIRMED while the digits read 66 / 8 / 0, exactly the pet that most needs care. The
+     * proof is a track run that starts at the cap and spans the bar: 184 px from x 322 on that
+     * frame, while the rows between the bars break after 84 px and the wallpaper above the panel
+     * after 9 px.
+     */
+    internal fun blankBar(row: IntArray): Boolean {
+        var x = 0
+        while (x < row.size && !blankTrack(row[x])) x++
+        if (x > BAR_CAP_RIGHT - BAR_CAP_LEFT) return false
+        var end = x
+        while (end + 1 < row.size && blankTrack(row[end + 1])) end++
+        return end - x + 1 >= BAR_TRACK_MIN_PX
     }
 
     /**
@@ -98,10 +129,18 @@ object PetHealthCheck {
         fun digits(y: Int): ObservedValue<Int> = if (!anchored) ObservedValue.Unknown("HEALTH_PANEL_UNCONFIRMED",at,evidence)
             else reader.read(52,31,{ x,j -> val p=frame.getPixel(256+x,y+j)
                 maxOf(Color.red(p),Color.green(p),Color.blue(p))<100 },at,evidence)
-        val bars = if (anchored) runCatching { read(frame,drift) }
-            .onFailure { e -> android.util.Log.e("PetHealthCheck","read failed drift=$drift",e) }
-            .getOrNull() else null
-        fun bar(v: Int?): ObservedValue<Int> = if(v==null) ObservedValue.Unknown("BAR_UNCONFIRMED",at,evidence)
+        val attempt = if (anchored) runCatching { read(frame,drift) } else null
+        attempt?.onFailure { e -> android.util.Log.e("PetHealthCheck","read failed drift=$drift",e) }
+        val bars = attempt?.getOrNull()
+        // The reason goes into the session record: a bare BAR_UNCONFIRMED could not tell a panel
+        // that never opened apart from a bar the reader refused, which cost a full device session
+        // to find out on 2026-11-05.
+        val barReason = when {
+            !anchored -> "HEALTH_PANEL_UNCONFIRMED"
+            attempt == null -> "BAR_UNCONFIRMED"
+            else -> "BAR_UNCONFIRMED:" + attempt.exceptionOrNull()?.message
+        }
+        fun bar(v: Int?): ObservedValue<Int> = if(v==null) ObservedValue.Unknown(barReason,at,evidence)
             else ObservedValue.Known(v,at,1.0,evidence,ObservationSource.CONSERVATIVE_BAR_ESTIMATE)
         val (energyRow,cleanRow,moodRow) = digitRows(drift)
         return HealthObservations(digits(energyRow),digits(cleanRow),digits(moodRow),bar(bars?.energy),bar(bars?.cleanliness),
@@ -128,7 +167,7 @@ object PetHealthCheck {
             return out
         }
         val values = ys.zip(colors).map { (y, color) ->
-            check(barPresent(row(y), color)) { "Health panel absent or occluded" }
+            check(barPresent(row(y), color)) { "no bar at y=$y color=$color" }
             // The fill starts behind the cap (x 323 measured), so the scan runs from the first
             // coloured pixel to the end of that fill: the old 330 start missed the tail of a short
             // bar and read 心情 5 as 0.
@@ -149,6 +188,13 @@ object PetHealthCheck {
 
     /** Two cap pixels are enough: a 5% bar is only 7 px of fill. */
     internal const val BAR_CAP_RUN_PX = 2
+
+    /**
+     * How far a blank bar's track has to run to prove the bar. The bar itself is 184 px
+     * (measured 2026-11-05, virtual display 44); the longest grey run anywhere else on the panel
+     * was 84 px, so this sits between the two with room on both sides.
+     */
+    internal const val BAR_TRACK_MIN_PX = 150
 
     /**
      * The number a filled pixel bar reports when its last fully coloured pixel is [end].
@@ -175,5 +221,5 @@ object PetHealthCheck {
     /** Width of the measured bar, in the health panel's own pixels. */
     private const val BAR_WIDTH = 184.6
     /** First pixel of the measured bar track, used as the empty bar's boundary. */
-    private const val BAR_LEFT_EDGE = 318
+    internal const val BAR_LEFT_EDGE = 318
 }
