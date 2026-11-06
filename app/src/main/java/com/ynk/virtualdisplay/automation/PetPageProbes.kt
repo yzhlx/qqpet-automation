@@ -178,9 +178,37 @@ object PetPageProbes {
     val upgrade = experimental("upgrade", 245, 558, 480, 610)
     val careUpgradeHint = experimental("care_upgrade_hint", 250, 1160, 478, 1200)
     val careUpgradeReward = experimental("care_upgrade_reward", 240, 1020, 480, 1080)
+    /**
+     * QQ MESSAGE tab: the search box that opens the search page. Only exists on the message
+     * tab (measured 2026-11-06 VD47: bounds [235,244,485,298), centre (360,271)). A tap here
+     * opens the search page; it is the safe first anchor because it never overlaps a
+     * conversation row. Shell text injection was rejected (the box throws NullPointerException).
+     */
+    val qqMessageSearchBox = experimental("qq_message_search_box", 320, 244, 400, 298)
+
+    /**
+     * QQ search page: the recent-searches history word. Measured 2026-11-06 VD47 at
+     * bounds [28,731,88,772), centre (58,751). Tapping it fills the search box (the box
+     * refuses injected text) and shows the pet function result row. Present only when the
+     * word is in the recent-searches list, which is the common case after one manual search.
+     */
+    val qqSearchHistoryPet = experimental("qq_search_history_pet", 28, 731, 88, 772)
+
+    /**
+     * QQ search page: the empty search box shown before any history word is tapped, distinct
+     * from [qqMessageSearchBox] which sits on the message tab. Measured 2026-11-06 VD47.
+     */
+    val qqSearchEmptyBox = experimental("qq_search_empty_box", 48, 176, 672, 244)
+
+    /**
+     * QQ search page: the submit button that runs the box, for the cold start where no
+     * history word is available. Measured 2026-11-06 VD47 at bounds [648,179,708,237).
+     */
+    val qqSearchSubmit = experimental("qq_search_submit", 648, 179, 708, 237)
+
 
     fun byName(): Map<String, PetProfile.Probe> = listOf(
         home, room, healthPanel, cookie, foodScene, foodExchangeBubble, soap, bath, bathExchangeBubble, outdoor, academy, highFive,
-        gradeA, upgrade, careUpgradeHint, careUpgradeReward, qqHostSearch, qqSearchPetRow,
+        gradeA, upgrade, careUpgradeHint, careUpgradeReward, qqHostSearch, qqSearchPetRow, qqMessageSearchBox, qqSearchHistoryPet, qqSearchEmptyBox, qqSearchSubmit,
     ).associateBy { it.name }
 }

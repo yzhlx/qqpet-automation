@@ -1342,6 +1342,59 @@ class PetNavigation(private val flow: PetFlowContext, private val workReader: Wo
         verifySettled(roomProbes,"$label-reenter-pet-app-after")
     }
     /**
+     * Enter the pet mini-program from cold when it is NOT already on the display.
+     *
+     * Distinct from [reenterPetApp], which assumes the display already sits on the QQ search
+     * RESULTS page (the mini-program was just closed there). This is the full chain from the QQ
+     * message tab, used when a fresh virtual display starts on QQ but the pet app was never
+     * opened: message search box -> search page -> history word -> pet function row -> room.
+     *
+     * MEASURED 2026-11-06 VD47 (720x1600): the search box is at [235,244,485,298); one tap
+     * opens the search page. The recent-searches word is at [28,731,88,772); one tap fills
+     * the box (shell text injection throws NullPointerException, so the history word is the only
+     * text path) and the pet function row appears. One tap on its orange icon at (98,502) lands
+     * on the pet ROOM page.
+     *
+     * Every step is anchored on a template probe before any tap: the action for the CURRENT
+     * screen is [PetReentry.next], so an unknown page stops the chain instead of tapping into a
+     * conversation. No swipe or unanchored coordinate is used.
+     */
+    suspend fun enterPetApp(label: String) = with(flow) {
+        var historyTaps = 0
+        repeat(6) { step ->
+            val current = frame()
+            val screen: PetReentry.Screen
+            try {
+                screen = when {
+                    score(current, roomProbes) >= profile.matchThreshold -> PetReentry.Screen.ROOM
+                    score(current, listOf(qqSearchPetRow)) >= profile.matchThreshold -> PetReentry.Screen.SEARCH_RESULT_PET
+                    score(current, listOf(qqSearchHistoryPet)) >= profile.matchThreshold -> PetReentry.Screen.SEARCH_HISTORY_PET
+                    score(current, listOf(qqMessageSearchBox)) >= profile.matchThreshold -> PetReentry.Screen.MESSAGE_SEARCH_BOX
+                    else -> PetReentry.Screen.UNKNOWN
+                }
+            } finally { current.recycle() }
+            when(PetReentry.next(screen, historyTaps)) {
+                PetReentry.Action.DONE -> return@with
+                PetReentry.Action.OPEN_SEARCH -> {
+                    emit(label + "-enter-open-search", null, "MESSAGE_SEARCH_BOX")
+                    safety(); input.tap(360f, 271f); delay(profile.pageSettleMs)
+                }
+                PetReentry.Action.TAP_HISTORY_PET -> {
+                    historyTaps++
+                    emit(label + "-enter-history-pet", null, "historyTaps=" + historyTaps)
+                    safety(); input.tap(58f, 751f); delay(profile.pageSettleMs)
+                }
+                PetReentry.Action.TAP_PET_ROW -> {
+                    emit(label + "-enter-pet-row", null, "SEARCH_RESULT_PET")
+                    safety(); input.tap(98f, 502f); delay(profile.pageSettleMs)
+                }
+                PetReentry.Action.STOP -> error("ENTER_PET_UNRECOVERED:" + label + ":screen=" + screen + ":step=" + step)
+            }
+        }
+        error("ENTER_PET_EXHAUSTED:" + label)
+    }
+
+    /**
      * The outdoor map's back arrow is the only way home, and the mini-program's own history can
      * pop one level too far: measured 2026-10-21 (session 68564b34) the very same tap that had
      * returned to the room earlier in the session landed on the QQ search page instead, which

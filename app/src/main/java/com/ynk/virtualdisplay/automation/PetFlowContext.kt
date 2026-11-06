@@ -48,6 +48,10 @@ class PetFlowContext(val context: Context, val capture: HeadlessDisplayCapture,
     /** QQ HOST page: proof that the pet mini-program is gone and QQ's search page is showing. */
     val qqHostSearch = PetPageProbes.qqHostSearch
     val qqSearchPetRow = PetPageProbes.qqSearchPetRow
+    val qqMessageSearchBox = PetPageProbes.qqMessageSearchBox
+    val qqSearchHistoryPet = PetPageProbes.qqSearchHistoryPet
+    val qqSearchEmptyBox = PetPageProbes.qqSearchEmptyBox
+    val qqSearchSubmit = PetPageProbes.qqSearchSubmit
     val highFive = PetPageProbes.highFive
     val gradeA = PetPageProbes.gradeA
     val upgrade = PetPageProbes.upgrade
