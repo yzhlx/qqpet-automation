@@ -77,6 +77,12 @@ object RecordsPresentation {
         reason.contains("PERMISSION_DENIED", true) || reason.contains("SHIZUKU", true) || reason.contains("DISPLAY_PERMISSION", true) -> "系统权限不足，请在排故页检查 Shizuku 与显示授权"
         reason.contains("PLAN_DISPLAY_NOT_READY", true) -> "虚拟显示未就绪，请在主页选择或创建虚拟屏"
         reason.contains("PAGE_MISMATCH", true) -> "页面对不上"
+        // The QQ entry chain (cold start from the message tab). Each of these used to fall through to
+        // the generic "中途停止", which tells the user nothing about what to do next.
+        reason.startsWith("ENTER_PET_NO_HISTORY_WORD", true) -> "QQ 搜索页的「最近搜索」里没有「宠物」，请先在 QQ 里搜一次「宠物」再开始"
+        reason.startsWith("ENTER_PET_", true) || reason.contains("INITIAL_PAGE_UNKNOWN", true) ->
+            "没能从 QQ 当前页面进入宠物房间，请把后台 QQ 停在「消息」页再开始"
+        reason.contains("WALLET_COIN_REGION_UNREAD", true) -> "没读到金币数，请确认宠物房间顶部状态栏已显示"
         reason.contains("OCR_TIMEOUT", true) || reason.contains("BUTTON_NOT_FOUND", true) -> "界面未识别目标按钮或入口，请确认 QQ 处于宠物页面"
         reason.contains("WORK_ALL_CANDIDATES_REFUSED", true) -> "候选打工岗位均未达到开工条件"
         reason.startsWith("WORK_NOT_STARTED", true) -> "条件不够，没有开始打工"

@@ -125,4 +125,15 @@ class RecordsPresentationTest {
         assertEquals("兑换面板里选中的商品不对，已停止购买，请重新进入兑换",
             RecordsPresentation.stopReasonText("EXCHANGE_PRODUCT_UNCONFIRMED:0.88"))
     }
+
+    /** 冷启动进房失败要告诉用户下一步做什么（2026-11-06 起这些都只显示「中途停止」）。 */
+    @Test fun enterChainFailuresSayWhatToDo() {
+        assertEquals("QQ 搜索页的「最近搜索」里没有「宠物」，请先在 QQ 里搜一次「宠物」再开始",
+            RecordsPresentation.stopReasonText("ENTER_PET_NO_HISTORY_WORD:initial:step=2"))
+        val goToMessagePage = "没能从 QQ 当前页面进入宠物房间，请把后台 QQ 停在「消息」页再开始"
+        assertEquals(goToMessagePage, RecordsPresentation.stopReasonText("ENTER_PET_UNRECOVERED:initial:screen=UNKNOWN:step=1"))
+        assertEquals(goToMessagePage, RecordsPresentation.stopReasonText("ENTER_PET_EXHAUSTED:initial"))
+        assertEquals(goToMessagePage, RecordsPresentation.stopReasonText("INITIAL_PAGE_UNKNOWN"))
+        assertEquals("没读到金币数，请确认宠物房间顶部状态栏已显示", RecordsPresentation.stopReasonText("WALLET_COIN_REGION_UNREAD"))
+    }
 }

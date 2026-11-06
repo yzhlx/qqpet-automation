@@ -626,6 +626,14 @@ class PetNavigation(private val flow: PetFlowContext, private val workReader: Wo
          */
         const val ENTER_SETTLE_MS=12000L
         const val ENTER_POLL_MS=400L
+        /** Extra looks at an unrecognised first frame before INITIAL_PAGE_UNKNOWN (a page may be mid-transition). */
+        const val INITIAL_UNKNOWN_RETRIES=3
+        const val INITIAL_UNKNOWN_RETRY_MS=1000L
+        /** How much of an OCR reading of an unrecognised page goes into the log. */
+        const val ENTRY_OCR_LOG_CHARS=400
+        /** Fresh-frame OCR reads of an unrecognised QQ page before it counts as unrecognised. */
+        const val ENTRY_OCR_READS=3
+        const val ENTRY_OCR_GAP_MS=300L
 
         /**
          * How far either side of a candidate's OWN measured width the window width is swept.
@@ -1381,12 +1389,25 @@ class PetNavigation(private val flow: PetFlowContext, private val workReader: Wo
      * screen is [PetReentry.next], so an unknown page stops the chain instead of tapping into a
      * conversation. No swipe or unanchored coordinate is used.
      */
+    /**
+     * The OCR lines of the current page, with their text logged. A page that is not recognised has
+     * to be diagnosable from the log alone: the real frame and the OCR reading of it are the only
+     * evidence, and the reading is otherwise thrown away.
+     */
+    private suspend fun entryPageLines(tag: String): List<TextLine> = with(flow) {
+        val lines = workReader?.readPageLines().orEmpty()
+        emit(tag, null, lines.joinToString(";") { it.text }.take(ENTRY_OCR_LOG_CHARS))
+        lines
+    }
+
     suspend fun enterPetApp(label: String) = with(flow) {
         var historyTaps = 0
         var acted = false
+        var searchPageSeen = false
         repeat(6) { step ->
             var screen = PetReentry.Screen.UNKNOWN
-            var historyDrift = 0
+            var historyPoint: Pair<Float, Float>? = null
+            var historySource = ""
             // The first frame is judged at once; after a tap the next page is still arriving, so an
             // unrecognised frame is retried until the settle deadline before the chain gives up.
             val deadline = SystemClock.elapsedRealtime() + if(acted) ENTER_SETTLE_MS else 0L
@@ -1398,10 +1419,36 @@ class PetNavigation(private val flow: PetFlowContext, private val workReader: Wo
                         score(current, listOf(qqHostSearch, qqSearchPetRow)) >= profile.matchThreshold -> PetReentry.Screen.SEARCH_RESULT_PET
                         else -> {
                             val history = matchOptional(current, qqSearchHistoryPet)
-                            when {
-                                history.score >= profile.matchThreshold -> { historyDrift = history.drift; PetReentry.Screen.SEARCH_HISTORY_PET }
-                                score(current, qqMessageSearchBoxes) >= profile.matchThreshold -> PetReentry.Screen.MESSAGE_SEARCH_BOX
-                                else -> PetReentry.Screen.UNKNOWN
+                            if(history.score >= profile.matchThreshold) {
+                                val r = qqSearchHistoryPet.rect
+                                historyPoint = ((r.left + r.right) / 2f) to ((r.top + r.bottom) / 2f + history.drift)
+                                historySource = "template"
+                                PetReentry.Screen.SEARCH_HISTORY_PET
+                            } else if(score(current, qqMessageSearchBoxes) >= profile.matchThreshold) {
+                                PetReentry.Screen.MESSAGE_SEARCH_BOX
+                            } else {
+                                // QQ lists recent searches newest first, so one search of anything
+                                // else moves 宠物 out of the template's slot. The page is then
+                                // identified by its text and the word is tapped where it is drawn.
+                                // ML Kit's reading differs frame to frame (one frame read 最近搜索 as
+                                // 最近機素), so an unrecognised page is read a few times, each on a
+                                // fresh frame, before it counts as unrecognised.
+                                var point: Pair<Float, Float>? = null
+                                var reads = 0
+                                while(point == null && reads < ENTRY_OCR_READS) {
+                                    if(reads > 0) delay(ENTRY_OCR_GAP_MS)
+                                    val lines = entryPageLines(label + "-enter-page-ocr")
+                                    reads++
+                                    if(PetEntryText.isSearchPage(lines)) {
+                                        searchPageSeen = true
+                                        point = PetEntryText.historyWordPoint(lines)
+                                    }
+                                }
+                                if(point != null) {
+                                    historyPoint = point
+                                    historySource = "ocr"
+                                    PetReentry.Screen.SEARCH_HISTORY_PET
+                                } else PetReentry.Screen.UNKNOWN
                             }
                         }
                     }
@@ -1417,17 +1464,22 @@ class PetNavigation(private val flow: PetFlowContext, private val workReader: Wo
                 }
                 PetReentry.Action.TAP_HISTORY_PET -> {
                     historyTaps++
-                    val r = qqSearchHistoryPet.rect
-                    val x = (r.left + r.right) / 2
-                    val y = (r.top + r.bottom) / 2 + historyDrift
-                    emit(label + "-enter-history-pet", null, "historyTaps=" + historyTaps + ",tap=" + x + "," + y)
-                    safety(); input.tap(x.toFloat(), y.toFloat()); acted = true; delay(profile.pageSettleMs)
+                    val (x, y) = checkNotNull(historyPoint) { "ENTER_PET_HISTORY_POINT_MISSING" }
+                    emit(label + "-enter-history-pet", null,
+                        "historyTaps=" + historyTaps + ",src=" + historySource + ",tap=" + x.toInt() + "," + y.toInt())
+                    safety(); input.tap(x, y); acted = true; delay(profile.pageSettleMs)
                 }
                 PetReentry.Action.TAP_PET_ROW -> {
                     emit(label + "-enter-pet-row", null, "SEARCH_RESULT_PET")
                     safety(); input.tap(98f, 502f); acted = true; delay(profile.pageSettleMs)
                 }
-                PetReentry.Action.STOP -> error("ENTER_PET_UNRECOVERED:" + label + ":screen=" + screen + ":step=" + step)
+                PetReentry.Action.STOP -> {
+                    // The search page was read but never offered the word: say so, because the fix
+                    // is the user's (search 宠物 once in QQ), not another retry.
+                    if(searchPageSeen && screen == PetReentry.Screen.UNKNOWN)
+                        error("ENTER_PET_NO_HISTORY_WORD:" + label + ":step=" + step)
+                    error("ENTER_PET_UNRECOVERED:" + label + ":screen=" + screen + ":step=" + step)
+                }
             }
         }
         error("ENTER_PET_EXHAUSTED:" + label)
@@ -1634,7 +1686,8 @@ class PetNavigation(private val flow: PetFlowContext, private val workReader: Wo
         }
         error("ACADEMY_COURSE_PANEL_NOT_OPENED_AFTER_${taps}_TAPS")
     }
-    suspend fun initialise(healthAlreadyClosed: Boolean = false, payrollAlreadyLeft: Boolean = false): Unit = with(flow) {
+    suspend fun initialise(healthAlreadyClosed: Boolean = false, payrollAlreadyLeft: Boolean = false,
+        unknownRetries: Int = 0): Unit = with(flow) {
         dismissCareUpgradeIfPresent()
         dismissUpgradeIfPresent("initial")
         val current=frame()
@@ -1720,8 +1773,24 @@ class PetNavigation(private val flow: PetFlowContext, private val workReader: Wo
                     safety();input.tap(PAYROLL_BACK_X,BACK_Y);delay(profile.pageSettleMs)
                     return@with initialise(healthAlreadyClosed,payrollAlreadyLeft=true)
                 }
+                // QQ's search page with the 宠物 word somewhere other than the template's slot has no
+                // template of its own; its text identifies it, and the enter chain finds the word.
+                if(PetEntryText.isSearchPage(entryPageLines("initial-page-ocr"))) {
+                    emit("initial-page-qq-search-text",null,"QQ_SEARCH_PAGE")
+                    return@with enterPetApp("initial")
+                }
                 val town=workReader?.let { readTownPage(it) }
-                if(town==null) error("INITIAL_PAGE_UNKNOWN")
+                if(town==null) {
+                    // A frame taken while a page is still sliding in, or while the mini-program shows
+                    // its splash, reads as unknown for a moment. Look again before giving up, so a
+                    // transition does not end a session that a second look would have run.
+                    if(unknownRetries<INITIAL_UNKNOWN_RETRIES) {
+                        emit("initial-page-unknown-retry",null,"retry="+(unknownRetries+1))
+                        delay(INITIAL_UNKNOWN_RETRY_MS)
+                        return@with initialise(healthAlreadyClosed,payrollAlreadyLeft,unknownRetries+1)
+                    }
+                    error("INITIAL_PAGE_UNKNOWN")
+                }
                 emit("initial-page-town",null,if(town.isDetailPage) "DETAIL" else "LIST")
                 leaveTownAndReturnHome(town)
             }

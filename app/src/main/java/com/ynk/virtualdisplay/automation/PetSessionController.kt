@@ -279,7 +279,15 @@ class PetSessionController(context:Context,capture:HeadlessDisplayCapture,input:
         try {
             flow.state="INITIAL_NAVIGATION"
             navigation.initialise()
-            val initialCoins = readRoomCoins("session-initial-coins")
+            // The room's top bar fills in a moment after the page itself, so a read taken in the
+            // first frame of a cold start can miss the coin count. Read again before giving up.
+            var initialCoins = readRoomCoins("session-initial-coins")
+            var coinReads = 1
+            while (initialCoins !is ObservedValue.Known && coinReads < INITIAL_COIN_READS) {
+                delay(INITIAL_COIN_READ_GAP_MS)
+                initialCoins = readRoomCoins("session-initial-coins")
+                coinReads++
+            }
             if (initialCoins is ObservedValue.Known && sessionRoomCoinsBefore == null) {
                 sessionRoomCoinsBefore = initialCoins.value
             }
@@ -1397,6 +1405,9 @@ class PetSessionController(context:Context,capture:HeadlessDisplayCapture,input:
     companion object {
         private const val COURSE_COST_READ_ATTEMPTS = 4
         private const val COURSE_COST_RETRY_DELAY_MS = 800L
+        /** Cold start: the top bar's coin count lags the room page, so the first read can miss it. */
+        private const val INITIAL_COIN_READS = 4
+        private const val INITIAL_COIN_READ_GAP_MS = 700L
     }
     /** One consolidated run record per session, written once at termination. */
     private fun writeRunRecord(terminal:SessionRunState) {

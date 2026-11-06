@@ -84,6 +84,8 @@ class DeviceWorkPageReader(
 
     override suspend fun readPayrollPage(): Boolean = readLines().any { it.text.contains("工资明细") }
 
+    override suspend fun readPageLines(): List<TextLine> = readLines()
+
     override suspend fun locateVenueLabel(venue: String): PointF? = locate { it.text.trim() == venue }
 
     override suspend fun readDetailPage(): PetWorkNavigation.TownPage {

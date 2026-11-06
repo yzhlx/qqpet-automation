@@ -84,6 +84,8 @@ object StrategyPresentation {
             reason.contains("DAILY_BUDGET_LIMIT", true) -> "今日时长预算已用完"
             reason.contains("COURSE_SUFFIX", true) -> "课程结算没有确认"
             reason.contains("PAGE_MISMATCH", true) -> "页面对不上"
+            reason.startsWith("ENTER_PET_NO_HISTORY_WORD", true) -> "QQ 最近搜索里没有「宠物」"
+            reason.startsWith("ENTER_PET_", true) || reason.contains("INITIAL_PAGE_UNKNOWN", true) -> "没能进入宠物房间"
             reason.contains("OCR_TIMEOUT", true) || reason.contains("BUTTON_NOT_FOUND", true) -> "没找到界面上的目标"
             reason.contains("PERMISSION_DENIED", true) || reason.contains("SHIZUKU", true) -> "系统授权不足"
             reason.contains("USER_STOP", true) || reason.contains("MANUAL_PAUSE", true) -> "你停掉了这一轮"

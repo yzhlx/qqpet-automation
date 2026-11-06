@@ -297,6 +297,13 @@ interface WorkPageReader {
     /** True when the current page is the 工资明细 page a finished shift leaves behind. */
     suspend fun readPayrollPage(): Boolean = false
 
+    /**
+     * Every OCR text line on the current frame, read-only. Empty when the reader cannot read.
+     * The QQ entry chain uses it to find the search page's recent-searches word by its text
+     * ([PetEntryText]) instead of by a fixed position.
+     */
+    suspend fun readPageLines(): List<TextLine> = emptyList()
+
     /** Locates a venue label at the current scroll position. Null when not visible. */
     suspend fun locateVenueLabel(venue: String): PointF?
 
