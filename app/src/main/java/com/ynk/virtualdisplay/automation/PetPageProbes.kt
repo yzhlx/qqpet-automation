@@ -194,6 +194,14 @@ object PetPageProbes {
      * tab (measured 2026-11-06 VD47: bounds [235,244,485,298), centre (360,271)). A tap here
      * opens the search page; it is the safe first anchor because it never overlaps a
      * conversation row. Shell text injection was rejected (the box throws NullPointerException).
+     *
+     * The asset is an exact raw-pixel crop of a real VD47 message-tab frame at this ROI
+     * (captured 2026-11-06, 80x54). Replaying the shipping matcher over recorded frames:
+     *   1.0000 on that frame and 1.0000 on the independent QQ message list (display 45),
+     *   at most 0.9272 on the pet room, the room with the health sheet open, the bath scene,
+     *   the QQ search page and the search results page - all under the unchanged 0.95 gate.
+     * The margin is thinner than the room probe because QQ draws a similar light box on the
+     * search page; the vertical drift retry reaches it. It still clears the gate.
      */
     val qqMessageSearchBox = experimental("qq_message_search_box", 320, 244, 400, 298)
 
