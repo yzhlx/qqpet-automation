@@ -74,6 +74,21 @@ class RoomWalletParserTest {
         assertTrue(value is ObservedValue.Unknown)
     }
 
+    @Test fun aFourDigitBalanceThatReachesPastTheCropEdgeIsReadOnTheFullFrame() {
+        // The pill centres its number: 1606 spans about x 497..553, which a crop starting at 500 cuts.
+        val lines = listOf(line("1606", 525, 262, w = 56), line("19", 380, 262))
+        val value = RoomWalletParser.parse(lines, width, height, 1000L, "fixture")
+        assertEquals(1606, (value as ObservedValue.Known).value)
+    }
+
+    @Test fun onlyAnEdgeCutOrEmptyCropReadIsWorthAFullFrameRead() {
+        assertTrue(RoomWalletParser.worthFullFrameRead("WALLET_CROP_TRUNCATED_DIGIT"))
+        assertTrue(RoomWalletParser.worthFullFrameRead("WALLET_COIN_REGION_UNREAD"))
+        assertTrue(!RoomWalletParser.worthFullFrameRead("WALLET_COIN_REGION_AMBIGUOUS:670/6"))
+        assertTrue(!RoomWalletParser.worthFullFrameRead("WALLET_FRAME_SIZE_INVALID"))
+        assertTrue(!RoomWalletParser.worthFullFrameRead("WALLET_OCR_FAILED:IllegalStateException"))
+    }
+
     @Test fun zeroIsAReadableBalance() {
         val value = RoomWalletParser.parse(
             listOf(line("0", 524, 260)), width, height, 1000L, "fixture")

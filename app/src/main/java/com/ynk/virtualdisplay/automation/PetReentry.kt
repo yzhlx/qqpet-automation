@@ -30,6 +30,11 @@ object PetReentry {
         SEARCH_RESULT_PET,
         /** The pet room is already showing: nothing to do. */
         ROOM,
+        /**
+         * QQ's bottom tab bar is showing but not on the message tab (联系人, 频道, 动态): a tap on the
+         * bar's own 消息 label brings the message tab back. Read from text, see [PetEntryText.messageTabPoint].
+         */
+        OTHER_TAB,
         /** None of the above: stop rather than tap into an unknown page. */
         UNKNOWN,
     }
@@ -42,6 +47,8 @@ object PetReentry {
         TAP_HISTORY_PET,
         /** Tap the "宠物 - 功能" row's orange icon to enter the pet room. */
         TAP_PET_ROW,
+        /** Tap the bottom bar's 消息 tab to get back to the message page. */
+        TAP_MESSAGE_TAB,
         /** Already on the room: done. */
         DONE,
         /** Unknown page after the allowed steps: stop the chain. */
@@ -51,9 +58,11 @@ object PetReentry {
     /**
      * @param screen what the current frame actually matched
      * @param historyTaps how many times the history word has been tapped this chain
+     * @param tabTaps how many times the message tab has been tapped this chain
      */
-    fun next(screen: Screen, historyTaps: Int): Action = when(screen) {
+    fun next(screen: Screen, historyTaps: Int, tabTaps: Int = 0): Action = when(screen) {
         Screen.ROOM -> Action.DONE
+        Screen.OTHER_TAB -> if(tabTaps < MAX_TAB_TAPS) Action.TAP_MESSAGE_TAB else Action.STOP
         Screen.MESSAGE_SEARCH_BOX -> Action.OPEN_SEARCH
         Screen.SEARCH_HISTORY_PET -> if(historyTaps < MAX_HISTORY_TAPS) Action.TAP_HISTORY_PET else Action.STOP
         Screen.SEARCH_RESULT_PET -> Action.TAP_PET_ROW
@@ -62,4 +71,7 @@ object PetReentry {
 
     /** How many times the history word may be tapped before the chain gives up. */
     const val MAX_HISTORY_TAPS = 3
+
+    /** The message tab is tapped once: if that does not bring the message page, something else is wrong. */
+    const val MAX_TAB_TAPS = 1
 }

@@ -46,6 +46,22 @@ class PetCareReading(val observations:HealthObservations) {
     val recordedEnergy:Int? get()=(observations.energy as? ObservedValue.Known)?.value
     val recordedCleanliness:Int? get()=(observations.cleanliness as? ObservedValue.Known)?.value
 
+    /**
+     * The conservative digit/bar bound as it was measured, with no age gate, for logs and evidence.
+     *
+     * [energy] and [cleanliness] throw HEALTH_STALE once the reading is over a minute old, which is the
+     * right answer for a decision and the wrong one for WRITING DOWN a reading that was true when it was
+     * taken. Serialising the care "before" reading through them stopped a run that had just finished
+     * care (2026-11-07: a cookie, a soap and a scrub took ~90 s, then `plan-care.json` threw).
+     */
+    val measuredEnergy:Int? get()=measuredBound(observations.energy,observations.barEnergy)
+    val measuredCleanliness:Int? get()=measuredBound(observations.cleanliness,observations.barCleanliness)
+    private fun measuredBound(digit:ObservedValue<Int>,bar:ObservedValue<Int>):Int? {
+        val d=(digit as? ObservedValue.Known)?.value ?: return null
+        val b=(bar as? ObservedValue.Known)?.value ?: return null
+        return minOf(d,b)
+    }
+
     /** True when this reading may no longer decide a consuming action. */
     fun isStale(maxAgeMs:Long=60000):Boolean {
         val now=System.currentTimeMillis()

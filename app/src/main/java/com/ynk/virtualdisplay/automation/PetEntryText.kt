@@ -83,6 +83,46 @@ object PetEntryText {
         return null
     }
 
+    /** QQ's bottom tab bar names; the message tab is the one to go back to. */
+    private const val MESSAGE_TAB = "消息"
+    private val OTHER_TABS = listOf("联系人", "频道", "动态", "看点", "小世界")
+
+    /** The tab bar is the bottom ~9% of the frame (measured band 1450-1600 on 720x1600). */
+    private const val TAB_BAR_TOP_FRACTION = 0.9f
+
+    /**
+     * A tap target on the 消息 label of QQ's bottom tab bar, or null when no tab bar is on screen.
+     *
+     * Used when QQ was left on another tab (联系人, 动态…): the tab bar is the only thing every such
+     * page shares, and tapping a tab opens no conversation and sends nothing. The bar is proven by
+     * the 消息 label together with at least one other tab name in the bottom band, so a page that
+     * merely contains the word 消息 (a chat, a settings row) is not mistaken for it, and neither is
+     * the pet mini-program, which draws no QQ tab bar.
+     */
+    fun messageTabPoint(lines: List<TextLine>, frameWidth: Int = 720, frameHeight: Int = 1600): Pair<Float, Float>? {
+        val bandTop = frameHeight * TAB_BAR_TOP_FRACTION
+        val bottom = lines.filter { it.bounds.top >= bandTop }
+        val tokens = bottom.flatMap { it.text.trim().split(Regex("\\s+")) }.filter { it.isNotEmpty() }
+        if (OTHER_TABS.none { tab -> tokens.any { it.startsWith(tab) } }) return null
+        for (line in bottom) {
+            val text = line.text.trim()
+            val parts = text.split(Regex("\\s+")).filter { it.isNotEmpty() }
+            // ML Kit may report the whole bar as one line ("消息 频道 联系人 动态"); then the label is
+            // located by its share of the characters, which is plenty for a tab-wide touch target.
+            val x = when {
+                text == MESSAGE_TAB -> (line.bounds.left + line.bounds.right) / 2f
+                parts.size >= 2 && MESSAGE_TAB in parts ->
+                    line.bounds.left + (line.bounds.right - line.bounds.left).toFloat() *
+                        (text.indexOf(MESSAGE_TAB) + MESSAGE_TAB.length / 2f) / text.length
+                else -> continue
+            }
+            val y = (line.bounds.top + line.bounds.bottom) / 2f
+            if (x < 0f || x > frameWidth || y < 0f || y > frameHeight) continue
+            return x to y
+        }
+        return null
+    }
+
     /** The y where the recent-searches entries start: under the heading, else under the scope row, else the default. */
     private fun listTop(lines: List<TextLine>): Int {
         lines.filter { isHeading(it) }.minByOrNull { it.bounds.top }?.let { return it.bounds.bottom }

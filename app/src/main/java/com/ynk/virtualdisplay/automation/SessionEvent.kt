@@ -15,7 +15,9 @@ enum class EventKind { HEALTH_OBSERVED, HEALTH_UNKNOWN, FRAME_VALID, FRAME_INVAL
     // Batch-wide consumable allowance ledger. Its own kind on purpose: SESSION_STATE is catalogued by
     // the runtime-state reader and CHECKPOINT is the page/health recovery ledger, so neither may be
     // reused to carry budget semantics without corrupting those records.
-    CARE_BUDGET }
+    CARE_BUDGET,
+    // The pet's adventure: a finished one (read off the map panel) or one handed over still running.
+    ADVENTURE_COMPLETED, ADVENTURE_PENDING }
 interface EventClock {
     fun wallTimeMs(): Long
     fun monotonicMs(): Long

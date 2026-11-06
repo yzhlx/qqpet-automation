@@ -279,15 +279,10 @@ class PetSessionController(context:Context,capture:HeadlessDisplayCapture,input:
         try {
             flow.state="INITIAL_NAVIGATION"
             navigation.initialise()
-            // The room's top bar fills in a moment after the page itself, so a read taken in the
-            // first frame of a cold start can miss the coin count. Read again before giving up.
-            var initialCoins = readRoomCoins("session-initial-coins")
-            var coinReads = 1
-            while (initialCoins !is ObservedValue.Known && coinReads < INITIAL_COIN_READS) {
-                delay(INITIAL_COIN_READ_GAP_MS)
-                initialCoins = readRoomCoins("session-initial-coins")
-                coinReads++
-            }
+            // The room's top bar fills in a moment after the page itself: a read taken in the first
+            // frame of a cold start can miss the count or catch it still rolling up (measured: 0 while
+            // the balance was 636). A value counts once two reads in a row agree.
+            val initialCoins = readRoomCoins("session-initial-coins")
             if (initialCoins is ObservedValue.Known && sessionRoomCoinsBefore == null) {
                 sessionRoomCoinsBefore = initialCoins.value
             }
@@ -616,10 +611,14 @@ class PetSessionController(context:Context,capture:HeadlessDisplayCapture,input:
     }
 
     /**
-     * Coins off the room's top bar, or Unknown (never 0). Evidence only: a failed read never stops the
-     * plan, it only leaves the payout proved by the payroll award alone.
+     * Coins off the room's top bar, or Unknown. Trusted only when two reads in a row agree (see
+     * [StableRoomCoins]). Evidence only: a failed read never stops the plan, it only leaves the payout
+     * proved by the payroll award alone.
      */
-    private suspend fun readRoomCoins(tag:String):ObservedValue<Int> {
+    private suspend fun readRoomCoins(tag:String):ObservedValue<Int> =
+        StableRoomCoins.read(tag) {readRoomCoinsOnce(tag)}
+
+    private suspend fun readRoomCoinsOnce(tag:String):ObservedValue<Int> {
         val now=System.currentTimeMillis()
         val value=try {
             val f=flow.frame(latest=true)
@@ -1040,6 +1039,7 @@ class PetSessionController(context:Context,capture:HeadlessDisplayCapture,input:
                 is AdventureOutcome.Completed -> {
                     ctx.completed(index + 1, durationMinutes)
                     flow.emit("ADVENTURE_COMPLETE", result = "round=" + (index + 1) + " coins=" + outcome.coinAward)
+                    recordAdventureEvent(EventKind.ADVENTURE_COMPLETED, index + 1, step.mode, outcome.eventSummary)
                 }
                 is AdventureOutcome.Blocked -> {
                     if (inputDispatched) {
@@ -1064,6 +1064,14 @@ class PetSessionController(context:Context,capture:HeadlessDisplayCapture,input:
                     }
                     return StepOutcome.Blocked("ADVENTURE_INTERRUPTED")
                 }
+                is AdventureOutcome.Started -> {
+                    // 诗和远方这类长冒险：宠物已出发、体力已花，结果要之后才有。不能当成完成，
+                    // 也不能让计划再来一轮（会撞上"宠物还在冒险"）。
+                    ctx.unconfirmed(index + 1, "ADVENTURE_RESULT_PENDING")
+                    flow.emit("ADVENTURE_PENDING", result = "round=" + (index + 1) + " minutes=" + outcome.expectedDurationMinutes)
+                    recordAdventureEvent(EventKind.ADVENTURE_PENDING, index + 1, step.mode, null)
+                    return StepOutcome.Unconfirmed("ADVENTURE_RESULT_PENDING")
+                }
                 else -> {
                     if (inputDispatched) {
                         ctx.unconfirmed(index + 1, "UNCONFIRMED")
@@ -1073,6 +1081,17 @@ class PetSessionController(context:Context,capture:HeadlessDisplayCapture,input:
             }
         }
         return StepOutcome.Completed()
+    }
+
+    /** Puts the adventure on the Records timeline; a failed write must never fail the run. */
+    private fun recordAdventureEvent(kind: EventKind, round: Int, mode: AdventureMode, summary: String?) {
+        runCatching {
+            flow.capture.facts.events.append(
+                EventSource.GAME_OBSERVATION, kind,
+                mapOf("round" to round, "mode" to mode.label, "summary" to summary),
+                emptyList(),
+            )
+        }
     }
 
     private suspend fun runAdventureOnly(): String {
@@ -1102,6 +1121,7 @@ class PetSessionController(context:Context,capture:HeadlessDisplayCapture,input:
                 completed = 1
                 snapshot = snapshot.copy(completedRounds = 1, nextStep = "冒险完成")
                 flow.emit("ADVENTURE_COMPLETE", result = "coins=" + outcome.coinAward)
+                recordAdventureEvent(EventKind.ADVENTURE_COMPLETED, 1, AdventureMode.NEARBY_WALK, outcome.eventSummary)
                 "ADVENTURE_PASS"
             }
             is AdventureOutcome.Blocked -> {
@@ -1111,6 +1131,10 @@ class PetSessionController(context:Context,capture:HeadlessDisplayCapture,input:
             is AdventureOutcome.Failed -> {
                 stopReason = outcome.reason
                 "FAILED"
+            }
+            is AdventureOutcome.Started -> {
+                stopReason = "ADVENTURE_RESULT_PENDING"
+                "STOPPED"
             }
             else -> "STOPPED"
         }
@@ -1405,9 +1429,6 @@ class PetSessionController(context:Context,capture:HeadlessDisplayCapture,input:
     companion object {
         private const val COURSE_COST_READ_ATTEMPTS = 4
         private const val COURSE_COST_RETRY_DELAY_MS = 800L
-        /** Cold start: the top bar's coin count lags the room page, so the first read can miss it. */
-        private const val INITIAL_COIN_READS = 4
-        private const val INITIAL_COIN_READ_GAP_MS = 700L
     }
     /** One consolidated run record per session, written once at termination. */
     private fun writeRunRecord(terminal:SessionRunState) {

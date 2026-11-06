@@ -74,4 +74,30 @@ class StrategyPresentationTest {
         assertEquals("本轮没有可展示的策略说明", StrategyPresentation.summary(emptyList()))
         assertTrue(StrategyPresentation.lines(emptyList()).isEmpty())
     }
+
+    @Test fun anExpiredHealthReadingIsNotShownAsARawCode() {
+        // The 2026-11-07 04:38 run showed "HEALTH_STALE:OBSERVATION_EXPIRED_OR_CLOCK_REVERSED" on the home card.
+        val stale = StrategyPresentation.lines(listOf(
+            action("护理", StrategyExplanation.Outcome.UNCONFIRMED, "HEALTH_STALE:OBSERVATION_EXPIRED_OR_CLOCK_REVERSED")))
+        assertTrue(stale[0].text.contains("没能确认宠物当前的体力和清洁"))
+        assertFalse(stale[0].text.contains("HEALTH_STALE"))
+        val locked = StrategyPresentation.lines(listOf(
+            action("学习", StrategyExplanation.Outcome.BLOCKED, "PHONE_LOCKED")))
+        assertTrue(locked[0].text.contains("手机锁屏了"))
+        val timeout = StrategyPresentation.lines(listOf(
+            action("学习", StrategyExplanation.Outcome.FAILED, "CAPTURE_TIMEOUT:no frame; displayId=50")))
+        assertTrue(timeout[0].text.contains("后台画面没有及时返回"))
+        assertFalse(timeout[0].text.contains("CAPTURE_TIMEOUT"))
+    }
+
+    @Test fun aFailedWalkHomeIsNotShownAsARawCode() {
+        // The 2026-11-07 03:09 adventure run showed "RETURN_HOME_UNRECOVERED:adventure-page-unconfirmed" on the home card.
+        val lines = StrategyPresentation.lines(listOf(
+            action("冒险", StrategyExplanation.Outcome.UNCONFIRMED, "RETURN_HOME_UNRECOVERED:adventure-page-unconfirmed")))
+        assertTrue(lines[0].text.contains("没能自动退回宠物房间"))
+        assertFalse(lines[0].text.contains("RETURN_HOME"))
+        val notOpened = StrategyPresentation.lines(listOf(
+            action("冒险", StrategyExplanation.Outcome.UNCONFIRMED, "ADVENTURE_PAGE_NOT_CONFIRMED")))
+        assertTrue(notOpened[0].text.contains("没能打开冒险面板"))
+    }
 }

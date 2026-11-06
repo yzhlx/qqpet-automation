@@ -50,12 +50,27 @@ object PetDisplayPicker {
     }
 
     /**
+     * Whether QQ should be launched onto [displayId] before a session starts.
+     *
+     * Only when QQ is on no screen at all (closed by the user, killed by the system, or lost with a
+     * restarted screen service): measured 2026-11-07 02:17, a session on such a screen waited 20 s
+     * for a frame that never came and stopped with a raw capture error. If QQ is on ANY screen it is
+     * left alone: launching it here would pull the user's own foreground QQ off the phone.
+     */
+    fun shouldRelaunchQq(hosting: Set<Int>): Boolean = hosting.isEmpty()
+
+    /**
      * Display ids that hold an activity of [packageName], read from `dumpsys activity activities`.
-     * Sections start with `Display #N`; an `ActivityRecord{… u0 pkg/…}` line inside belongs to N.
+     * Sections start with `Display #N`; an `ActivityRecord{… u0 pkg/… tID}` line inside belongs to N.
+     *
+     * Only a record that sits in a task counts (`t2760`, never `t-1`). Measured 2026-11-07 02:17 with
+     * QQ gone from the pet screen: the dump still named QQ on `Display #49` through a leftover
+     * `deepestLastOrientationSource=ActivityRecord{… SplashActivity t-1 f}` bookkeeping line, so an
+     * empty screen read as "QQ is on it" and nothing noticed that it was black.
      */
     fun displaysHosting(dumpsys: String, packageName: String): Set<Int> {
         val header = Regex("""^\s*Display #(\d+)""")
-        val record = Regex("""ActivityRecord\{\S+ u\d+ ${Regex.escape(packageName)}/""")
+        val record = Regex("""ActivityRecord\{\S+ u\d+ ${Regex.escape(packageName)}/\S+ t\d+\b""")
         var current: Int? = null
         val found = mutableSetOf<Int>()
         dumpsys.lineSequence().forEach { line ->

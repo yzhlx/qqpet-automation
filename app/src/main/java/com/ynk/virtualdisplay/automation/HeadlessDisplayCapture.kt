@@ -32,6 +32,8 @@ class HeadlessDisplayCapture(
     private val width: Int,
     private val height: Int,
 ) {
+    /** The display this capture reads and the flows tap; evidence lines name it instead of a constant. */
+    val targetDisplayId: Int get() = displayId
     val facts = AutomationFacts(repository.automationEventsDirectory, displayId)
     private class InvalidFrame(message: String): IllegalStateException(message)
     /** 屏还没有任何渲染内容（全黑帧）：QQ 尚未启动/渲染完，等一等再试，不算捕获失败。 */

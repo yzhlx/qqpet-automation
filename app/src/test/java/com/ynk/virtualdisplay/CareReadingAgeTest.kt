@@ -35,6 +35,29 @@ class CareReadingAgeTest {
         assertEquals(83, old.recordedCleanliness)
     }
 
+    @Test fun anOldReadingCanStillBeWrittenDownAsMeasured() {
+        // plan-care.json records the "before" reading after the whole care iteration: over a minute later.
+        val old = PetCareReading(observations(System.currentTimeMillis() - 120_000L))
+        assertEquals(83, old.measuredEnergy)
+        assertEquals(83, old.measuredCleanliness)
+    }
+
+    @Test fun theWrittenDownValueIsTheLowerOfDigitAndBar() {
+        val at = System.currentTimeMillis()
+        val h = observations(at).copy(
+            energy = ObservedValue.Known(91, at, 1.0, "panel", ObservationSource.DIGIT_RECOGNITION),
+            barEnergy = ObservedValue.Known(90, at, 1.0, "panel", ObservationSource.CONSERVATIVE_BAR_ESTIMATE),
+        )
+        assertEquals(90, PetCareReading(h).measuredEnergy)
+    }
+
+    @Test fun anUnreadValueIsLeftOutNotInvented() {
+        val at = System.currentTimeMillis()
+        val h = observations(at).copy(energy = ObservedValue.Unknown("ENERGY_UNREAD", at, "panel"))
+        assertNull(PetCareReading(h).measuredEnergy)
+        assertEquals(83, PetCareReading(h).measuredCleanliness)
+    }
+
     @Test fun aFreshReadingIsNotStale() {
         val fresh = PetCareReading(observations(System.currentTimeMillis()))
         assertFalse(fresh.isStale())

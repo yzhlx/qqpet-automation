@@ -178,8 +178,12 @@ class PetFlowContext(val context: Context, val capture: HeadlessDisplayCapture,
         }
         error("PAGE_MISMATCH:$state:$name:$lastScore")
     }
-    fun healthJson(h: PetCareReading) = JSONObject().put("stamina",h.energy)
-        .put("cleanliness",h.cleanliness)
-        .put("mood",JSONObject(h.observations.mood.fields()))
-        .put("observations",JSONObject(h.observations.fields()))
+    // A record of what was measured, so it must not go through the 60 s decision gate: the care
+    // "before" reading is routinely older than that by the time the care result is written down.
+    fun healthJson(h: PetCareReading) = JSONObject().apply {
+        h.measuredEnergy?.let { put("stamina",it) }
+        h.measuredCleanliness?.let { put("cleanliness",it) }
+        put("mood",JSONObject(h.observations.mood.fields()))
+        put("observations",JSONObject(h.observations.fields()))
+    }
 }

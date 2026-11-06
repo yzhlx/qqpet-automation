@@ -109,6 +109,55 @@ class RecordsPresentationTest {
         assertEquals(VerdictTone.CONFIRMED, rows[0].tone)
     }
 
+    @Test fun aFinishedAdventureAppearsOnTheTimeline() {
+        val events = listOf(
+            JournalEvent(5_000L, "ADVENTURE_COMPLETED", mapOf(
+                "round" to "1", "mode" to "附近走走", "summary" to "我遇到了榛果！")),
+            JournalEvent(6_000L, "ADVENTURE_PENDING", mapOf("round" to "1", "mode" to "诗和远方")),
+        )
+        val rows = TimelinePresentation.rows(emptyList(), events, timeFormatter = { "$it" })
+        assertEquals(listOf("宠物出发冒险", "冒险完成"), rows.map { it.label })
+        assertEquals("第 1 轮 · 附近走走 · 我遇到了榛果！", rows[1].detail)
+        assertEquals("已完成", rows[1].chip)
+        assertEquals(VerdictTone.CONFIRMED, rows[1].tone)
+        assertEquals("第 1 轮 · 诗和远方 · 结果回游戏里看", rows[0].detail)
+        assertEquals("待确认", rows[0].chip)
+    }
+
+    @Test fun aGenericSummaryIsNotRepeatedOnTheAdventureRow() {
+        val events = listOf(JournalEvent(5_000L, "ADVENTURE_COMPLETED", mapOf("round" to "1", "mode" to "附近走走", "summary" to "冒险完成")))
+        val rows = TimelinePresentation.rows(emptyList(), events, timeFormatter = { "$it" })
+        assertEquals("第 1 轮 · 附近走走", rows.single().detail)
+    }
+
+    @Test fun aStartedCourseIsNotLeftSayingInProgress() {
+        val events = listOf(JournalEvent(1_000L, "COURSE_STARTED", mapOf("round" to "1", "course" to "study:蹦蹦跳跳体能课")))
+        val rows = TimelinePresentation.rows(emptyList(), events, timeFormatter = { "$it" })
+        assertEquals("已开始", rows.single().chip)
+    }
+
+    @Test fun identicalLeftoverErrorsCollapseToOneLine() {
+        val events = listOf(
+            JournalEvent(2_000L, "ERROR", mapOf("reason" to "PAGE_MISMATCH")),
+            JournalEvent(2_000L, "ERROR", mapOf("reason" to "PAGE_MISMATCH")),
+            JournalEvent(2_000L, "ERROR", mapOf("reason" to "PAGE_MISMATCH")),
+            JournalEvent(3_000L, "ERROR", mapOf("reason" to "OCR_TIMEOUT")),
+        )
+        val rows = TimelinePresentation.rows(emptyList(), events, timeFormatter = { "$it" })
+        assertEquals(2, rows.size)
+        assertEquals(RecordsPresentation.stopReasonText("OCR_TIMEOUT"), rows[0].detail)
+        assertEquals("页面对不上（共 3 次）", rows[1].detail)
+    }
+
+    @Test fun errorsAtDifferentTimesAreNotMerged() {
+        val events = listOf(
+            JournalEvent(2_000L, "ERROR", mapOf("reason" to "PAGE_MISMATCH")),
+            JournalEvent(9_000L, "ERROR", mapOf("reason" to "PAGE_MISMATCH")),
+        )
+        val rows = TimelinePresentation.rows(emptyList(), events, timeFormatter = { "$it" })
+        assertEquals(2, rows.size)
+    }
+
     @Test fun aDayWithoutEventsHasNoTimeline() {
         assertEquals(0, TimelinePresentation.rows(emptyList(), emptyList(), timeFormatter = { "$it" }).size)
     }
@@ -135,5 +184,30 @@ class RecordsPresentationTest {
         assertEquals(goToMessagePage, RecordsPresentation.stopReasonText("ENTER_PET_EXHAUSTED:initial"))
         assertEquals(goToMessagePage, RecordsPresentation.stopReasonText("INITIAL_PAGE_UNKNOWN"))
         assertEquals("没读到金币数，请确认宠物房间顶部状态栏已显示", RecordsPresentation.stopReasonText("WALLET_COIN_REGION_UNREAD"))
+    }
+
+    @Test fun healthAndLockStopsSayWhatToDo() {
+        assertEquals("没能确认宠物当前的体力和清洁，已按安全规则停下，请重新开始",
+            RecordsPresentation.stopReasonText("HEALTH_STALE:OBSERVATION_EXPIRED_OR_CLOCK_REVERSED"))
+        assertEquals("没能确认宠物当前的体力和清洁，已按安全规则停下，请重新开始",
+            RecordsPresentation.stopReasonText("HEALTH_NOT_READY_OR_STALE_BEFORE_START"))
+        assertEquals("手机锁屏了，请保持屏幕亮起再开始", RecordsPresentation.stopReasonText("PHONE_LOCKED"))
+        assertEquals("后台画面没有及时返回，请重新开始；反复出现就回主页点「一键创建」",
+            RecordsPresentation.stopReasonText("CAPTURE_TIMEOUT:Timed out waiting for 8000 ms; displayId=50"))
+    }
+
+    @Test fun aBlankPetScreenSaysWhatToDo() {
+        // The raw reason of a session started while QQ was gone from the pet screen (device log 2026-11-07 02:17).
+        val blank = "后台画面是空的（QQ 可能被关掉了），请回主页点「一键创建」重新建一个后台画面再开始"
+        assertEquals(blank, RecordsPresentation.stopReasonText("CHECKPOINT_MISSING:CAPTURE_INVALID:FRAME_NOT_READY_TIMEOUT:20822ms"))
+        assertEquals(blank, RecordsPresentation.stopReasonText("FRAME_NOT_READY:INVALID_BLACK_FRAME"))
+    }
+
+    @Test fun aSessionThatCouldNotWalkBackSaysSoInWords() {
+        // Raw stop reason of the 2026-11-07 03:09 run: the adventure tap landed on the career town and
+        // the walk home stopped. The card used to print this code verbatim.
+        val words = "没能自动退回宠物房间，请回主页重新开始"
+        assertEquals(words, RecordsPresentation.stopReasonText("RETURN_HOME_UNRECOVERED:adventure-page-unconfirmed"))
+        assertEquals(words, RecordsPresentation.stopReasonText("WALK_BACK_UNCONFIRMED_AFTER_2_BACKS:adventure-page-unconfirmed"))
     }
 }

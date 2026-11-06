@@ -32,11 +32,72 @@ object AdventureParser {
         return point((left + right) / 2f, (top + bottom) / 2f)
     }
 
-    /** 判断当前页面是否为冒险页面 */
+    /**
+     * 判断当前页面是否为冒险面板。
+     *
+     * 户外地图自己就带「冒险」标签，所以单有「冒险」二字不能证明面板已打开（点击落空时地图仍在）。
+     * 面板必有两张模式卡（附近走走 / 诗和远方）；OCR 漏读卡片时，才退而要求标题与面板里的
+     * 其它字（规则说明 / 出发按钮）同时出现。
+     */
     fun isAdventurePage(lines: List<TextLine>): Boolean {
         val texts = lines.map { it.text.filterNot { c -> c.isWhitespace() } }
-        return texts.any { it.contains("附近走走") || it.contains("诗和远方") || it.contains("冒险") || it.contains("探索之旅") }
+        if (texts.any { it.contains("附近走走") || it.contains("诗和远方") }) return true
+        val title = texts.any { it.contains("冒险") || it.contains("探索之旅") }
+        val panelText = texts.any { t -> t.contains("规则说明") || START_BUTTON_LABELS.any { t.contains(it) } }
+        return title && panelText
     }
+
+    /**
+     * What the outdoor map shows while the pet is out adventuring.
+     * [events] is the panel's log, newest first, without the time stamps.
+     */
+    data class Progress(val inProgress: Boolean, val remainingSec: Int?, val events: List<String>)
+
+    private val REMAINING = Regex("""剩余\|?(\d{1,2})[:：.](\d{2})[:：.](\d{2})""")
+    private val TIME_ONLY = Regex("""^\d{1,2}[:：]\d{2}$""")
+    private val LEADING_TIME = Regex("""^\d{1,2}\s*[:：]\s*\d{2}\s*""")
+    private val EVENT_NOISE = listOf("剩余", "召回", "正在冒险", "冒险中")
+    private val FOUND_WORDS = listOf("捡到", "获得", "拾得", "得到", "收到")
+
+    /**
+     * MEASURED 2026-11-07: while out, the map carries a bubble "冒险中" and a bottom panel
+     * "正在冒险 / 剩余 00:00:25 / 召回" over a log of "03:37 我捡到了一个袋子！". Any one of those
+     * marks the adventure as running, because ML Kit misreads individual labels frame to frame;
+     * the pre-start sheet and the room carry none of them.
+     */
+    fun readProgress(lines: List<TextLine>): Progress {
+        val texts = lines.map { it.text.filterNot { c -> c.isWhitespace() } }
+        val joined = texts.joinToString("|")
+        val remaining = REMAINING.find(joined)?.let {
+            it.groupValues[1].toInt() * 3600 + it.groupValues[2].toInt() * 60 + it.groupValues[3].toInt()
+        }
+        val title = lines.firstOrNull { it.text.contains("正在冒险") }
+        val recall = lines.firstOrNull { it.text.filterNot { c -> c.isWhitespace() } == "召回" }
+        val running = title != null || recall != null || remaining != null || texts.any { it.contains("冒险中") }
+        if (!running) return Progress(false, null, emptyList())
+        // The log sits under the panel's title row; without a title the 召回 button marks the same row.
+        val panelBottom = (title ?: recall)?.bounds?.bottom
+        val events = if (panelBottom == null) emptyList() else lines
+            .filter { it.bounds.top > panelBottom }
+            .sortedWith(compareBy({ it.bounds.top / WorkPageParser.ROW_BUCKET_PX }, { it.bounds.left }))
+            .map { LEADING_TIME.replace(it.text.trim(), "").trim() }
+            .filter { it.isNotEmpty() && !TIME_ONLY.matches(it) && EVENT_NOISE.none { n -> it.contains(n) } }
+        return Progress(true, remaining, events)
+    }
+
+    /** The newest thing the pet did that is worth saying (the "出门了" opener is not). */
+    fun summarise(events: List<String>): String =
+        events.firstOrNull { !it.startsWith("出门了") } ?: events.firstOrNull() ?: "冒险完成"
+
+    /** Events that name something the pet brought back. */
+    fun foundItems(events: List<String>): List<String> =
+        events.filter { e -> FOUND_WORDS.any { e.contains(it) } }
+
+    /** Two entry readings agree when they are within this many pixels on both axes. */
+    const val ENTRY_AGREE_PX = 12f
+
+    fun sameEntry(a: PointF, b: PointF): Boolean =
+        kotlin.math.abs(a.x - b.x) <= ENTRY_AGREE_PX && kotlin.math.abs(a.y - b.y) <= ENTRY_AGREE_PX
 
     /** 定位目标冒险模式标签（如「附近走走」） */
     fun locateModeOption(lines: List<TextLine>, mode: AdventureMode): PointF? {

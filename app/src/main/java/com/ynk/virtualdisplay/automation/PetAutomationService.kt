@@ -12,6 +12,7 @@ import android.hardware.display.DisplayManager
 import android.os.IBinder
 import android.os.Build
 import android.os.PowerManager
+import android.os.SystemClock
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import com.ynk.virtualdisplay.MyApplication
@@ -776,6 +777,7 @@ class PetAutomationService : Service() {
                 app.displayRepository.managedDisplayIds.first { displayId in it }
             }
             verifyDisplay(displayId)
+            ensureQqOnDisplay(displayId)
             acquireWakeLock()
 
             val budget = DailyBudgetStore(this)
@@ -872,7 +874,12 @@ class PetAutomationService : Service() {
                 // successful WORK_PASS/CARE_PASS/HEALTH_CHECK_PASS must not be reported as STOPPED
                 // while the controller itself marked the run COMPLETED (stopReason null).
                 stopReason=when(verdict) {
-                    "PLAN_PASS" -> "PLAN_PASS work=${controller.planRunSnapshot?.counts?.workShiftsCompleted ?: 0} care=${controller.planRunSnapshot?.counts?.careCompleted ?: 0} study=${controller.completed}/$requestedRounds"
+                    // controller.completed adds study and adventure together, which read as "study=2/1" for
+                    // one lesson plus one adventure; each action reports its own count instead.
+                    "PLAN_PASS" -> controller.planRunSnapshot?.counts.let { c ->
+                        "PLAN_PASS work=${c?.workShiftsCompleted ?: 0} care=${c?.careCompleted ?: 0} " +
+                            "study=${c?.studyRoundsCompleted ?: 0} adventure=${c?.adventureCompleted ?: 0}"
+                    }
                     "MANAGED_BATCH_PASS" -> "BATCH_PASS ${controller.completed}/$requestedRounds"
                     "WORK_PASS" -> "WORK_PASS"
                     "CARE_PASS" -> "CARE_PASS"
@@ -902,6 +909,37 @@ class PetAutomationService : Service() {
             Log.e(TAG, "session failed", t)
             stopSession("会话异常：${t.javaClass.simpleName}: ${t.message}")
         }
+    }
+
+    /**
+     * QQ gone from every screen (closed, killed, or lost with a restarted screen service) is the one
+     * start state the user cannot see coming: the pet screen is simply black. The app already knows
+     * how to put QQ on it (the same launch 一键创建 does), so it does that instead of failing on a
+     * capture error 20 s later. Never when QQ is on any screen: see [PetDisplayPicker.shouldRelaunchQq].
+     * Best effort: a failure here only logs, and the normal entry chain then reports what it sees.
+     */
+    private suspend fun ensureQqOnDisplay(displayId: Int) {
+        val repo = app.displayRepository
+        val hosting = repo.displaysHosting(PetDisplayPicker.QQ_PACKAGE).getOrNull() ?: return
+        if (!PetDisplayPicker.shouldRelaunchQq(hosting)) return
+        logLine("QQ_NOT_ON_ANY_DISPLAY display=$displayId, launching it on the pet screen")
+        val launched = repo.launchApp(PetDisplayPicker.QQ_PACKAGE, displayId)
+        if (launched.isFailure) {
+            logLine("QQ_RELAUNCH_FAILED ${launched.exceptionOrNull()?.message}")
+            return
+        }
+        // QQ takes a few seconds to draw; the entry chain's own settle logic does the rest.
+        val deadline = SystemClock.elapsedRealtime() + QQ_RELAUNCH_WAIT_MS
+        while (SystemClock.elapsedRealtime() < deadline) {
+            delay(QQ_RELAUNCH_POLL_MS)
+            val now = repo.displaysHosting(PetDisplayPicker.QQ_PACKAGE).getOrNull().orEmpty()
+            if (displayId in now) {
+                logLine("QQ_RELAUNCHED display=$displayId")
+                delay(QQ_RELAUNCH_DRAW_MS)
+                return
+            }
+        }
+        logLine("QQ_RELAUNCH_NOT_CONFIRMED display=$displayId")
     }
 
     @Suppress("DEPRECATION")
@@ -1061,6 +1099,11 @@ class PetAutomationService : Service() {
         private const val ACTION_READ_COURSE_GAINS = "com.ynk.virtualdisplay.pet.READ_COURSE_GAINS"
         private const val ACTION_READ_WORK_GAINS = "com.ynk.virtualdisplay.pet.READ_WORK_GAINS"
         private const val MAX_WAKELOCK_MS = 8L * 60L * 60L * 1000L
+
+        /** Relaunching QQ onto a pet screen it has left: how long to wait for it to appear, and to draw. */
+        private const val QQ_RELAUNCH_WAIT_MS = 10_000L
+        private const val QQ_RELAUNCH_POLL_MS = 500L
+        private const val QQ_RELAUNCH_DRAW_MS = 2_500L
 
         /** What the foreground notification shows while a session runs, per mode. */
         private fun modeLabel(mode: SessionMode) = when (mode) {

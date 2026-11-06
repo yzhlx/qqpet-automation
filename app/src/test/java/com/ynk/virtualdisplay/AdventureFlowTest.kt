@@ -1,5 +1,6 @@
 package com.ynk.virtualdisplay
 
+import android.graphics.PointF
 import android.graphics.Rect
 import com.ynk.virtualdisplay.automation.*
 import org.junit.Assert.*
@@ -39,11 +40,64 @@ class AdventureFlowTest {
     }
 
     @Test
-    fun isAdventurePageRecognizesKeywords() {
+    fun locateAdventureEntryIgnoresOcrBlockOrder() {
+        // Measured 2026-11-07: the real outdoor map came back with 冒险 BEFORE 职业小镇, and the
+        // tap went to the town island. Whatever the order, the tap is the 冒险 label itself.
+        val lines = listOf(
+            line("冒险", 255, 1165, 375, 1205),
+            line("职业小镇", 480, 815, 655, 855),
+            line("宠物学园", 110, 605, 288, 665),
+            line("出门", 330, 140, 390, 180),
+        )
+        val hit = AdventureParser.locateAdventureEntry(lines)!!
+        assertEquals(315f, hit.x, 0.5f)
+        assertEquals(1185f, hit.y, 0.5f)
+    }
+
+    @Test
+    fun entryReadingsAgreeOnlyWhenTheyAreClose() {
+        val a = PointF().apply { x = 315f; y = 1185f }
+        val near = PointF().apply { x = 320f; y = 1190f }
+        val far = PointF().apply { x = 340f; y = 1185f }
+        assertTrue(AdventureParser.sameEntry(a, near))
+        assertFalse(AdventureParser.sameEntry(a, far))
+    }
+
+    @Test
+    fun isAdventurePageRecognizesTheSheet() {
         assertTrue(AdventureParser.isAdventurePage(listOf(line("附近走走", 100, 200, 200, 240))))
         assertTrue(AdventureParser.isAdventurePage(listOf(line("诗和远方", 100, 200, 200, 240))))
-        assertTrue(AdventureParser.isAdventurePage(listOf(line("神秘冒险之旅", 100, 200, 300, 240))))
+        // The cards were not read: the title together with the sheet's own text still proves it.
+        assertTrue(AdventureParser.isAdventurePage(listOf(line("冒险", 330, 740, 400, 780), line("规则说明", 510, 740, 610, 770))))
+        assertTrue(AdventureParser.isAdventurePage(listOf(line("冒险", 330, 740, 400, 780), line("出发", 330, 1430, 400, 1470))))
         assertFalse(AdventureParser.isAdventurePage(listOf(line("职业小镇", 100, 200, 200, 240), line("竹影武馆", 100, 300, 200, 340))))
+    }
+
+    @Test
+    fun theOutdoorMapAloneIsNotTheAdventureSheet() {
+        // The map carries its own 冒险 label; a tap that missed leaves exactly this on screen.
+        val map = listOf(
+            line("出门", 330, 140, 390, 180),
+            line("宠物学园", 110, 605, 288, 665),
+            line("职业小镇", 480, 815, 655, 855),
+            line("冒险", 255, 1165, 375, 1205),
+        )
+        assertFalse(AdventureParser.isAdventurePage(map))
+    }
+
+    @Test
+    fun theCareerTownJobSheetIsNotTheAdventureSheet() {
+        // Real OCR of the page the 2026-11-07 run landed on (it also says 规则说明).
+        val town = listOf(
+            line("同伴", 560, 140, 620, 180),
+            line("宠物职业小镇", 200, 140, 520, 180),
+            line("习武小童☆1", 100, 400, 400, 440),
+            line("帮武馆跑腿", 100, 470, 400, 510),
+            line("陪练基础课", 100, 760, 400, 800),
+            line("规则说明>", 500, 760, 640, 800),
+            line("去打工", 280, 1400, 440, 1450),
+        )
+        assertFalse(AdventureParser.isAdventurePage(town))
     }
 
     @Test

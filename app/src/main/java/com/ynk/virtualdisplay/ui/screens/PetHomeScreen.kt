@@ -212,8 +212,14 @@ fun PetHomeScreen(
     val progress = RoundProgressPresentation.of(managed.totalRounds, managed.completedRounds)
     val budgetCap = minOf(plan.dailyBudgetMinutes, DailyBudgetStore.HARD_STOP_MINUTES)
     // STR-16：运行中的说明来自实时状态，结束后来自最近一次会话记录。
-    val strategyActions = if (managed.strategyActions.isNotEmpty()) managed.strategyActions
-        else latest?.record?.strategyActions.orEmpty()
+    // The live list is only filled when a run ends, so a run in progress has none yet. It must not borrow
+    // the previous run's ✓ marks and show them under "本轮策略" (seen on the phone 2026-11-07).
+    val strategyActions = when {
+        runtime.running && !managedView.sessionIsCurrent -> emptyList()
+        managed.strategyActions.isNotEmpty() -> managed.strategyActions
+        runtime.running -> emptyList()
+        else -> latest?.record?.strategyActions.orEmpty()
+    }
     val strategyLines = StrategyPresentation.lines(strategyActions)
     val strategySummary = StrategyPresentation.summary(strategyActions)
 

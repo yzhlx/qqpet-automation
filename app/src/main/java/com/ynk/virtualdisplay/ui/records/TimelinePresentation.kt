@@ -72,7 +72,30 @@ object TimelinePresentation {
                         event.payload["durationMinutes"]?.let { "约 " + it + " 分钟" },
                     ).joinToString(" · "),
                     tone = VerdictTone.UNKNOWN,
-                    chip = "进行中",
+                    // A row is a moment, not a live state: "进行中" stayed on screen long after the course ended.
+                    chip = "已开始",
+                )
+                "ADVENTURE_COMPLETED" -> TimelineRow(
+                    timeText = timeFormatter(event.wallTimeMs),
+                    label = "冒险完成",
+                    detail = listOfNotNull(
+                        event.payload["round"]?.let { "第 " + it + " 轮" },
+                        event.payload["mode"],
+                        event.payload["summary"]?.takeIf { it.isNotBlank() && it != "冒险完成" },
+                    ).joinToString(" · "),
+                    tone = VerdictTone.CONFIRMED,
+                    chip = "已完成",
+                )
+                "ADVENTURE_PENDING" -> TimelineRow(
+                    timeText = timeFormatter(event.wallTimeMs),
+                    label = "宠物出发冒险",
+                    detail = listOfNotNull(
+                        event.payload["round"]?.let { "第 " + it + " 轮" },
+                        event.payload["mode"],
+                        "结果回游戏里看",
+                    ).joinToString(" · "),
+                    tone = VerdictTone.PENDING,
+                    chip = "待确认",
                 )
                 "LEARNING_CONFIRMED" -> TimelineRow(
                     timeText = timeFormatter(event.wallTimeMs),
@@ -98,6 +121,32 @@ object TimelinePresentation {
             if (row != null) stamped += event.wallTimeMs to row
         }
 
-        return stamped.sortedByDescending { it.first }.take(limit).map { it.second }
+        return collapseRepeats(stamped.sortedByDescending { it.first }.map { it.second }).take(limit)
     }
+
+    /**
+     * The same unfinished step is recorded once per interrupted attempt, so a few of them left over from
+     * earlier runs showed up as identical lines. Identical neighbours become one line with a count.
+     */
+    internal fun collapseRepeats(rows: List<TimelineRow>): List<TimelineRow> {
+        val out = mutableListOf<TimelineRow>()
+        var run = 0
+        for (row in rows) {
+            val last = out.lastOrNull()
+            if (last != null && last.label == row.label && last.detail.removeCountSuffix() == row.detail &&
+                last.chip == row.chip && last.timeText == row.timeText
+            ) {
+                run++
+                out[out.lastIndex] = last.copy(detail = row.detail + "（共 " + (run + 1) + " 次）")
+            } else {
+                run = 0
+                out += row
+            }
+        }
+        return out
+    }
+
+    private val COUNT_SUFFIX = Regex("""（共 \d+ 次）$""")
+
+    private fun String.removeCountSuffix(): String = replace(COUNT_SUFFIX, "")
 }

@@ -22,10 +22,20 @@ class PetAdventureFlow(
 ) {
     var phase: AdventurePhase = AdventurePhase.IDLE; private set
 
+    companion object {
+        /** Readings of the 冒险 label taken before the tap; two consecutive ones must agree. */
+        const val ENTRY_READS = 4
+        const val ENTRY_READ_GAP_MS = 500L
+        /** Gap between reads while the pet is out; each read is an OCR pass of its own. */
+        const val WATCH_POLL_MS = 2000L
+        private const val PROGRESS_LOG_STEP_SEC = 10
+        private val COIN_IN_EVENT = Regex("""金币\s*[+＋]?\s*(\d+)""")
+    }
+
     /** 执行一次完整的冒险闭环 */
     suspend fun run(
         mode: AdventureMode = AdventureMode.NEARBY_WALK,
-        settleWaitTimeoutMs: Long = 45_000L,
+        settleWaitTimeoutMs: Long = AdventureWatch.UNSEEN_TIMEOUT_MS,
         onBeforeStart: suspend () -> Unit = {},
     ): AdventureOutcome = with(flow) {
         flow.state = "ADVENTURE"
@@ -37,15 +47,36 @@ class PetAdventureFlow(
             navigation.enterOutdoor("adventure-outdoor")
             this@PetAdventureFlow.phase = AdventurePhase.ENTERING_ADVENTURE
 
-            // 2. 定位「冒险」建筑入口
-            val outdoorLines = lineReader()
-            val entryPoint = AdventureParser.locateAdventureEntry(outdoorLines)
+            // 2. 定位「冒险」建筑入口：两次独立读数一致才点（地图刚打开时镜头可能还在动）
+            var entryPoint: PointF? = null
+            var previous: PointF? = null
+            var lastLines: List<TextLine> = emptyList()
+            for (read in 1..ENTRY_READS) {
+                lastLines = lineReader()
+                // An adventure already under way replaces the 冒险 label with a "冒险中" bubble and
+                // opens the bottom panel; a tap on that bubble is not an entry and a second run
+                // cannot start until the pet is back.
+                if (read == 1 && AdventureParser.readProgress(lastLines).inProgress) {
+                    this@PetAdventureFlow.phase = AdventurePhase.BLOCKED
+                    emit("adventure-already-running", result = "lines=${lastLines.joinToString(";") { it.text }}")
+                    navigation.walkBackToRoom("adventure-already-running")
+                    return@with AdventureOutcome.Blocked("ADVENTURE_ALREADY_RUNNING")
+                }
+                val located = AdventureParser.locateAdventureEntry(lastLines)
+                if (located != null && previous != null && AdventureParser.sameEntry(previous, located)) {
+                    entryPoint = located
+                    break
+                }
+                previous = located
+                if (read < ENTRY_READS) delay(ENTRY_READ_GAP_MS)
+            }
             if (entryPoint == null) {
                 this@PetAdventureFlow.phase = AdventurePhase.BLOCKED
-                emit("adventure-entry-unconfirmed", result = "lines=${outdoorLines.joinToString(";") { it.text }}")
-                navigation.returnHomeFromMap("adventure-entry-missing")
+                emit("adventure-entry-unconfirmed", result = "lines=${lastLines.joinToString(";") { it.text }}")
+                navigation.walkBackToRoom("adventure-entry-missing")
                 return@with AdventureOutcome.Blocked("ADVENTURE_ENTRY_NOT_FOUND")
             }
+            emit("adventure-entry-located", result = "tap=${entryPoint.x.toInt()},${entryPoint.y.toInt()}")
 
             // 3. 点击进入冒险
             tap(entryPoint, pageSettleMs)
@@ -56,9 +87,8 @@ class PetAdventureFlow(
             if (!AdventureParser.isAdventurePage(pageLines)) {
                 this@PetAdventureFlow.phase = AdventurePhase.BLOCKED
                 emit("adventure-page-unconfirmed", result = "lines=${pageLines.joinToString(";") { it.text }}")
-                // 点击左上角返回户外再回房
-                tap(PointF(80f, 160f), pageSettleMs)
-                navigation.returnHomeFromMap("adventure-page-unconfirmed")
+                // 不知道落在了哪一页：按页面实际样子一级级退回房间（职业小镇也能退）
+                navigation.walkBackToRoom("adventure-page-unconfirmed")
                 return@with AdventureOutcome.Blocked("ADVENTURE_PAGE_NOT_CONFIRMED")
             }
             this@PetAdventureFlow.phase = AdventurePhase.PAGE_CONFIRMED
@@ -68,8 +98,7 @@ class PetAdventureFlow(
             if (limit != null) {
                 this@PetAdventureFlow.phase = AdventurePhase.BLOCKED
                 emit("adventure-blocked-limit", result = "reason=$limit")
-                tap(PointF(80f, 160f), pageSettleMs)
-                navigation.returnHomeFromMap("adventure-limited")
+                navigation.walkBackToRoom("adventure-limited")
                 return@with AdventureOutcome.Blocked("ADVENTURE_LIMITED:$limit")
             }
 
@@ -86,8 +115,7 @@ class PetAdventureFlow(
             if (startPoint == null) {
                 this@PetAdventureFlow.phase = AdventurePhase.BLOCKED
                 emit("adventure-start-button-missing", result = "lines=${updatedLines.joinToString(";") { it.text }}")
-                tap(PointF(80f, 160f), pageSettleMs)
-                navigation.returnHomeFromMap("adventure-start-missing")
+                navigation.walkBackToRoom("adventure-start-missing")
                 return@with AdventureOutcome.Blocked("ADVENTURE_START_BUTTON_NOT_FOUND")
             }
 
@@ -98,46 +126,62 @@ class PetAdventureFlow(
             this@PetAdventureFlow.phase = AdventurePhase.IN_PROGRESS
             emit("adventure-started", result = "mode=${mode.label} startedAt=$startedAt")
 
-            // 8. 等待奇遇结算与结果确认
+            // 8. 等宠物回来。实机（2026-11-07）：冒险没有结算弹窗；地图下方是「正在冒险 / 剩余 mm:ss /
+            //    召回」面板，倒计时走完后宠物自己回房间。所以看面板：见过它、又连续两次读不到才算结束。
             this@PetAdventureFlow.phase = AdventurePhase.WAITING_RESULT
-            val deadline = startedAt + settleWaitTimeoutMs
-            var settlementResult: AdventureParser.SettlementResult? = null
-
-            while (clock() < deadline) {
-                delay(2000L)
-                val checkLines = lineReader()
-                val parsed = AdventureParser.parseSettlement(checkLines)
-                if (parsed != null) {
-                    settlementResult = parsed
-                    // 点击弹窗的确定/收下按钮
-                    val dismissPoint = AdventureParser.locateDismissButton(checkLines)
-                    if (dismissPoint != null) {
-                        tap(dismissPoint, pageSettleMs)
-                        delay(1000L)
-                    }
-                    break
+            val watch = AdventureWatch(startedAt, unseenTimeoutMs = settleWaitTimeoutMs)
+            var verdict: AdventureWatch.Verdict = AdventureWatch.Verdict.Waiting
+            var watchLines: List<TextLine> = emptyList()
+            var loggedRemaining: Int? = null
+            while (verdict === AdventureWatch.Verdict.Waiting) {
+                delay(WATCH_POLL_MS)
+                watchLines = lineReader()
+                verdict = watch.observe(clock(), watchLines)
+                // The pet's log text jitters between OCR passes; write a line on the first sighting and then
+                // about every PROGRESS_LOG_STEP_SEC of countdown, not on every changed spelling.
+                val remaining = watch.lastRemainingSec
+                if (watch.sawProgress && (loggedRemaining == null || (remaining != null && loggedRemaining - remaining >= PROGRESS_LOG_STEP_SEC))) {
+                    loggedRemaining = remaining ?: loggedRemaining ?: 0
+                    emit("adventure-progress", result = "remaining=$remaining events=${watch.events.joinToString("|")}")
                 }
             }
+            if (verdict is AdventureWatch.Verdict.Settled) {
+                // 旧版界面的结算弹窗：点掉确定/收下
+                AdventureParser.locateDismissButton(watchLines)?.let { tap(it, pageSettleMs); delay(1000L) }
+            }
 
-            // 9. 安全退出并回房
-            tap(PointF(80f, 160f), pageSettleMs)
-            delay(1000L)
-            navigation.returnHomeFromMap("adventure-finish")
+            // 9. 按画面实际样子回房：房间里不再点返回（那会退出小程序），地图上才点箭头
+            navigation.walkBackToRoom("adventure-finish")
 
-            if (settlementResult != null) {
-                this@PetAdventureFlow.phase = AdventurePhase.RESULT_CONFIRMED
-                emit("adventure-completed", result = "summary=${settlementResult.summary} coins=${settlementResult.coinAward}")
-                this@PetAdventureFlow.phase = AdventurePhase.FINISHED
-                return@with AdventureOutcome.Completed(
-                    mode = mode,
-                    eventSummary = settlementResult.summary,
-                    coinAward = settlementResult.coinAward,
-                    itemsAwarded = settlementResult.items,
-                )
-            } else {
-                this@PetAdventureFlow.phase = AdventurePhase.FAILED
-                emit("adventure-timeout", result = "timeoutMs=$settleWaitTimeoutMs")
-                return@with AdventureOutcome.Failed("ADVENTURE_SETTLEMENT_TIMEOUT")
+            return@with when (val v = verdict) {
+                is AdventureWatch.Verdict.Finished -> {
+                    this@PetAdventureFlow.phase = AdventurePhase.RESULT_CONFIRMED
+                    val coins = v.events.firstNotNullOfOrNull { COIN_IN_EVENT.find(it)?.groupValues?.get(1)?.toIntOrNull() }
+                    emit("adventure-completed", result = "summary=${AdventureParser.summarise(v.events)} coins=$coins events=${v.events.joinToString("|")}")
+                    this@PetAdventureFlow.phase = AdventurePhase.FINISHED
+                    AdventureOutcome.Completed(
+                        mode = mode,
+                        eventSummary = AdventureParser.summarise(v.events),
+                        coinAward = coins,
+                        itemsAwarded = AdventureParser.foundItems(v.events),
+                    )
+                }
+                is AdventureWatch.Verdict.Settled -> {
+                    this@PetAdventureFlow.phase = AdventurePhase.RESULT_CONFIRMED
+                    emit("adventure-completed", result = "summary=${v.result.summary} coins=${v.result.coinAward}")
+                    this@PetAdventureFlow.phase = AdventurePhase.FINISHED
+                    AdventureOutcome.Completed(mode, v.result.summary, v.result.coinAward, v.result.items)
+                }
+                is AdventureWatch.Verdict.TooLong -> {
+                    // 诗和远方要 2 小时：不守着，宠物在游戏里继续跑，结果之后在游戏里看
+                    emit("adventure-result-pending", result = "remainingSec=${v.remainingSec}")
+                    AdventureOutcome.Started(mode, startedAt, v.remainingSec / 60 + 1)
+                }
+                else -> {
+                    this@PetAdventureFlow.phase = AdventurePhase.FAILED
+                    emit("adventure-timeout", result = "sawPanel=${watch.sawProgress} remaining=${watch.lastRemainingSec}")
+                    AdventureOutcome.Failed("ADVENTURE_SETTLEMENT_TIMEOUT")
+                }
             }
         } catch (t: Throwable) {
             this@PetAdventureFlow.phase = AdventurePhase.FAILED

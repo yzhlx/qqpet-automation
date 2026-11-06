@@ -1402,12 +1402,14 @@ class PetNavigation(private val flow: PetFlowContext, private val workReader: Wo
 
     suspend fun enterPetApp(label: String) = with(flow) {
         var historyTaps = 0
+        var tabTaps = 0
         var acted = false
         var searchPageSeen = false
         repeat(6) { step ->
             var screen = PetReentry.Screen.UNKNOWN
             var historyPoint: Pair<Float, Float>? = null
             var historySource = ""
+            var messageTabPoint: Pair<Float, Float>? = null
             // The first frame is judged at once; after a tap the next page is still arriving, so an
             // unrecognised frame is retried until the settle deadline before the chain gives up.
             val deadline = SystemClock.elapsedRealtime() + if(acted) ENTER_SETTLE_MS else 0L
@@ -1435,20 +1437,25 @@ class PetNavigation(private val flow: PetFlowContext, private val workReader: Wo
                                 // fresh frame, before it counts as unrecognised.
                                 var point: Pair<Float, Float>? = null
                                 var reads = 0
-                                while(point == null && reads < ENTRY_OCR_READS) {
+                                while(point == null && messageTabPoint == null && reads < ENTRY_OCR_READS) {
                                     if(reads > 0) delay(ENTRY_OCR_GAP_MS)
                                     val lines = entryPageLines(label + "-enter-page-ocr")
                                     reads++
                                     if(PetEntryText.isSearchPage(lines)) {
                                         searchPageSeen = true
                                         point = PetEntryText.historyWordPoint(lines)
+                                    } else {
+                                        // QQ left on another tab (联系人, 动态…): its bottom bar carries a
+                                        // 消息 label that brings the message page back.
+                                        messageTabPoint = PetEntryText.messageTabPoint(lines)
                                     }
                                 }
                                 if(point != null) {
                                     historyPoint = point
                                     historySource = "ocr"
                                     PetReentry.Screen.SEARCH_HISTORY_PET
-                                } else PetReentry.Screen.UNKNOWN
+                                } else if(messageTabPoint != null) PetReentry.Screen.OTHER_TAB
+                                else PetReentry.Screen.UNKNOWN
                             }
                         }
                     }
@@ -1456,8 +1463,14 @@ class PetNavigation(private val flow: PetFlowContext, private val workReader: Wo
                 if(screen != PetReentry.Screen.UNKNOWN || SystemClock.elapsedRealtime() >= deadline) break
                 delay(ENTER_POLL_MS)
             }
-            when(PetReentry.next(screen, historyTaps)) {
+            when(PetReentry.next(screen, historyTaps, tabTaps)) {
                 PetReentry.Action.DONE -> return@with
+                PetReentry.Action.TAP_MESSAGE_TAB -> {
+                    tabTaps++
+                    val (x, y) = checkNotNull(messageTabPoint) { "ENTER_PET_TAB_POINT_MISSING" }
+                    emit(label + "-enter-message-tab", null, "tabTaps=" + tabTaps + ",tap=" + x.toInt() + "," + y.toInt())
+                    safety(); input.tap(x, y); acted = true; delay(profile.pageSettleMs)
+                }
                 PetReentry.Action.OPEN_SEARCH -> {
                     emit(label + "-enter-open-search", null, "MESSAGE_SEARCH_BOX")
                     safety(); input.tap(360f, 271f); acted = true; delay(profile.pageSettleMs)
@@ -1775,9 +1788,24 @@ class PetNavigation(private val flow: PetFlowContext, private val workReader: Wo
                 }
                 // QQ's search page with the 宠物 word somewhere other than the template's slot has no
                 // template of its own; its text identifies it, and the enter chain finds the word.
-                if(PetEntryText.isSearchPage(entryPageLines("initial-page-ocr"))) {
+                val pageLines=entryPageLines("initial-page-ocr")
+                if(PetEntryText.isSearchPage(pageLines)) {
                     emit("initial-page-qq-search-text",null,"QQ_SEARCH_PAGE")
                     return@with enterPetApp("initial")
+                }
+                // QQ left on another tab (联系人, 频道, 动态): measured 2026-11-07 02:44 the session
+                // stopped here after four looks. The tab bar names itself on the page, and one tap on
+                // its 消息 label brings back the message page the chain starts from.
+                if(PetEntryText.messageTabPoint(pageLines)!=null) {
+                    emit("initial-page-qq-other-tab",null,"QQ_OTHER_TAB")
+                    return@with enterPetApp("initial")
+                }
+                // A session that stopped on the adventure sheet (stopped by hand, or the app was
+                // killed while it was open) leaves the pet there. The sheet names itself by its two
+                // mode cards, so it is positively identified before any back tap is spent.
+                if(AdventureParser.isAdventurePage(pageLines)) {
+                    emit("initial-page-adventure-sheet",null,"ADVENTURE_SHEET")
+                    return@with walkBackToRoom("initial-leave-adventure")
                 }
                 val town=workReader?.let { readTownPage(it) }
                 if(town==null) {
@@ -1835,6 +1863,34 @@ class PetNavigation(private val flow: PetFlowContext, private val workReader: Wo
                     page=awaitTownExitPage()
                 }
                 TownExitPolicy.Step.STOP -> error("TOWN_EXIT_UNCONFIRMED_AFTER_${hops}_BACKS")
+            }
+        }
+    }
+    /**
+     * Walks back to the room from whatever pet page a flow ended up on, judged only by what the
+     * screen shows: the room is done, the outdoor map goes home by its own arrow, and anything else
+     * (an adventure sheet, the career town, one of its job sheets) gets a back tap and a fresh look.
+     *
+     * Measured 2026-11-07: the adventure entry tap landed on the career town, and the old recovery
+     * (one back tap, then "the page must be the outdoor map") stopped the session with
+     * RETURN_HOME_UNRECOVERED while the pet stood in the town. The back count is bounded and every
+     * hop is followed by a fresh classification, so a page that never leaves stops the session
+     * instead of tapping on.
+     */
+    suspend fun walkBackToRoom(label: String) = with(flow) {
+        emit("$label-walk-back",null,"START")
+        var hops=0
+        var page=townExitPage()
+        while(true) {
+            when(TownExitPolicy.next(page,hops,TOWN_EXIT_MAX_HOPS)) {
+                TownExitPolicy.Step.DONE -> return@with
+                TownExitPolicy.Step.LEAVE_MAP -> return@with returnHomeFromMap(label)
+                TownExitPolicy.Step.BACK -> {
+                    safety();input.tap(BACK_X,BACK_Y);delay(profile.pageSettleMs);hops++
+                    emit("$label-walk-back-hop",null,"hop=$hops")
+                    page=awaitTownExitPage()
+                }
+                TownExitPolicy.Step.STOP -> error("WALK_BACK_UNCONFIRMED_AFTER_${hops}_BACKS:$label")
             }
         }
     }

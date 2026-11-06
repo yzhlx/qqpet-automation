@@ -335,9 +335,23 @@ object WorkPageParser {
             return intArrayOf(top, bottom, left, right)
         }
 
+        // A label that one OCR line holds on its own is located by THAT line. Measured 2026-11-07
+        // (real device, 冒险 on the outdoor map): ML Kit hands the lines over in block order, not
+        // top-to-bottom, so the gap rule below saw a negative gap between 冒险 (y 1170) and 职业小镇
+        // (y 822), folded both into one run and tapped the centre of their union - on the town
+        // island, which opened the career town instead of the adventure sheet. An exact line is
+        // the label itself, and a line that merely contains it is the next best thing.
+        val compact = lines.filter { it.text.isNotBlank() }
+        compact.firstOrNull { it.text.filterNot { c -> c.isWhitespace() } == label }?.let { return bounds(listOf(it)) }
+        compact.firstOrNull { it.text.contains(label) }?.let { return bounds(listOf(it)) }
+
+        // A label ML Kit split over several lines (职业 / 小镇) is joined from neighbours only, and the
+        // neighbours are found in reading order: rows first (tops within a few pixels are one row),
+        // then left to right. Unsorted input must never produce a "gap" that is really an overlap.
+        val ordered = lines.sortedWith(compareBy({ it.bounds.top / ROW_BUCKET_PX }, { it.bounds.left }))
         val run = mutableListOf<TextLine>()
         var lastBottom = -1
-        for (line in lines) {
+        for (line in ordered) {
             if (run.isNotEmpty() && line.bounds.top - lastBottom > joinedLineGapPx) {
                 if (run.joinToString("") { it.text }.contains(label)) return bounds(run)
                 run.clear()
@@ -443,4 +457,7 @@ object WorkPageParser {
 
     /** Max vertical gap between consecutive lines that still form one joined label run. */
     const val JOINED_LINE_GAP_PX = 18
+
+    /** Lines whose tops fall in the same bucket of this height read as one row, left to right. */
+    const val ROW_BUCKET_PX = 12
 }

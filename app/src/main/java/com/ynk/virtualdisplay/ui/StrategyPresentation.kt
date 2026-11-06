@@ -86,11 +86,24 @@ object StrategyPresentation {
             reason.contains("PAGE_MISMATCH", true) -> "页面对不上"
             reason.startsWith("ENTER_PET_NO_HISTORY_WORD", true) -> "QQ 最近搜索里没有「宠物」"
             reason.startsWith("ENTER_PET_", true) || reason.contains("INITIAL_PAGE_UNKNOWN", true) -> "没能进入宠物房间"
+            reason.contains("FRAME_NOT_READY", true) || reason.contains("INVALID_BLACK_FRAME", true) ||
+                reason.contains("CAPTURE_INVALID", true) -> "后台画面是空的，QQ 可能被关掉了"
             reason.contains("OCR_TIMEOUT", true) || reason.contains("BUTTON_NOT_FOUND", true) -> "没找到界面上的目标"
             reason.contains("PERMISSION_DENIED", true) || reason.contains("SHIZUKU", true) -> "系统授权不足"
             reason.contains("USER_STOP", true) || reason.contains("MANUAL_PAUSE", true) -> "你停掉了这一轮"
+            // A health reading that expired, was out of range or was not good enough to start on: the run
+            // stopped by the safety rule, so say that in words (2026-11-07: the card showed the raw code).
+            reason.startsWith("HEALTH_", true) -> "没能确认宠物当前的体力和清洁"
+            reason.contains("PHONE_LOCKED", true) -> "手机锁屏了"
+            reason.contains("CAPTURE_TIMEOUT", true) -> "后台画面没有及时返回"
             reason.contains("NO_EXECUTOR_FOR", true) -> "这个动作还没有可用的实现"
             reason.contains("WORK_", true) -> "打工没有完成"
+            reason.startsWith("RETURN_HOME_UNRECOVERED", true) || reason.startsWith("WALK_BACK_UNCONFIRMED", true) ||
+                reason.startsWith("TOWN_EXIT", true) -> "没能自动退回宠物房间"
+            reason.contains("ADVENTURE_PAGE_NOT_CONFIRMED", true) -> "没能打开冒险面板"
+            reason.contains("ADVENTURE_ALREADY_RUNNING", true) -> "宠物还在冒险，等它回来再试"
+            reason.contains("ADVENTURE_RESULT_PENDING", true) -> "宠物出发了，结果回房间后在游戏里看"
+            reason.contains("ADVENTURE_SETTLEMENT_TIMEOUT", true) -> "没看到宠物冒险回来，请在游戏里确认"
             reason.contains("ADVENTURE_", true) -> "冒险没有完成"
             else -> reason
         }

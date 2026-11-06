@@ -38,6 +38,13 @@ class PetReentryTest {
             PetReentry.next(PetReentry.Screen.UNKNOWN, historyTaps = 0))
     }
 
+    @Test fun anotherQqTabGoesBackToTheMessageTabOnce() {
+        assertEquals(PetReentry.Action.TAP_MESSAGE_TAB,
+            PetReentry.next(PetReentry.Screen.OTHER_TAB, historyTaps = 0, tabTaps = 0))
+        assertEquals(PetReentry.Action.STOP,
+            PetReentry.next(PetReentry.Screen.OTHER_TAB, historyTaps = 0, tabTaps = PetReentry.MAX_TAB_TAPS))
+    }
+
     @Test fun historyTapsAreBounded() {
         assertEquals(PetReentry.Action.STOP,
             PetReentry.next(PetReentry.Screen.SEARCH_HISTORY_PET,

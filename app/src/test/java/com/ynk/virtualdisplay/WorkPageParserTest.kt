@@ -448,6 +448,49 @@ class WorkPageParserTest {
     }
 
     @Test
+    fun `aLineInBlockOrderDoesNotFoldFarApartLabelsIntoOneRun`() {
+        // THE bug (measured 2026-11-07, real device, outdoor map): ML Kit hands lines over in block
+        // order, so 冒险 (y 1170) came before 职业小镇 (y 822). The gap 822 - 1197 is NEGATIVE, so
+        // the old rule joined them and the tap went to the centre of their union, on the town island.
+        val lines = listOf(
+            line("冒险", 289, 1170, 342, 1197),
+            line("职业小镇", 513, 822, 623, 849),
+            line("宠物学园", 144, 621, 253, 648),
+            line("出门", 330, 140, 390, 180),
+        )
+        val hit = WorkPageParser.locateJoinedRun(lines, "冒险")!!
+        assertEquals(1170, hit[0])
+        assertEquals(1197, hit[1])
+        assertEquals(289, hit[2])
+        assertEquals(342, hit[3])
+    }
+
+    @Test
+    fun `aSplitLabelIsStillJoinedWhenTheLinesComeInBlockOrder`() {
+        val lines = listOf(
+            line("小镇", 575, 823, 623, 848),
+            line("冒险", 289, 1170, 342, 1197),
+            line("职业", 513, 822, 570, 849),
+        )
+        val hit = WorkPageParser.locateJoinedRun(lines, "职业小镇")!!
+        assertEquals(822, hit[0])
+        assertEquals(849, hit[1])
+        assertEquals(513, hit[2])
+        assertEquals(623, hit[3])
+    }
+
+    @Test
+    fun `anExactLineBeatsALongerLineThatMerelyContainsTheLabel`() {
+        val lines = listOf(
+            line("开始你的冒险吧", 100, 300, 600, 340),
+            line("冒险", 289, 1170, 342, 1197),
+        )
+        val hit = WorkPageParser.locateJoinedRun(lines, "冒险")!!
+        assertEquals(1170, hit[0])
+        assertEquals(289, hit[2])
+    }
+
+    @Test
     fun `anAbsentLabelHasNoJoinedRun`() {
         assertNull(WorkPageParser.locateJoinedRun(listOf(line("冒险", 289, 1170, 342, 1197)), "职业小镇"))
     }

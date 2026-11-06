@@ -62,4 +62,32 @@ class PetDisplayPickerTest {
         assertEquals(setOf(0), PetDisplayPicker.displaysHosting(dumpsys, "com.huawei.android.launcher"))
         assertEquals(emptySet<Int>(), PetDisplayPicker.displaysHosting("", "com.tencent.mobileqq"))
     }
+
+    /**
+     * Real `dumpsys activity activities` of the phone 2026-11-07 02:17 with QQ gone from pet screen 49
+     * (lines trimmed to the ones that matter, order kept). The orientation bookkeeping line still names
+     * a QQ activity, but with task id -1: it is in no task, so QQ is on no screen.
+     */
+    @Test fun aLeftoverRecordWithoutATaskDoesNotCountAsQqBeingOnTheScreen() {
+        val dumpsys = """
+            Display #0 (activities from top to bottom):
+                mResumedActivity: ActivityRecord{b28b8ea u0 com.ynk.virtualdisplay/.ui.main.MainActivity t2762}
+                  mLastFocusedRootTask=Task{da7be29 #2760 type=standard A=10230:com.tencent.mobileqq U=0 visible=false mode=fullscreen translucent=true sz=0}
+            Display #49 (activities from top to bottom):
+              mLastOrientationSource=DefaultTaskDisplayArea@105441358
+              deepestLastOrientationSource=ActivityRecord{65ba6f3 u0 com.tencent.mobileqq/.activity.SplashActivity t-1 f}}
+        """.trimIndent()
+        val hosting = PetDisplayPicker.displaysHosting(dumpsys, "com.tencent.mobileqq")
+        assertEquals(emptySet<Int>(), hosting)
+        assertTrue(PetDisplayPicker.shouldRelaunchQq(hosting))
+    }
+
+    @Test fun qqIsRelaunchedOnlyWhenItIsOnNoScreenAtAll() {
+        assertTrue(PetDisplayPicker.shouldRelaunchQq(emptySet()))
+        // On the pet screen already: nothing to do.
+        assertFalse(PetDisplayPicker.shouldRelaunchQq(setOf(49)))
+        // On the phone's own screen (the user is in QQ): launching it onto the pet screen would pull
+        // it away from them, so it is left alone and the session reports what it sees.
+        assertFalse(PetDisplayPicker.shouldRelaunchQq(setOf(0)))
+    }
 }

@@ -83,6 +83,10 @@ object RecordsPresentation {
         reason.startsWith("ENTER_PET_", true) || reason.contains("INITIAL_PAGE_UNKNOWN", true) ->
             "没能从 QQ 当前页面进入宠物房间，请把后台 QQ 停在「消息」页再开始"
         reason.contains("WALLET_COIN_REGION_UNREAD", true) -> "没读到金币数，请确认宠物房间顶部状态栏已显示"
+        // A pet screen that never produced a frame: QQ is not on it (closed, killed) or the screen died.
+        reason.contains("FRAME_NOT_READY", true) || reason.contains("INVALID_BLACK_FRAME", true) ||
+            reason.contains("CAPTURE_INVALID", true) ->
+            "后台画面是空的（QQ 可能被关掉了），请回主页点「一键创建」重新建一个后台画面再开始"
         reason.contains("OCR_TIMEOUT", true) || reason.contains("BUTTON_NOT_FOUND", true) -> "界面未识别目标按钮或入口，请确认 QQ 处于宠物页面"
         reason.contains("WORK_ALL_CANDIDATES_REFUSED", true) -> "候选打工岗位均未达到开工条件"
         reason.startsWith("WORK_NOT_STARTED", true) -> "条件不够，没有开始打工"
@@ -90,14 +94,22 @@ object RecordsPresentation {
         reason.contains("COINS_INSUFFICIENT", true) -> "金币余额不足以支付学费或开销"
         reason.contains("COOKIE_OUT_OF_STOCK", true) || reason.contains("SOAP_OUT_OF_STOCK", true) -> "背包护理道具不足"
         reason.contains("ADVENTURE_LIMIT", true) || reason.contains("ADVENTURE_ENTRY_NOT_FOUND", true) -> "冒险入口未找到或已达今日次数上限"
+        reason.contains("ADVENTURE_ALREADY_RUNNING", true) -> "宠物还在冒险，没有再开一次"
+        reason.contains("ADVENTURE_RESULT_PENDING", true) -> "宠物已出发（诗和远方约 2 小时），结果请回游戏查看"
+        reason.contains("ADVENTURE_SETTLEMENT_TIMEOUT", true) -> "没看到宠物冒险回来，请在游戏里确认"
+        reason.contains("ADVENTURE_PAGE_NOT_CONFIRMED", true) -> "没能打开冒险面板"
         reason.startsWith("ADVENTURE_", true) -> "冒险未完成或未到结算"
         reason.startsWith("WORK_", true) -> "打工未完成"
-        reason.startsWith("TOWN_EXIT", true) -> "没能回到宠物房间"
+        reason.startsWith("TOWN_EXIT", true) || reason.startsWith("RETURN_HOME_UNRECOVERED", true) ||
+            reason.startsWith("WALK_BACK_UNCONFIRMED", true) -> "没能自动退回宠物房间，请回主页重新开始"
         reason.startsWith("PLAN_", true) -> "方案条件不满足"
         reason.contains("QQ_NOT_READY", true) || reason.contains("ROOM_UNCONFIRMED", true) -> "QQ 宠物未处于房间状态，请先在后台拉起 QQ"
         reason.contains("EXCHANGE_DIALOG_UNCONFIRMED", true) -> "兑换面板没有显示完整，请先回到宠物房间再重新打开兑换"
         reason.contains("EXCHANGE_QUANTITY_UNREADABLE", true) || reason.contains("EXCHANGE_TOTAL_UNREADABLE", true) -> "兑换面板上的数字没看清，请重新打开兑换面板再试一次"
         reason.contains("EXCHANGE_PRODUCT_UNCONFIRMED", true) -> "兑换面板里选中的商品不对，已停止购买，请重新进入兑换"
+        reason.startsWith("HEALTH_", true) -> "没能确认宠物当前的体力和清洁，已按安全规则停下，请重新开始"
+        reason.contains("PHONE_LOCKED", true) -> "手机锁屏了，请保持屏幕亮起再开始"
+        reason.contains("CAPTURE_TIMEOUT", true) -> "后台画面没有及时返回，请重新开始；反复出现就回主页点「一键创建」"
         reason.contains("BUDGET", true) -> "今天蟹累了，明天再来"
         else -> "中途停止"
     }

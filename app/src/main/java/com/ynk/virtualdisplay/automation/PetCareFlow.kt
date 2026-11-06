@@ -326,6 +326,9 @@ class PetCareFlow(private val flow: PetFlowContext,private val navigation: PetNa
         // was measured on a pet that already sat at 84-91, so a pet that starts at 16 could never
         // reach a 70 threshold with it: the loop stopped with FEED_RETRY_LIMIT while the
         // threshold still asked for more (measured 2026-10-20, 16 体力 / 0 清洁, 70/70 plan).
+        // The allowance is sized on a reading that may be older than the window by the time care
+        // starts (a long shift or lesson just before); take a fresh one instead of throwing HEALTH_STALE.
+        if(h.isStale()) h=readHealth("feed-health-fresh")
         val feedLimit=CareAllowance.feedLimit(h.energy,energyThreshold)
         while(true) {
             // A care iteration can exceed the freshness window (a purchase plus a long gesture), so

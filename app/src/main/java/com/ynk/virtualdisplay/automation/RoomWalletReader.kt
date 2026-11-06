@@ -34,6 +34,13 @@ object RoomWalletParser {
     private val DIGITS = Regex("""^\d{1,6}$""")
 
     /**
+     * A crop read that found nothing or hit the crop's edge may still be a readable balance on the
+     * full frame. Anything else (wrong frame size, ambiguous, OCR failure) is not worth a second try.
+     */
+    fun worthFullFrameRead(reason: String): Boolean =
+        reason.startsWith("WALLET_CROP_TRUNCATED_DIGIT") || reason.startsWith("WALLET_COIN_REGION_UNREAD")
+
+    /**
      * Picks the coin number out of one frame's recognised lines.
      *
      * A line counts only when its centre falls inside the coin region AND its text is nothing but
@@ -135,10 +142,22 @@ object ExchangeWalletParser {
 
 /** Local OCR only. The caller has verified room identity, or passes same-frame dialog proof. */
 class DeviceWalletReader(private val reader: CourseNameReader) : WalletReader {
-    override fun read(openedFrame: Bitmap, observedAt: Long, evidence: String): ObservedValue<Int> =
-        readLocal(openedFrame,android.graphics.Rect(500,230,566,292),observedAt,evidence) { lines ->
+    override fun read(openedFrame: Bitmap, observedAt: Long, evidence: String): ObservedValue<Int> {
+        val local=readLocal(openedFrame,android.graphics.Rect(500,230,566,292),observedAt,evidence) { lines ->
             RoomWalletParser.parse(lines,openedFrame.width,openedFrame.height,observedAt,evidence)
         }
+        if(local !is ObservedValue.Unknown || !RoomWalletParser.worthFullFrameRead(local.reason)) return local
+        // The number is centred in its pill, so it grows to both sides: a 3-digit balance starts at
+        // x~499 and a 4-digit one at ~487, left of this crop's edge at 500 (measured 2026-11-07:
+        // "606" read WALLET_CROP_TRUNCATED_DIGIT five times in a row, while "636" read fine). Reading
+        // the whole frame and keeping only a digit-only line centred on the pill has no such edge.
+        return try {
+            RoomWalletParser.parse(reader.read(openedFrame),openedFrame.width,openedFrame.height,observedAt,evidence)
+        } catch(t: Exception) {
+            if(t is kotlinx.coroutines.CancellationException) throw t
+            local
+        }
+    }
 
     fun readExchange(openedFrame: Bitmap, observedAt: Long, evidence: String,
         pageIdentityVerified: Boolean, drift: Int = 0): ObservedValue<Int> {

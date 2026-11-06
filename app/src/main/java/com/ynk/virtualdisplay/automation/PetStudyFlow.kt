@@ -170,7 +170,7 @@ class PetStudyFlow(private val flow: PetFlowContext,private val navigation: PetN
             if(first==null) {first=offset;burstStartedAt=SystemClock.elapsedRealtime()}
             last=offset;sent++;ledger.encouraged(round)
             emit("high-five-$sent",s,JSONObject().put("action","HIGH_FIVE_BURST")
-                .put("displayId",4).put("tapIndex",sent).put("tapLimit",10)
+                .put("displayId",capture.targetDisplayId).put("tapIndex",sent).put("tapLimit",10)
                 .put("targetSelected",true).put("currentTargetScore",s).put("offsetMs",offset)
                 .put("result","INPUT_SENT_BUSINESS_UNCONFIRMED").toString())
             awaitLearningPanel("high-five-$sent-after", null).recycle()
