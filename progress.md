@@ -947,3 +947,37 @@
 1. 把「搜索页点历史词『宠物』」这条已验证入口固化进 `PetNavigation`：现在的 `reenterPetApp` 假设 VD 停在 QQ 搜索结果页并盲点 (98,502)；本轮证明更稳的前置是「消息页 → 搜索框 → 最近搜索历史词」，需要决定是把它做成 App 内的恢复入口，还是继续作为人工前置。这属于实现决策，本轮按功能冻结原则**只做记录，不改代码**。
 2. 跑 `RoomPageProbeSkinTest`（本机 `gradlew :app:testDebugUnitTest --tests com.ynk.virtualdisplay.RoomPageProbeSkinTest`，注意包名是 `com.ynk.virtualdisplay` 不是 `.automation`，且 Z: 映射盘已不存在，需用完整工作树路径 + JAVA_HOME=Android Studio jbr）。
 3. 全量回归 1090 项（同一条命令去掉 --tests）。
+
+---
+
+## 2026-11-06 第三轮：测试环境对抗性审查结论（功能冻结中）
+
+本轮不改任何产品代码，只定位「gradlew :app:testDebugUnitTest 反复报 Test process encountered an unexpected problem / Could not execute test class RoomPageProbeSkinTest」的根因，并给出已验证的替代验证路径。
+
+### 根因（环境，非代码缺陷）
+
+1. `gt12.log` 的 `--stacktrace` 显示底层是 `java.lang.ClassNotFoundException: com.ynk.virtualdisplay.RoomPageProbeSkinTest`。
+2. 该测试类的 `.class` 实际产物在 `app/build/intermediates/built_in_kotlinc/debugUnitTest/compileDebugUnitTestKotlin/classes/`，而 Gradle Test worker 的 classpath 仍指向旧布局 `app/build/tmp/kotlin-classes/debugUnitTest/`，目录为空，fork 的 JVM 找不到类，于是 TestWorkerFailureException。
+3. 任何 `--rerun-tasks` 或删掉产物目录强制重编译的恢复动作，都会触发 `:app:compileDebugAidl` 在中文工作树路径下的 `java.nio.charset.MalformedInputException: Input length = 1`（见 `gt13.log` / `gt14.log`），无法走通。这是环境级阻塞：中文路径 + 新版 Kotlin/AGP 的 `built_in_kotlinc` 产物布局 + AIDL 编码三者叠加，不能通过改构建脚本低风险绕过（且本轮功能冻结，不顺带改构建配置）。
+
+### 已验证的替代验证路径（直接 JUnitCore，绕开 Gradle Test worker）
+
+- 命令形态（在 `app/` 目录、JAVA_HOME=Android Studio jbr 下）：
+
+```
+java -cp "<built_in_kotlinc debugUnitTest classes>;<built_in_kotlinc debug classes>;app/src/test/resources;junit-4.13.2.jar;hamcrest-core-1.3.jar;kotlin-stdlib-2.2.21.jar" org.junit.runner.JUnitCore com.ynk.virtualdisplay.RoomPageProbeSkinTest
+```
+
+- `RoomPageProbeSkinTest` 结果：`JUnit version 4.13.2 / ........... / Time: 0.79 / OK (11 tests)`。11/11 通过，证明该测试类与其覆盖的多皮肤 room 模板逻辑在当前代码下是绿的，之前的 Gradle 失败纯属环境。
+- 注：跑全量 117 个测试类时，`PetLogTimelineTest` 与 `PetStudyStartRegressionTest` 两个源码文件存在但未编译出 `.class`（增量编译对这两个文件失效），JUnitCore 报 ClassNotFound。这两个类在本轮之前的全量回归基线里是否已含尚不确定，需待 Gradle 环境恢复后重跑确认；本轮按功能冻结原则不改代码、不重编。
+
+### 本轮状态改动
+
+- `RoomPageProbeSkinTest`：Gradle 路径 = BLOCKED（环境）；直接 JUnitCore 路径 = **PASS（11/11）**。
+- 其余护理 / 健康检查 / room 猫皮模板：维持上一轮的 **PASS**（真机证据见上节）。
+
+### 下一条具体动作
+
+1. （环境）把中文工作树路径迁到纯 ASCII，或给 AIDL 任务显式指定 `-Dfile.encoding=UTF-8` / 修 AGP 编码，让 `:app:compileDebugAidl` 在中文路径下不再 MalformedInputException；恢复后用 `gradlew :app:testDebugUnitTest` 重跑全量回归，确认 `PetLogTimelineTest` / `PetStudyStartRegressionTest` 编译归属。
+2. （实现决策，冻结中只记录）把「搜索页点历史词『宠物』」固化进 `PetNavigation.reenterPetApp` 前置。
+3. PR #4 描述可补本轮「RoomPageProbeSkinTest 直接 JUnitCore 11/11 PASS」作为验证补充。
