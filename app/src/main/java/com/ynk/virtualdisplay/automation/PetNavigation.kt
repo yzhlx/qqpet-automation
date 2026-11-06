@@ -619,6 +619,13 @@ class PetNavigation(private val flow: PetFlowContext, private val workReader: Wo
         private const val TOWN_EXIT_POLL_MS=300L
         private const val TOWN_READ_ATTEMPTS=3
         private const val TOWN_READ_RETRY_MS=900L
+        /**
+         * Cold-start entry: after a tap the next QQ page slides in (search page) or the pet
+         * mini-program boots (room), so an unrecognised frame is retried this long, every
+         * [ENTER_POLL_MS], before the chain declares the page unknown.
+         */
+        const val ENTER_SETTLE_MS=12000L
+        const val ENTER_POLL_MS=400L
 
         /**
          * How far either side of a candidate's OWN measured width the window width is swept.
@@ -1349,48 +1356,76 @@ class PetNavigation(private val flow: PetFlowContext, private val workReader: Wo
      * message tab, used when a fresh virtual display starts on QQ but the pet app was never
      * opened: message search box -> search page -> history word -> pet function row -> room.
      *
-     * MEASURED 2026-11-06 VD47 (720x1600): the search box is at [235,244,485,298); one tap
-     * opens the search page. The recent-searches word is at [28,731,88,772); one tap fills
-     * the box (shell text injection throws NullPointerException, so the history word is the only
-     * text path) and the pet function row appears. One tap on its orange icon at (98,502) lands
-     * on the pet ROOM page.
+     * MEASURED 2026-11-06 (720x1600): the message-tab search box has two layouts (centre y 250
+     * or 272); one tap at (360,271), inside both, opens the search page. Once the page has
+     * SETTLED the recent-searches word sits at [28,612,88,653); one tap fills the box (shell
+     * text injection throws NullPointerException, so the history word is the only text path)
+     * and the pet function row appears. One tap on its orange icon at (98,502) lands on the
+     * pet ROOM page.
+     *
+     * The first measurement of the history word (y 751) was taken from a frame captured while
+     * the search page was still sliding in, so the shipped template and tap were 119 px off and
+     * the chain stopped on the real, settled page (session 01:15). Two consequences here:
+     *  - after every tap the chain WAITS for the next page to be recognised (up to
+     *    [ENTER_SETTLE_MS]) instead of judging the very next frame: the page animates in and the
+     *    mini-program needs a few seconds to boot;
+     *  - the history tap follows the template's measured vertical drift rather than a fixed y.
      *
      * The results page is proven by EITHER host template. Replaying the shipping matcher over a
      * real VD47 results frame (measured 2026-11-06) put the row template alone at 0.751 there -
      * the pet - function row sits about 111 px higher on this layout than on the 2026-11-03
      * frame it was cropped from - while qqHostSearch scored 1.000. Judging the page on the row
-     * template alone would read a real results page as UNKNOWN and stop the chain.\n     * Every step is anchored on a template probe before any tap: the action for the CURRENT
+     * template alone would read a real results page as UNKNOWN and stop the chain.
+     *
+     * Every step is anchored on a template probe before any tap: the action for the CURRENT
      * screen is [PetReentry.next], so an unknown page stops the chain instead of tapping into a
      * conversation. No swipe or unanchored coordinate is used.
      */
     suspend fun enterPetApp(label: String) = with(flow) {
         var historyTaps = 0
+        var acted = false
         repeat(6) { step ->
-            val current = frame()
-            val screen: PetReentry.Screen
-            try {
-                screen = when {
-                    score(current, roomProbes) >= profile.matchThreshold -> PetReentry.Screen.ROOM
-                    score(current, listOf(qqHostSearch, qqSearchPetRow)) >= profile.matchThreshold -> PetReentry.Screen.SEARCH_RESULT_PET
-                    score(current, listOf(qqSearchHistoryPet)) >= profile.matchThreshold -> PetReentry.Screen.SEARCH_HISTORY_PET
-                    score(current, listOf(qqMessageSearchBox)) >= profile.matchThreshold -> PetReentry.Screen.MESSAGE_SEARCH_BOX
-                    else -> PetReentry.Screen.UNKNOWN
-                }
-            } finally { current.recycle() }
+            var screen = PetReentry.Screen.UNKNOWN
+            var historyDrift = 0
+            // The first frame is judged at once; after a tap the next page is still arriving, so an
+            // unrecognised frame is retried until the settle deadline before the chain gives up.
+            val deadline = SystemClock.elapsedRealtime() + if(acted) ENTER_SETTLE_MS else 0L
+            while(true) {
+                val current = frame()
+                try {
+                    screen = when {
+                        score(current, roomProbes) >= profile.matchThreshold -> PetReentry.Screen.ROOM
+                        score(current, listOf(qqHostSearch, qqSearchPetRow)) >= profile.matchThreshold -> PetReentry.Screen.SEARCH_RESULT_PET
+                        else -> {
+                            val history = matchOptional(current, qqSearchHistoryPet)
+                            when {
+                                history.score >= profile.matchThreshold -> { historyDrift = history.drift; PetReentry.Screen.SEARCH_HISTORY_PET }
+                                score(current, qqMessageSearchBoxes) >= profile.matchThreshold -> PetReentry.Screen.MESSAGE_SEARCH_BOX
+                                else -> PetReentry.Screen.UNKNOWN
+                            }
+                        }
+                    }
+                } finally { current.recycle() }
+                if(screen != PetReentry.Screen.UNKNOWN || SystemClock.elapsedRealtime() >= deadline) break
+                delay(ENTER_POLL_MS)
+            }
             when(PetReentry.next(screen, historyTaps)) {
                 PetReentry.Action.DONE -> return@with
                 PetReentry.Action.OPEN_SEARCH -> {
                     emit(label + "-enter-open-search", null, "MESSAGE_SEARCH_BOX")
-                    safety(); input.tap(360f, 271f); delay(profile.pageSettleMs)
+                    safety(); input.tap(360f, 271f); acted = true; delay(profile.pageSettleMs)
                 }
                 PetReentry.Action.TAP_HISTORY_PET -> {
                     historyTaps++
-                    emit(label + "-enter-history-pet", null, "historyTaps=" + historyTaps)
-                    safety(); input.tap(58f, 751f); delay(profile.pageSettleMs)
+                    val r = qqSearchHistoryPet.rect
+                    val x = (r.left + r.right) / 2
+                    val y = (r.top + r.bottom) / 2 + historyDrift
+                    emit(label + "-enter-history-pet", null, "historyTaps=" + historyTaps + ",tap=" + x + "," + y)
+                    safety(); input.tap(x.toFloat(), y.toFloat()); acted = true; delay(profile.pageSettleMs)
                 }
                 PetReentry.Action.TAP_PET_ROW -> {
                     emit(label + "-enter-pet-row", null, "SEARCH_RESULT_PET")
-                    safety(); input.tap(98f, 502f); delay(profile.pageSettleMs)
+                    safety(); input.tap(98f, 502f); acted = true; delay(profile.pageSettleMs)
                 }
                 PetReentry.Action.STOP -> error("ENTER_PET_UNRECOVERED:" + label + ":screen=" + screen + ":step=" + step)
             }
@@ -1609,8 +1644,8 @@ class PetNavigation(private val flow: PetFlowContext, private val workReader: Wo
         val sOutdoor=score(current,listOf(outdoor))
         val sResult=score(current,listOf(profile.resultProbe))
         val sHost=score(current,listOf(qqHostSearch,qqSearchPetRow))
-        val sMsgBox=score(current,listOf(qqMessageSearchBox))
-        val sHistory=score(current,listOf(qqSearchHistoryPet))
+        val sMsgBox=score(current,qqMessageSearchBoxes)
+        val sHistory=scoreOptional(current,qqSearchHistoryPet)
         val unknownDump=try {ByteArrayOutputStream().also {current.compress(Bitmap.CompressFormat.PNG,80,it)}} catch(t:Throwable) {null}
         val page=try {
             when {

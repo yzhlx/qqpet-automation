@@ -9,7 +9,7 @@ import org.junit.Test
  * so it is unit-tested here; the taps and template matching live in PetNavigation.enterPetApp.
  *
  * MEASURED 2026-11-06 VD47: message search box (360,271) opens the search page, the history word
- * "宠物" (58,751) fills the box, and the "宠物 - 功能" row icon (98,502) lands on the room. An
+ * "宠物" (58,632) fills the box, and the "宠物 - 功能" row icon (98,502) lands on the room. An
  * unknown page must STOP rather than tap into a QQ conversation.
  */
 class PetReentryTest {

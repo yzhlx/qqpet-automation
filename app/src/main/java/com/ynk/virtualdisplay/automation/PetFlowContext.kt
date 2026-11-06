@@ -10,6 +10,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.TimeoutCancellationException
 import org.json.JSONObject
 import java.io.File
+import java.io.FileNotFoundException
 
 class PetFlowContext(val context: Context, val capture: HeadlessDisplayCapture,
     val input: PetInputController, val evidence: File, val guard: () -> Unit,
@@ -49,9 +50,9 @@ class PetFlowContext(val context: Context, val capture: HeadlessDisplayCapture,
     val qqHostSearch = PetPageProbes.qqHostSearch
     val qqSearchPetRow = PetPageProbes.qqSearchPetRow
     val qqMessageSearchBox = PetPageProbes.qqMessageSearchBox
+    /** QQ message tab, proven by either of its two search-box layouts. */
+    val qqMessageSearchBoxes = PetPageProbes.qqMessageSearchBoxes
     val qqSearchHistoryPet = PetPageProbes.qqSearchHistoryPet
-    val qqSearchEmptyBox = PetPageProbes.qqSearchEmptyBox
-    val qqSearchSubmit = PetPageProbes.qqSearchSubmit
     val highFive = PetPageProbes.highFive
     val gradeA = PetPageProbes.gradeA
     val upgrade = PetPageProbes.upgrade
@@ -98,6 +99,20 @@ class PetFlowContext(val context: Context, val capture: HeadlessDisplayCapture,
     }
     fun score(frame: Bitmap, probes: List<PetProfile.Probe>) =
         probes.maxOf { matcher.match(frame,it,profile.matchThreshold).score }
+    /**
+     * [score] for a probe that only the QQ entry chain needs. A missing template reads as "this
+     * page is not shown" (0.0) instead of throwing, so an absent entry-chain asset can never
+     * stop a session that is already on the pet room; the miss is logged so it stays visible.
+     * [PetProbeAssetsTest] keeps the asset set complete at build time.
+     */
+    fun scoreOptional(frame: Bitmap, probe: PetProfile.Probe): Double = matchOptional(frame,probe).score
+    /** [scoreOptional] that also reports where the template sits ([TemplateMatcher.Result.drift]). */
+    fun matchOptional(frame: Bitmap, probe: PetProfile.Probe): TemplateMatcher.Result = try {
+        matcher.match(frame,probe,profile.matchThreshold)
+    } catch(t: FileNotFoundException) {
+        emit("template-missing:"+probe.assetPath,0.0,"SKIPPED")
+        TemplateMatcher.Result(false,0.0)
+    }
     fun healthDrift(frame: Bitmap) = matcher.match(frame,healthPanel,profile.matchThreshold).drift
     suspend fun verify(probes: List<PetProfile.Probe>, name: String, saveEvidence: Boolean = true, latest: Boolean = false): Double {
         val f = frame(latest)

@@ -206,28 +206,53 @@ object PetPageProbes {
     val qqMessageSearchBox = experimental("qq_message_search_box", 320, 244, 400, 298)
 
     /**
-     * QQ search page: the recent-searches history word. Measured 2026-11-06 VD47 at
-     * bounds [28,731,88,772), centre (58,751). Tapping it fills the search box (the box
-     * refuses injected text) and shows the pet function result row. Present only when the
-     * word is in the recent-searches list, which is the common case after one manual search.
+     * The QQ message tab has a SECOND search-box layout. Measured 2026-11-06 (cold start on VD48,
+     * session 01:04): the box sits at y 214-286 (centre 250) instead of y 237-307 (centre 272), a
+     * little wider, so [qqMessageSearchBox] only reached 0.92 there and the start died with
+     * INITIAL_PAGE_UNKNOWN on a perfectly ordinary message page. This is an exact raw-pixel crop
+     * (80x54) of that real frame; the ROI is centred on the box, 21 px above the first one.
+     *
+     * Replaying the shipping matcher over every recorded 720x1600 frame: 1.0000 on every message-
+     * tab frame of this layout (including the ones with the QQ-show banner or the "cannot receive
+     * notifications" strip below the box), at most 0.9202 on the other layout's message tab and
+     * at most 0.9156 on every non-message page (pet room, bath scene, contacts tab, QQ-space page,
+     * search page, search results page) - all under the 0.95 gate. [QqEntryProbeFixturesTest]
+     * pins this against real frames. A message tab is recognised when EITHER box
+     * template matches: [qqMessageSearchBoxes]. The tap target (360,271) lies inside both boxes.
      */
-    val qqSearchHistoryPet = experimental("qq_search_history_pet", 28, 731, 88, 772)
+    val qqMessageSearchBoxCompact = experimental("qq_message_search_box_compact", 320, 223, 400, 277)
+
+    /** Every shipped message-tab search-box layout; the tab is proven by whichever matches. */
+    val qqMessageSearchBoxes: List<PetProfile.Probe> = listOf(qqMessageSearchBox, qqMessageSearchBoxCompact)
 
     /**
-     * QQ search page: the empty search box shown before any history word is tapped, distinct
-     * from [qqMessageSearchBox] which sits on the message tab. Measured 2026-11-06 VD47.
+     * QQ search page: the recent-searches history word. Measured 2026-11-06 on the SETTLED page
+     * (VD48, 720x1600) at bounds [28,612,88,653), centre (58,632). Tapping it fills the search
+     * box (the box refuses injected text) and shows the pet function result row. Present only
+     * when the word is in the recent-searches list, which is the common case after one manual
+     * search.
+     *
+     * The asset is an exact raw-pixel crop (60x41) of the real settled search-page frame at this
+     * ROI. Replaying the shipping matcher (24x24 box mean, coarse vertical drifts) over every
+     * recorded 720x1600 frame: 1.0000 on the four settled search-page frames, 0.8645 on the
+     * frame captured while the page was still sliding in, and at most 0.8571 on the message
+     * list, contacts tab, search-results page, pet room, bath scene and the other QQ pages - a
+     * margin of more than 0.09 under the 0.95 gate. The tap follows the matched drift.
+     *
+     * 2026-11-06, two failures in a row on this probe:
+     *  - 1.0.195 shipped it WITHOUT its asset, so the start path threw FileNotFoundException on
+     *    every session ([PetProbeAssetsTest] now keeps that from recurring);
+     *  - the first crop (and the tap, y 751) came from a frame grabbed while the page was still
+     *    animating in, 119 px below where the settled page draws the word, so on the real page
+     *    the chain read UNKNOWN. [QqEntryProbeFixturesTest] pins both frames.
+     * The two sibling probes drafted next to it (empty search box, submit button) were never
+     * captured and their ROIs do not match the real search layout, so they were removed rather
+     * than left as landmines; capture them from a real frame if the no-history path is needed.
      */
-    val qqSearchEmptyBox = experimental("qq_search_empty_box", 48, 176, 672, 244)
-
-    /**
-     * QQ search page: the submit button that runs the box, for the cold start where no
-     * history word is available. Measured 2026-11-06 VD47 at bounds [648,179,708,237).
-     */
-    val qqSearchSubmit = experimental("qq_search_submit", 648, 179, 708, 237)
-
+    val qqSearchHistoryPet = experimental("qq_search_history_pet", 28, 612, 88, 653)
 
     fun byName(): Map<String, PetProfile.Probe> = listOf(
         home, room, healthPanel, cookie, foodScene, foodExchangeBubble, soap, bath, bathExchangeBubble, outdoor, academy, highFive,
-        gradeA, upgrade, careUpgradeHint, careUpgradeReward, qqHostSearch, qqSearchPetRow, qqMessageSearchBox, qqSearchHistoryPet, qqSearchEmptyBox, qqSearchSubmit,
+        gradeA, upgrade, careUpgradeHint, careUpgradeReward, qqHostSearch, qqSearchPetRow, qqMessageSearchBox, qqMessageSearchBoxCompact, qqSearchHistoryPet,
     ).associateBy { it.name }
 }
