@@ -981,3 +981,59 @@ java -cp "<built_in_kotlinc debugUnitTest classes>;<built_in_kotlinc debug class
 1. （环境）把中文工作树路径迁到纯 ASCII，或给 AIDL 任务显式指定 `-Dfile.encoding=UTF-8` / 修 AGP 编码，让 `:app:compileDebugAidl` 在中文路径下不再 MalformedInputException；恢复后用 `gradlew :app:testDebugUnitTest` 重跑全量回归，确认 `PetLogTimelineTest` / `PetStudyStartRegressionTest` 编译归属。
 2. （实现决策，冻结中只记录）把「搜索页点历史词『宠物』」固化进 `PetNavigation.reenterPetApp` 前置。
 3. PR #4 描述可补本轮「RoomPageProbeSkinTest 直接 JUnitCore 11/11 PASS」作为验证补充。
+
+
+## 更正与结案：JVM 回归已取得完整证据，Gradle test worker 为工具链缺陷（2026-11-06 第四轮）
+
+### 先更正上一条记录（commit 8fde211）的错误根因
+
+上一条写「Test worker 的 classpath 指向旧布局 tmp/kotlin-classes，目录为空」。**这个结论是错的**，特此更正。用外部 init script（不改仓库任何文件）打印 Gradle 自己的 test 任务属性，实测：
+
+- `Test.classpath` 共 **192 项**，第一项就是 `app\build\intermediates\built_in_kotlinc\debugUnitTest\compileDebugUnitTestKotlin\classes`，并包含 mockable `android.jar`、`kotlinx-coroutines`、`junit 4.13.2`、`R.jar`、`runtime_app_classes_jar`。
+- `Test.testClassesDirs` 指向同一个 `built_in_kotlinc\debugUnitTest\...\classes`，`exists=true`。
+- 任务实现类是 `com.android.build.gradle.tasks.factory.AndroidUnitTest_Decorated`。
+
+也就是说 Gradle 指的类目录和 jar 都对，worker 却报 `ClassNotFoundException`。问题在 Gradle 侧，不在项目 classpath。
+
+### 已证伪的假设（不要再走这些弯路）
+
+1. 「中文路径导致 classpath 被解码坏」：用 `New-Item -ItemType Junction` 建纯 ASCII 联接 `C:\wt-ascii` 从那里跑，Gradle 把路径规范化回中文后仍同样失败，不是路径编码问题。（实验联接已 `rmdir` 删除，工作树完好。）
+2. 「daemon 目录快照过期」：`gradlew --stop` 起全新 daemon 重跑，一样失败（`gt22.log`）。
+3. 「重编译能修好」：`--rerun-tasks` 会让 `:app:compileDebugAidl` 报 `MalformedInputException`；手动删 `built_in_kotlinc\debugUnitTest` 同样逼 AIDL 重跑并失败，之后 Gradle 无法再重建产物。**教训：不要删 `app\build\intermediates\built_in_kotlinc\debugUnitTest`。** 本轮删过一次，靠带 `-Dfile.encoding=UTF-8` 的单次调用恢复（`gt15.log` BUILD SUCCESSFUL）。
+4. 命令行传 `-Dorg.gradle.jvmargs=...` 会整体覆盖 `gradle.properties` 里的同名设置，把 `-Dfile.encoding=UTF-8` 与自定义 `-Djava.io.tmpdir` 一起丢掉，反而更坏（`gt16.log` 全部类失败）。
+
+### 结论：`:app:testDebugUnitTest` = BLOCKED（Gradle 9.3.1 + AGP AndroidUnitTest worker），不是产品缺陷
+
+### 可用且不依赖 Gradle worker 的验证配方（本轮据此拿到完整证据）
+
+1. 外部 init script 注册一个任务，把 `testDebugUnitTest` 的 `classpath` 写到文件（不改仓库文件）。
+2. 该 classpath 前置 `src/test/resources`，并把 `app\build` 前缀改成相对路径，写入 `java @argfile`（argfile 必须全 ASCII，否则 JVM 按 GBK 解码成乱码）。
+3. `java @argfile org.junit.runner.JUnitCore <类名列表>`，类名从已编译 `.class` 枚举（121 个 `*Test`），不要从 `.kt` 文件名推：`PetLogTimelineTest.kt` 里的类其实叫 `PetLogPresentationTest`，`PetStudyStartRegressionTest.kt` 里叫 `StudyStartRegressionTest`。
+
+### 本轮验证结果
+
+- **全量 JVM 回归：`OK (1116 tests)`，0 失败**（`junit-full4.log`，Time 165.9s）。高于历史基线 1090~1105，与新增测试数量一致。
+- `RoomPageProbeSkinTest` 单跑：`OK (11 tests)`（`junit-direct4.log`）。上一轮 620517f 的 room 多皮肤修复在 JVM 侧继续为绿。
+- 本轮未改任何产品代码，未改 `gradle.properties`、未改 `build.gradle.kts`，功能冻结保持有效；真机 PASS 结论（护理链路、健康检查、room 猫皮模板）不受影响。
+
+### 剩余阻塞与下一条具体动作
+
+- 阻塞：Gradle 自带 test worker 跑不起来（工具链）。影响仅限「不能用一条 `gradlew` 命令跑测试」，JVM 验证本身已由上述配方覆盖；真机验证仍按上一轮记录为 PASS。
+- 下一条（可选，属工具链修复，需先确认是否允许在功能冻结期动构建配置）：调整 AGP/Gradle 版本组合，或把 `kotlin.compiler.execution.strategy` 从 `in-process` 改回默认 `daemon`，看产物布局是否回到 worker 能识别的位置。改前先记基线，改后要能一键回退。
+- 下一条（产品侧实现决策）：把「搜索页点历史词『宠物』」固化进 `PetNavigation.reenterPetApp` 前置。
+
+
+### 复现命令（下次直接照做，勿再摸索）
+
+```
+工作树 : wt-ui-reskin 工作树；JAVA_HOME=C:\Program Files\Android\Android Studio\jbr
+1) 导出 classpath（外部 init script，不动仓库）：
+   gradlew :app:printTestClasspath --init-script C:\tmp\cp-init.gradle -Dfile.encoding=UTF-8
+   -> C:\tmp\tcp.txt（192 行绝对路径）
+2) 生成 ASCII argfile（在 app 目录下，把 app\build 前缀转相对路径；文件内不得有非 ASCII）：
+   C:\tmp\ja3.txt = -cp / <classpath> / org.junit.runner.JUnitCore / <121 个 *Test 类名>
+3) 跑：java "@C:\tmp\ja3.txt" > C:\tmp\junit-full4.log 2>&1
+   期望末行：OK (1116 tests)
+```
+
+注意：`:app:compileDebugAidl` 只在带 `-Dfile.encoding=UTF-8` 时能在中文路径下成功；`--rerun-tasks` 或删 `built_in_kotlinc` 都会触发它失败。
