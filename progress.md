@@ -899,3 +899,51 @@
   1. 在 VD47 所在的蟹啦虚拟屏画面里，手动完成「QQ 搜索 → 输入宠物 → 点功能行 → 进入房间」并停留；随后点蟹啦 App 的「护理」，拉 `files/pet-events/<sessionId>.jsonl` 确认 `open-health-after` 与护理前后读数变化；或
   2. 在 VD47 上把蟹啦 App 自带的引导流程走到「已进入宠物房间」，再触发护理。
   验收判据不变：猫皮设备下 `room` 或 `room_skin_cat` 探针 ≥ `matchThreshold`，且护理出现可观察状态变化；读不出就报 `BAR_UNCONFIRMED`，不得记成功。
+
+
+## 追加（对抗性审查轮 2026-11-06 第三轮：护理链路真机闭环 PASS）
+
+- 上一轮的 BLOCKED 已解除，根因找到并绕过：QQ 消息页搜索框接受 shell 文字注入失败，但**搜索页「最近搜索」里有历史词「宠物」**（bounds [28,731][88,772]），直接点它即可进搜索结果页，无需注入任何文字。路径：点搜索框 (360,271) → 点历史词「宠物」(58,751) → 结果页出现「宠物 - 功能」行 → 点橙色宠物图标 (98,502) → **进入宠物房间**。
+- 进入房间后 uiautomator（`--display 47`）实测到房间节点：等级胶囊/踩踩胶囊/金币胶囊/职业胶囊、喂食、洗澡、好友、出门、装扮、宠物资料、体力/清洁/心情。上一轮「Q宠 浮窗卡片点不动」的判断是错的——那张卡片是装饰层，真正入口在搜索结果页。
+- **认知纠正仍然成立**：用户说的「A进房间了」当时指的是物理屏 display 0 的 QQ 小程序浮窗，蟹啦抓的是 display 47，所以那次对验收无用；本轮改在 display 47 上真正打开房间后才拿到证据。
+
+### 健康检查（只读，无消耗）—— PASS
+
+会话 `037127e8-9e2f-4db4-9453-d19fc7c657c6`（mode=health_check, runsCare=false, 13:14）：
+
+- seq7 `CHECKPOINT phase=INITIAL_NAVIGATION trustedPage=room` → **房间模板在真机命中**，这是 620517f 猫皮多皮肤修复要验的那一步。
+- seq9 `session-initial-coins result=PASS reason=coins=612`。
+- seq11/14 `trustedPage=home` → `trustedPage=health`（点 (516,160) 进健康页，INPUT_SENT 带 authorizingFrameAgeMs=495 / freshnessBudgetMs=5000，帧是新的）。
+- seq16 `HEALTH_OBSERVED`：体力 83（confidence 0.9869791666666666）、清洁 76（0.9947916666666666）、心情 10（0.98177083333334），三条全部 `status=KNOWN` + `source=DIGIT_RECOGNITION`，证据文件 `pet_mvp_session/1793942057662/round-1-health-check.png`。**没有 BAR_UNCONFIRMED**。
+- seq21 `trustedPage=home`（点 (355,454) 返回成功）、seq22 `STOPPED reason=BATCH_COMPLETE`。
+- 上一轮 display 44 的 `PetHealthCheck` 真机 FAIL 在本设备不复现：读数、置信度、证据文件、页面链全部正确。
+
+### 护理（真实消耗游戏道具）—— PASS
+
+会话 `84a2e834-2257-473a-9e97-bef53835f701`（13:16 起，194 行事件，终态 `STOPPED reason=BATCH_COMPLETE`）：
+
+| seq | 阶段 | 体力 | 清洁 | 心情 |
+|---|---|---|---|---|
+| 16 | `round-1-before.png` | 83 | 76 | 10 |
+| 69 | `round-1-feed-health.png` | **93 (+10)** | 76 | 10 |
+| 117 | `round-1-clean-health.png` | 93 | **86 (+10)** | **11 (+1)** |
+| 168 | 第二次洗澡后 | 93 | **96 (+10)** | **12 (+1)** |
+| 187 | 终态复核 | 93 | 96 | 12 |
+
+- **这就是「操作已发起 / 操作已执行 / 结果已确认」三态里最后一态的直接证据**：护理前后游戏数值真的变了（+10/+10/+10 与游戏固定增益一致），不是靠点击成功或脚本结束推断。
+- 记账链路完整可核对：`feed-reserve RESERVED` → `purchase-reserve COOKIE unit_price=5 reason=feed-numeric-zero` → `purchase-paid total=5` → `feed-consume CONSUMED`；香皂同理两次（`purchase-reserve SOAP unit_price=2` ×2）。累计 `session_purchases=3`、`session_coins_spent=9`，上限 `max_purchases=34`/`max_coins=138`/`cookie_budget=12`/`soap_budget=22` 全程有记录。
+- 两次购买 reason 都是 `*-numeric-zero`（饼干/香皂数量确实是 0 才买），不是无脑买；体力到 93、清洁到 96 后停止，符合 energyThreshold=90 / cleanlinessThreshold=90，**没有过度执行**。
+- 本轮真实花费：3 次购买共 9 游戏币（1 饼干 + 2 香皂），宠物体力 83→93、清洁 76→96、心情 10→12。这是 goal 明确要求的护理闭环验收，未发起好友互动、未买付费道具。
+
+### 本轮状态改动
+
+- 护理链路：`BLOCKED` → **`PASS`**（真机执行 + 前后状态变化 + 记账 + 终态复核）。
+- 健康检查链路：上一轮 display 44 的 FAIL → 本设备 **`PASS`**。
+- `room` 猫皮模板：`UNVERIFIED` → **`PASS`**（`trustedPage=room` 在本设备本皮肤下命中）。
+- `session-initial-coins` 那条被写成 `kind=ERROR` 但 `result=PASS`，是既有分类噪声，不影响判定（既有已知问题，本轮不改）。
+
+### 下一条具体动作
+
+1. 把「搜索页点历史词『宠物』」这条已验证入口固化进 `PetNavigation`：现在的 `reenterPetApp` 假设 VD 停在 QQ 搜索结果页并盲点 (98,502)；本轮证明更稳的前置是「消息页 → 搜索框 → 最近搜索历史词」，需要决定是把它做成 App 内的恢复入口，还是继续作为人工前置。这属于实现决策，本轮按功能冻结原则**只做记录，不改代码**。
+2. 跑 `RoomPageProbeSkinTest`（本机 `gradlew :app:testDebugUnitTest --tests com.ynk.virtualdisplay.RoomPageProbeSkinTest`，注意包名是 `com.ynk.virtualdisplay` 不是 `.automation`，且 Z: 映射盘已不存在，需用完整工作树路径 + JAVA_HOME=Android Studio jbr）。
+3. 全量回归 1090 项（同一条命令去掉 --tests）。
