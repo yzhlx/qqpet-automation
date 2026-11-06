@@ -53,6 +53,30 @@ object PetPageProbes {
      * RoomPageProbeSkinTest locks all of this, including that the ROI did not move.
      */
     val room = experimental("room", 20, 720, 120, 840)
+    /**
+     * ROOM page IDENTITY, second skin: the cat room this account is on since 2026-11-06.
+     *
+     * The shipped room template is skin-bound (see [room]) and the account switched away from
+     * the halloween skin, so on the cat skin the shipped template measured 0.63 against the real
+     * room and every managed session died with INITIAL_PAGE_UNKNOWN with the pet room open on
+     * the virtual display (measured 2026-11-06 on virtual display 47).
+     *
+     * This template is an exact raw-pixel crop of that live cat-skin room frame at the SAME ROI
+     * (20,720,120,840), so the rescale branch is skipped exactly as it is for [room]. Replayed
+     * over the recorded frames it scores 1.0000 on the cat-skin room and at most 0.6297 on the
+     * halloween room, the QQ message list and the bath scene - all far below the 0.95 gate.
+     *
+     * Two skins ship as two templates instead of one, so a skin change no longer needs a code
+     * change: the room is proven by whichever template the live skin matches, and a page that is
+     * neither room still matches neither.
+     */
+    val roomCatSkin = experimental("room_skin_cat", 20, 720, 120, 840)
+
+    /**
+     * Every shipped room-skin template. A room page is proven when ANY of them matches, so a
+     * skin change costs a new crop, never a new probe name or a new flow.
+     */
+    val roomProbes: List<PetProfile.Probe> = listOf(room, roomCatSkin)
     val healthPanel = experimental("health", 169, 228, 250, 415).copy(exactDrift = true)
 
     /**

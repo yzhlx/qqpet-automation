@@ -95,7 +95,7 @@ class CarePendingBaselineObserver(private val context:Context,private val captur
             val at=age?.let {wall-it} ?: wall
             observations.put("frameReceiptAgeMs",age ?: JSONObject.NULL).put("observedAt",at)
                 .put("observedAtSource",if(age==null) "UNKNOWN" else "TRANSPORT_RECEIPT")
-            val roomScore=matcher.match(frame,PetPageProbes.room,0.97).score
+            val roomScore=PetPageProbes.roomProbes.maxOf { matcher.match(frame,it,0.97).score }
             observations.put("roomScore",roomScore)
             val overlayScores=JSONObject()
             observations.put("overlayScores",overlayScores)

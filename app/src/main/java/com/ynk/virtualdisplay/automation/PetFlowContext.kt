@@ -31,6 +31,9 @@ class PetFlowContext(val context: Context, val capture: HeadlessDisplayCapture,
         PetProfile.Probe(name, Rect(l,t,r,b), "pet_experimental/$name.png")
     val home = PetPageProbes.home
     val room = PetPageProbes.room
+    /** Every shipped room-skin template; a room page is proven by whichever skin matches. */
+    val roomProbes = PetPageProbes.roomProbes
+    val roomCatSkin = PetPageProbes.roomCatSkin
     val healthPanel = PetPageProbes.healthPanel
     val cookie = PetPageProbes.cookie
     /** FOOD page IDENTITY: the stable floor/cushion scene region, never the cookie plate. */
@@ -51,7 +54,7 @@ class PetFlowContext(val context: Context, val capture: HeadlessDisplayCapture,
     val careUpgradeHint = PetPageProbes.careUpgradeHint
     val careUpgradeReward = PetPageProbes.careUpgradeReward
     val recovery=PetRecoveryBoundary(context,capture,guard,
-        (listOf(home,room,healthPanel,cookie,foodScene,soap,bath,outdoor,academy,highFive,profile.resultProbe,
+        (listOf(home,room,roomCatSkin,healthPanel,cookie,foodScene,soap,bath,outdoor,academy,highFive,profile.resultProbe,
             profile.courseListProbe,profile.courseDetailProbe,qqHostSearch,qqSearchPetRow)).associate {it.name to listOf(it)}+
             mapOf("LEARNING" to profile.learningProbes),onState=onRecovery,reconcile=reconcile,
             // Recovery around a lesson start must NOT re-impose the care thresholds: a paid-for lesson

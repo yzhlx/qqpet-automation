@@ -80,10 +80,15 @@ class RoomPageProbeSkinTest {
     }
 
     /** Reads the shipped template directly from the repo (JVM tests have no Android assets). */
-    private val template: BufferedImage by lazy {
-        val file = java.io.File("src/main/assets/pet_experimental/room.png")
+    private val template: BufferedImage by lazy { read("room.png") }
+
+    /** The second shipped skin: the cat room this account is on since 2026-11-06. */
+    private val catTemplate: BufferedImage by lazy { read("room_skin_cat.png") }
+
+    private fun read(name: String): BufferedImage {
+        val file = java.io.File("src/main/assets/pet_experimental/" + name)
         assertTrue("missing room template: " + file.absolutePath, file.exists())
-        ImageIO.read(file)
+        return ImageIO.read(file)
     }
 
     /** The ROI PetPageProbes.room uses; asserted so a coordinate move cannot pass silently. */
@@ -102,6 +107,36 @@ class RoomPageProbeSkinTest {
         val live = image("/health-panel/room-live-display46.png")
         val s = score(live, template, roomRect)
         assertTrue("room probe must match the live room page, got " + s, s >= 0.95)
+    }
+
+    /**
+     * The account switched from the halloween skin to the cat skin on 2026-11-06. The halloween
+     * template scored 0.63 on the cat-skin room, so every managed session died with
+     * INITIAL_PAGE_UNKNOWN while the pet room was open. The cat skin therefore ships its own
+     * template at the same ROI, and the room is proven by whichever skin is live.
+     */
+    @Test fun theCatSkinProbeMatchesTheCatSkinRoom() {
+        val live = image("/health-panel/room-live-display47-cat-skin.png")
+        val s = score(live, catTemplate, roomRect)
+        assertTrue("cat-skin probe must match the cat-skin room, got " + s, s >= 0.95)
+    }
+
+    @Test fun theCatSkinProbeDoesNotMatchTheHalloweenRoom() {
+        val live = image("/health-panel/room-live-display46.png")
+        val s = score(live, catTemplate, roomRect)
+        assertTrue("cat-skin probe must not claim the halloween room, got " + s, s < 0.95)
+    }
+
+    @Test fun theCatSkinProbeDoesNotMatchTheQqHostPages() {
+        val qqMain = image("/health-panel/qq-main-display45.png")
+        val s = score(qqMain, catTemplate, roomRect)
+        assertTrue("QQ message list must not read as the cat-skin room, got " + s, s < 0.95)
+    }
+
+    @Test fun theCatSkinProbeDoesNotMatchTheBathScene() {
+        val bath = image("/health-panel/panel-bath-display41.png")
+        val s = score(bath, catTemplate, roomRect)
+        assertTrue("bath scene must not read as the cat-skin room, got " + s, s < 0.95)
     }
 
     @Test fun theProbeAlsoMatchesTheRoomWithTheHealthSheetOpen() {

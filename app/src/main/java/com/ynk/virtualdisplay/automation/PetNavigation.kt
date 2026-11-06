@@ -1194,7 +1194,7 @@ class PetNavigation(private val flow: PetFlowContext, private val workReader: Wo
         if (!matched) return@with false
         verify(listOf(careUpgradeHint),"care-upgrade-before")
         safety();input.tap(360f,1180f);delay(profile.pageSettleMs)
-        verifySettled(listOf(foodScene,bath,room),"care-upgrade-after")
+        verifySettled(listOf(foodScene,bath)+roomProbes,"care-upgrade-after")
         true
     }
     /**
@@ -1229,7 +1229,7 @@ class PetNavigation(private val flow: PetFlowContext, private val workReader: Wo
                 val current = frame(latest = true)
                 val capturedAt = SystemClock.elapsedRealtime()
                 try {
-                    val roomScore = score(current, listOf(room))
+                    val roomScore = score(current, roomProbes)
                     check(roomScore >= profile.matchThreshold) { "ROOM_EXIT_NOT_ROOM:$action:$roomScore" }
                     check(current.width == 720 && current.height == 1600) { "ROOM_EXIT_DISPLAY_UNSUPPORTED" }
                     val lines = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { reader.read(current) }
@@ -1282,11 +1282,20 @@ class PetNavigation(private val flow: PetFlowContext, private val workReader: Wo
         } finally { recognizer?.close() }
     }
 
-    suspend fun tap(before: PetProfile.Probe, point: PointF, after: PetProfile.Probe, action: String) = with(flow) {
-        verify(listOf(before),"${serial++}-$action-before",latest=true)
+    suspend fun tap(before: PetProfile.Probe, point: PointF, after: PetProfile.Probe, action: String) =
+        tap(listOf(before),point,listOf(after),action)
+    /** The page before the tap is proven by one template, the page after it by any of several. */
+    suspend fun tap(before: PetProfile.Probe, point: PointF, after: List<PetProfile.Probe>, action: String) =
+        tap(listOf(before),point,after,action)
+    /**
+     * A tap that must be bracketed by page identity, where identity may be proven by any of
+     * several templates (the room ships one template per pet skin).
+     */
+    suspend fun tap(before: List<PetProfile.Probe>, point: PointF, after: List<PetProfile.Probe>, action: String) = with(flow) {
+        verify(before,"${serial++}-$action-before",latest=true)
         safety(); input.tap(point.x,point.y)
         delay(profile.pageSettleMs)
-        verifySettled(listOf(after),"${serial++}-$action-after")
+        verifySettled(after,"${serial++}-$action-after")
     }
     suspend fun dismissUpgradeIfPresent(action: String): Boolean = with(flow) {
         val current=frame()
@@ -1330,7 +1339,7 @@ class PetNavigation(private val flow: PetFlowContext, private val workReader: Wo
         emit("$label-reenter-pet-app",null,"QQ_HOST_PAGE")
                 // The orange pet icon in the search result row (measured 2026-11-06).
         safety();input.tap(98f,502f);delay(profile.pageSettleMs)
-        verifySettled(listOf(room),"$label-reenter-pet-app-after")
+        verifySettled(roomProbes,"$label-reenter-pet-app-after")
     }
     /**
      * The outdoor map's back arrow is the only way home, and the mini-program's own history can
@@ -1363,7 +1372,7 @@ class PetNavigation(private val flow: PetFlowContext, private val workReader: Wo
         var attempt=1
         while(true) {
             try {
-                tap(before,PointF(80f,160f),room,"$label-return-home")
+                tap(before,PointF(80f,160f),roomProbes,"$label-return-home")
                 return@with
             } catch(t: Throwable) {
                 if(t.message?.contains("PAGE_MISMATCH")!=true) throw t
@@ -1537,7 +1546,7 @@ class PetNavigation(private val flow: PetFlowContext, private val workReader: Wo
         dismissCareUpgradeIfPresent()
         dismissUpgradeIfPresent("initial")
         val current=frame()
-        val sRoom=score(current,listOf(room))
+        val sRoom=score(current,roomProbes)
         val sHealth=score(current,listOf(healthPanel))
         val panelDrift=healthDrift(current)
         val sOutdoor=score(current,listOf(outdoor))
@@ -1552,7 +1561,7 @@ class PetNavigation(private val flow: PetFlowContext, private val workReader: Wo
                 score(current,listOf(profile.resultProbe))>=profile.matchThreshold -> "result"
                 score(current,profile.learningProbes)>=profile.matchThreshold -> "LEARNING"
                 score(current,listOf(healthPanel))>=profile.matchThreshold -> "health"
-                score(current,listOf(room))>=profile.matchThreshold -> "room"
+                score(current,roomProbes)>=profile.matchThreshold -> "room"
                 score(current,listOf(profile.courseListProbe))>=profile.matchThreshold -> "course_list"
                 score(current,listOf(academy))>=profile.matchThreshold -> "academy"
                 score(current,listOf(outdoor))>=profile.matchThreshold -> "outdoor"
@@ -1569,7 +1578,7 @@ class PetNavigation(private val flow: PetFlowContext, private val workReader: Wo
             "food_scene" -> returnHomeFromPage(foodScene,"initial-leave-food")
             "bath" -> returnHomeFromPage(bath,"initial-leave-bath")
             "result" -> returnHomeFromResult("initial-unowned-result")
-            "room" -> verify(listOf(room),"initial-home")
+            "room" -> verify(roomProbes,"initial-home")
             "health" -> {
                 check(!healthAlreadyClosed) {"INITIAL_HEALTH_PANEL_NOT_CLOSED"}
                 verify(listOf(healthPanel),"initial-health-before")
