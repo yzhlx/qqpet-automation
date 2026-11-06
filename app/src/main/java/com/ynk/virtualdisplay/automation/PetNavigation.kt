@@ -1609,9 +1609,13 @@ class PetNavigation(private val flow: PetFlowContext, private val workReader: Wo
         val sOutdoor=score(current,listOf(outdoor))
         val sResult=score(current,listOf(profile.resultProbe))
         val sHost=score(current,listOf(qqHostSearch,qqSearchPetRow))
+        val sMsgBox=score(current,listOf(qqMessageSearchBox))
+        val sHistory=score(current,listOf(qqSearchHistoryPet))
         val unknownDump=try {ByteArrayOutputStream().also {current.compress(Bitmap.CompressFormat.PNG,80,it)}} catch(t:Throwable) {null}
         val page=try {
             when {
+                sMsgBox>=profile.matchThreshold -> "qq_message"
+                sHistory>=profile.matchThreshold -> "qq_history"
                 sHost>=profile.matchThreshold -> "qq_host"
                 score(current,listOf(foodScene))>=profile.matchThreshold -> "food_scene"
                 score(current,listOf(bath))>=profile.matchThreshold -> "bath"
@@ -1626,6 +1630,20 @@ class PetNavigation(private val flow: PetFlowContext, private val workReader: Wo
             }
         } finally {current.recycle()}
         when(page) {
+            "qq_message" -> {
+                // Cold start: QQ is on the message tab with the search box visible. The
+                // mini-program has never been opened, so walk the full enter chain
+                // (search -> history word -> pet function row) instead of stopping on
+                // INITIAL_PAGE_UNKNOWN with the pet room never reached.
+                emit("initial-page-qq-message",sMsgBox,"QQ_MESSAGE_TAB")
+                enterPetApp("initial")
+            }
+            "qq_history" -> {
+                // The search page is already open with the recent-searches word visible:
+                // the rest of the enter chain is the same as the cold-start chain.
+                emit("initial-page-qq-history",sHistory,"QQ_SEARCH_HISTORY")
+                enterPetApp("initial")
+            }
             "qq_host" -> {
                 // The mini-program is closed and QQ's search page is showing: re-open the pet
                 // app through its own entry instead of failing the session with an unknown page.
