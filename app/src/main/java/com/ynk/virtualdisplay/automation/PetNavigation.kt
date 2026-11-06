@@ -1355,7 +1355,11 @@ class PetNavigation(private val flow: PetFlowContext, private val workReader: Wo
      * text path) and the pet function row appears. One tap on its orange icon at (98,502) lands
      * on the pet ROOM page.
      *
-     * Every step is anchored on a template probe before any tap: the action for the CURRENT
+     * The results page is proven by EITHER host template. Replaying the shipping matcher over a
+     * real VD47 results frame (measured 2026-11-06) put the row template alone at 0.751 there -
+     * the pet - function row sits about 111 px higher on this layout than on the 2026-11-03
+     * frame it was cropped from - while qqHostSearch scored 1.000. Judging the page on the row
+     * template alone would read a real results page as UNKNOWN and stop the chain.\n     * Every step is anchored on a template probe before any tap: the action for the CURRENT
      * screen is [PetReentry.next], so an unknown page stops the chain instead of tapping into a
      * conversation. No swipe or unanchored coordinate is used.
      */
@@ -1367,7 +1371,7 @@ class PetNavigation(private val flow: PetFlowContext, private val workReader: Wo
             try {
                 screen = when {
                     score(current, roomProbes) >= profile.matchThreshold -> PetReentry.Screen.ROOM
-                    score(current, listOf(qqSearchPetRow)) >= profile.matchThreshold -> PetReentry.Screen.SEARCH_RESULT_PET
+                    score(current, listOf(qqHostSearch, qqSearchPetRow)) >= profile.matchThreshold -> PetReentry.Screen.SEARCH_RESULT_PET
                     score(current, listOf(qqSearchHistoryPet)) >= profile.matchThreshold -> PetReentry.Screen.SEARCH_HISTORY_PET
                     score(current, listOf(qqMessageSearchBox)) >= profile.matchThreshold -> PetReentry.Screen.MESSAGE_SEARCH_BOX
                     else -> PetReentry.Screen.UNKNOWN

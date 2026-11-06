@@ -1,4 +1,4 @@
-﻿package com.ynk.virtualdisplay
+package com.ynk.virtualdisplay
 
 import java.awt.image.BufferedImage
 import javax.imageio.ImageIO
@@ -110,15 +110,48 @@ class RoomPageProbeSkinTest {
     }
 
     /**
-     * The account switched from the halloween skin to the cat skin on 2026-11-06. The halloween
-     * template scored 0.63 on the cat-skin room, so every managed session died with
-     * INITIAL_PAGE_UNKNOWN while the pet room was open. The cat skin therefore ships its own
-     * template at the same ROI, and the room is proven by whichever skin is live.
+     * The frame kept as the cat-skin room is not the pet room at all: it is a QQ short-video feed
+     * page, with its own like, comment and share chrome visible. room_skin_cat.png was cropped
+     * from it, so it matches that page exactly and nothing else, and it scored 0.672 on the live
+     * room frame captured 2026-11-06. While it sat in PetPageProbes.roomProbes any QQ video page
+     * read as the pet room and the flows ran room actions on it. Measured by replaying the
+     * shipping matcher over both frames.
      */
-    @Test fun theCatSkinProbeMatchesTheCatSkinRoom() {
-        val live = image("/health-panel/room-live-display47-cat-skin.png")
+    @Test fun theCatSkinTemplateIsNotTheLiveRoom() {
+        val live = image("/health-panel/room-live-display47-2026-11-06.png")
         val s = score(live, catTemplate, roomRect)
-        assertTrue("cat-skin probe must match the cat-skin room, got " + s, s >= 0.95)
+        assertTrue("the video-feed template must not claim the live room, got " + s, s < 0.95)
+    }
+
+    /** The shipped room template against the room that is on the display right now. */
+    @Test fun theShippedRoomTemplateMatchesTheLiveRoom() {
+        val live = image("/health-panel/room-live-display47-2026-11-06.png")
+        val s = score(live, template, roomRect)
+        assertTrue("room must match the live room frame, got " + s, s >= 0.95)
+    }
+
+    /**
+     * Regression lock for the defect itself: a QQ short-video page used to satisfy the room
+     * identity set. The room template must never read that page as the pet room.
+     */
+    @Test fun theVideoFeedFrameIsNotReadAsRoom() {
+        val video = image("/health-panel/room-live-display47-cat-skin.png")
+        val s = score(video, template, roomRect)
+        assertTrue("a QQ short-video page must not read as the room, got " + s, s < 0.95)
+    }
+
+    /**
+     * Room identity is the shipped template alone. Adding a second template here is only safe
+     * when that template was cropped from a real room frame; this test fails if a template of
+     * unproven origin is put back into the identity set.
+     */
+    @Test fun roomIdentityUsesOnlyTheShippedTemplate() {
+        val source = java.io.File("src/main/java/com/ynk/virtualdisplay/automation/PetPageProbes.kt")
+        val text = source.readText()
+        assertTrue(
+            "roomProbes must stay listOf(room) unless a second template is proven on a real room frame",
+            text.contains("val roomProbes: List<PetProfile.Probe> = listOf(room)"),
+        )
     }
 
     @Test fun theCatSkinProbeDoesNotMatchTheHalloweenRoom() {

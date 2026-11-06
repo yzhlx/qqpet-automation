@@ -58,7 +58,7 @@ class PetFlowContext(val context: Context, val capture: HeadlessDisplayCapture,
     val careUpgradeHint = PetPageProbes.careUpgradeHint
     val careUpgradeReward = PetPageProbes.careUpgradeReward
     val recovery=PetRecoveryBoundary(context,capture,guard,
-        (listOf(home,room,roomCatSkin,healthPanel,cookie,foodScene,soap,bath,outdoor,academy,highFive,profile.resultProbe,
+        (listOf(home,room,healthPanel,cookie,foodScene,soap,bath,outdoor,academy,highFive,profile.resultProbe,
             profile.courseListProbe,profile.courseDetailProbe,qqHostSearch,qqSearchPetRow)).associate {it.name to listOf(it)}+
             mapOf("LEARNING" to profile.learningProbes),onState=onRecovery,reconcile=reconcile,
             // Recovery around a lesson start must NOT re-impose the care thresholds: a paid-for lesson

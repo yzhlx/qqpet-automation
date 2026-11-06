@@ -73,10 +73,21 @@ object PetPageProbes {
     val roomCatSkin = experimental("room_skin_cat", 20, 720, 120, 840)
 
     /**
-     * Every shipped room-skin template. A room page is proven when ANY of them matches, so a
-     * skin change costs a new crop, never a new probe name or a new flow.
+     * ROOM page identity: the shipped [room] template alone.
+     *
+     * roomCatSkin used to be in this list. Replaying the shipping matcher over a frame captured
+     * from the live virtual display on 2026-11-06 (pet room open, 720x1600) gives room 1.000 on
+     * it and also 1.000 on the recorded halloween room, while room_skin_cat gives 0.672 on the
+     * live room. The frame room_skin_cat was cropped from, kept as the cat-skin room fixture,
+     * is not the pet room at all: it is a QQ short-video feed page, with its own like, comment
+     * and share chrome visible. A template cut from that page matches that page exactly and
+     * nothing else, so leaving it in the identity set let any QQ video page read as the pet
+     * room, after which the flows ran room actions on it. That is the defect the note on [room]
+     * above already records once: calibrating a room template from a frame that is not a room.
+     *
+     * The probe and its asset stay in the tree for traceability, but they are not identity.
      */
-    val roomProbes: List<PetProfile.Probe> = listOf(room, roomCatSkin)
+    val roomProbes: List<PetProfile.Probe> = listOf(room)
     val healthPanel = experimental("health", 169, 228, 250, 415).copy(exactDrift = true)
 
     /**
