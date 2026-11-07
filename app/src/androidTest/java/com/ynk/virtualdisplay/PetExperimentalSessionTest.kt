@@ -60,7 +60,7 @@ class PetExperimentalSessionTest {
                 fun guard() {
                     check(Build.MODEL=="FOA-AL00") { "DEVICE_MODEL_CHANGED:${Build.MODEL}" }
                     val qq=app.packageManager.getPackageInfo("com.tencent.mobileqq",0)
-                    check(qq.versionName=="9.3.70" && qq.longVersionCode==16410L) { "QQ_VERSION_CHANGED" }
+                    check(qq.versionName=="9.3.75" && qq.longVersionCode==16580L) { "QQ_VERSION_CHANGED" }
                     check(repo.managedDisplayIds.value.contains(id)) { "DISPLAY_NOT_MANAGED" }
                     check(repo.connectionStatus.value==ConnectionStatus.CONNECTED) { "DISPLAY_DISCONNECTED" }
                     val d=dm.getDisplay(id)?:error("DISPLAY_DISAPPEARED")

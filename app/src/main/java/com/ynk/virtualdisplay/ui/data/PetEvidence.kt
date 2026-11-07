@@ -1,6 +1,10 @@
 package com.ynk.virtualdisplay.ui.data
 
 import android.content.Context
+import com.ynk.virtualdisplay.automation.StrategyExplanation
+import com.ynk.virtualdisplay.automation.StudyAttributeFact
+import com.ynk.virtualdisplay.automation.StudyDailyCapPolicy
+import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
 import java.text.SimpleDateFormat
@@ -131,6 +135,21 @@ data class SessionRunRecord(
     val encouragementSent: Int?,
     val courseStarts: Int?,
     val requestedRounds: Int?,
+    val workCompleted: Int? = null,
+    val adventureCompleted: Int? = null,
+    val signInCompleted: Int? = null,
+    val mailboxCompleted: Int? = null,
+    val luckyBagCompleted: Int? = null,
+    val roomCoinsBefore: Int? = null,
+    val roomCoinsAfter: Int? = null,
+    /** STR-08: 本次会话已确认完成的学习节数；没写过就是未知，不当作 0 以外的事实。 */
+    val studyRoundsCompleted: Int? = null,
+    /** STR-08: 本次会话的学习目标属性（力量/智力/魅力）。 */
+    val targetAttribute: String? = null,
+    /** STR-09: 本次会话每个属性的学习事实（上了几节、页面上写明加多少）。 */
+    val studyAttributes: List<StudyAttributeFact> = emptyList(),
+    /** STR-16: the real outcome and reason of every action, shown in the history detail. */
+    val strategyActions: List<StrategyExplanation.Action> = emptyList(),
 ) {
     val succeeded get() = terminalState == "COMPLETED"
 
@@ -157,6 +176,17 @@ data class SessionRunRecord(
                 encouragementSent = o.intOrNull("encouragementSent"),
                 courseStarts = o.intOrNull("courseStarts"),
                 requestedRounds = o.intOrNull("requestedRounds"),
+                workCompleted = o.intOrNull("workCompleted"),
+                adventureCompleted = o.intOrNull("adventureCompleted"),
+                signInCompleted = o.intOrNull("signInCompleted"),
+                mailboxCompleted = o.intOrNull("mailboxCompleted"),
+                luckyBagCompleted = o.intOrNull("luckyBagCompleted"),
+                roomCoinsBefore = o.intOrNull("roomCoinsBefore"),
+                roomCoinsAfter = o.intOrNull("roomCoinsAfter"),
+                studyRoundsCompleted = o.intOrNull("studyRoundsCompleted"),
+                targetAttribute = o.optString("targetAttribute").takeIf { it.isNotEmpty() && it != "null" },
+                studyAttributes = parseStudyAttributes(o.optJSONObject("studyAttributes")),
+                strategyActions = parseStrategyActions(o.optJSONArray("strategyActions")),
             )
         }.getOrNull()
     }
@@ -194,6 +224,23 @@ data class LogEntry(
                 reason = o.optString("stopReason").takeIf { it.isNotEmpty() && it != "null" },
                 score = if (o.has("matchScore") && !o.isNull("matchScore")) o.optDouble("matchScore") else null,
             )
+        }.getOrNull()
+    }
+}
+
+/** One row of `files/pet-events/<sessionId>.jsonl` (OBS-05), reduced to scalars. */
+data class JournalEvent(val wallTimeMs: Long, val kind: String, val payload: Map<String, String>) {
+    companion object {
+        fun parse(line: String): JournalEvent? = runCatching {
+            val o = JSONObject(line)
+            val kind = o.optString("kind").takeIf { it.isNotEmpty() } ?: return@runCatching null
+            val source = o.optJSONObject("payload")
+            val fields = linkedMapOf<String, String>()
+            source?.keys()?.forEach { key ->
+                val value = source.opt(key)
+                if (value != null && value != JSONObject.NULL) fields[key] = value.toString()
+            }
+            JournalEvent(o.optLong("wallTimeMs"), kind, fields)
         }.getOrNull()
     }
 }
@@ -250,11 +297,78 @@ class PetEvidenceRepository(private val context: Context) {
         }
     }
 
+    /**
+     * STR-08：今日已确认的学习节数（跨会话累计）。
+     *
+     * 只统计写进 run-record.json 的已确认节数；没有这个字段的旧记录不贡献任何数字，
+     * 也不会被猜成「已学 0 节以外的事实」。
+     */
+    fun confirmedStudyRoundsToday(nowMs: Long = System.currentTimeMillis()): Int {
+        val records = sessionDirectories(limit = Int.MAX_VALUE).mapNotNull { dir ->
+            val record = File(dir, "run-record.json").takeIf { it.isFile }
+                ?.let { runCatching { SessionRunRecord.parse(it.readText()) }.getOrNull() }
+                ?: return@mapNotNull null
+            val started = record.startedAtMs ?: return@mapNotNull null
+            val rounds = record.studyRoundsCompleted ?: return@mapNotNull null
+            StudyDailyCapPolicy.ConfirmedRecord(started, rounds, record.targetAttribute)
+        }
+        return StudyDailyCapPolicy.sumConfirmedToday(records, StudyDailyCapPolicy.dayKey(nowMs))
+    }
+
     /** Sessions whose record's local start date is today, newest first. */
+    /** OBS-06：前一天（按本地日期）开始的会话，跨零点后仍能看到昨天做了什么。 */
+    fun yesterdaySessions(nowMs: Long = System.currentTimeMillis()): List<SessionEvidence> {
+        val cal = java.util.Calendar.getInstance().apply {
+            timeInMillis = nowMs
+            add(java.util.Calendar.DAY_OF_YEAR, -1)
+        }
+        val day = dayKey(cal.timeInMillis)
+        return sessionDirectories().map { read(it) }
+            .filter { ev -> ev.record?.startedAtMs?.let { dayKey(it) == day } ?: false }
+    }
+
     fun todaySessions(nowMs: Long = System.currentTimeMillis()): List<SessionEvidence> {
         val day = dayKey(nowMs)
         return sessionDirectories().map { read(it) }
             .filter { ev -> ev.record?.startedAtMs?.let { dayKey(it) == day } ?: false }
+    }
+
+    /**
+     * OBS-05：今天会话的持久事件，按时间正序。
+     *
+     * 只读 `pet-events/<sessionId>.jsonl`，sessionId 来自同一目录的 run-record 或 runtime-state；
+     * 找不到就不读，绝不用目录名猜一个会话。事件时间取自日志里的 wallTimeMs。
+     */
+    fun todayJournalEvents(nowMs: Long = System.currentTimeMillis()): List<JournalEvent> {
+        val day = dayKey(nowMs)
+        return sessionDirectories(limit = Int.MAX_VALUE).asSequence()
+            .filter { dir ->
+                val started = File(dir, "run-record.json").takeIf { it.isFile }
+                    ?.let { runCatching { SessionRunRecord.parse(it.readText()) }.getOrNull() }?.startedAtMs
+                    ?: dir.name.toLongOrNull()
+                started != null && dayKey(started) == day
+            }
+            .mapNotNull { dir -> sessionIdOf(dir) }
+            .distinct()
+            .flatMap { id ->
+                val file = File(eventsDir, id + ".jsonl")
+                if (!file.isFile) emptySequence()
+                else runCatching { file.readLines() }.getOrDefault(emptyList()).asSequence()
+            }
+            .mapNotNull { JournalEvent.parse(it) }
+            .filter { it.wallTimeMs > 0 }
+            .sortedBy { it.wallTimeMs }
+            .toList()
+    }
+
+    private fun sessionIdOf(dir: File): String? {
+        for (name in listOf("run-record.json", "runtime-state.json")) {
+            val file = File(dir, name)
+            if (!file.isFile) continue
+            val id = runCatching { JSONObject(file.readText()).optString("sessionId") }.getOrNull()
+            if (!id.isNullOrEmpty() && id != "null") return id
+        }
+        return null
     }
 
     /** Tail of `files/pet_mvp.log`, newest last, parsed defensively. */
@@ -323,3 +437,35 @@ private fun JSONObject.longOrNull(key: String): Long? =
 
 private fun JSONObject.optLongOrNull(key: String): Long? =
     if (has(key) && !isNull(key)) optLong(key) else null
+
+/** STR-09: 读回每个属性的学习事实。读不懂的条目丢掉，不猜数值。 */
+private fun parseStudyAttributes(obj: JSONObject?): List<StudyAttributeFact> {
+    if (obj == null) return emptyList()
+    val out = mutableListOf<StudyAttributeFact>()
+    for (attribute in obj.keys()) {
+        val entry = obj.optJSONObject(attribute) ?: continue
+        val rounds = entry.intOrNull("rounds") ?: continue
+        if (rounds <= 0) continue
+        out.add(StudyAttributeFact(
+            attribute = attribute,
+            rounds = rounds,
+            gain = entry.intOrNull("gain"),
+            lessonsWithGain = entry.optInt("lessonsWithGain", 0)))
+    }
+    return out
+}
+
+/** STR-16: read back the per-action facts. An unreadable entry is dropped, never guessed. */
+private fun parseStrategyActions(array: JSONArray?): List<StrategyExplanation.Action> {
+    if (array == null) return emptyList()
+    val out = mutableListOf<StrategyExplanation.Action>()
+    for (index in 0 until array.length()) {
+        val item = array.optJSONObject(index) ?: continue
+        val label = item.optString("label").takeIf { it.isNotEmpty() } ?: continue
+        val outcome = runCatching { StrategyExplanation.Outcome.valueOf(item.optString("outcome")) }
+            .getOrNull() ?: continue
+        val reason = item.optString("reason").takeIf { it.isNotEmpty() && it != "null" }
+        out.add(StrategyExplanation.Action(label, outcome, reason))
+    }
+    return out
+}

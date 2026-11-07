@@ -4,6 +4,7 @@ import android.graphics.Bitmap
 import android.graphics.PointF
 import android.graphics.Rect
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.ensureActive
 import org.json.JSONObject
 import java.io.File
 
@@ -14,7 +15,8 @@ import java.io.File
  *
  * Hard stops (no input is ever sent after one of these):
  *  - EXCHANGE_BUDGET_EXHAUSTED      session purchase/coin budget exhausted (checked before dialog)
- *  - EXCHANGE_DIALOG_UNCONFIRMED    dialog identity not matched after the entry tap
+ *  - EXCHANGE_DIALOG_UNCONFIRMED    dialog identity not matched, or its body has not finished
+ *                                   rendering, after the entry tap
  *  - EXCHANGE_PRODUCT_UNCONFIRMED   expected product not the selected row
  *  - EXCHANGE_QUANTITY_BELOW        stepper went past the target (clamped at 1)
  *  - EXCHANGE_QUANTITY_STEPS        stepper did not reach the target within the step bound
@@ -27,7 +29,14 @@ import java.io.File
  * readable, and the minus stepper clamps at 1, so the terminal state is always reachable.
  */
 class PetExchangeFlow(private val flow: PetFlowContext, private val navigation: PetNavigation,
-    private val budget: ExchangeBudget = ExchangeBudget()) {
+    private val budget: ExchangeBudget = ExchangeBudget(),
+    /** Legacy source-compatible argument; not a purchase authorization or wallet source. */
+    private val payGuard: ((Consumable, Int, Int, Int) -> Unit)? = null,
+    private val freshPayGuard: (suspend (Consumable,Int,Int,Int,ObservedValue<Int>)->Unit)? = null,
+    private val walletReader: DeviceWalletReader = DeviceWalletReader(MlKitCourseNameReader()),
+    private val beforeConsumingInput: ((Consumable)->Unit)? = null,
+) {
+    private val paymentAttempt=CarePaymentAttemptGate()
 
     val qtyReader: DialogDigitReader by lazy {
         DialogDigitReader(DialogDigitReader.parse(
@@ -43,26 +52,62 @@ class PetExchangeFlow(private val flow: PetFlowContext, private val navigation: 
     // pay button (35-685,1380-1470) with the amount at ~(365-545,1395-1455).
     // 2026-10-15 recalibrated from a live FOA_AL00 capture (QQ 9.3.70/16410): the old title
     // template was cropped through strokes and rendered ~5px smaller, matching only 0.607.
-    private val foodTitle = PetProfile.Probe("exchange_food_title", Rect(278, 848, 432, 902),
-        "pet_exchange/dialog_food_title.png")
+    // 2026-11-05: the whole sheet sat 22 px higher on virtual display 40 than on display 39, and
+    // the coarse 8 px search cannot reach 22, so the run stopped with
+    // EXCHANGE_DIALOG_UNCONFIRMED:0.629. The title probe is now searched to the pixel and
+    // reports the drift; every region and tap of the sheet moves with it (ExchangeSheetLayout).
+    private val foodTitle = PetProfile.Probe("exchange_food_title",
+        layoutRect(ExchangeSheetLayout.TITLE_FOOD), "pet_exchange/dialog_food_title.png",
+        exactDrift = true)
     // 2026-10-16 soap title recalibrated the same way as foodTitle: the live "兑换洗护道具"
     // title is six characters wide (~232px), far wider than the old 4-char ROI, which matched
     // only 0.625 on a real soap dialog. Template re-cut from the same live capture with clean
     // padding on all sides.
-    private val soapTitle = PetProfile.Probe("exchange_soap_title", Rect(268, 846, 512, 906),
-        "pet_exchange/dialog_soap_title.png")
-    private val cookieSelected = PetProfile.Probe("exchange_cookie_selected", Rect(30, 975, 205, 1200),
-        "pet_exchange/food_cookie_selected.png")
-    private val soapSelected = PetProfile.Probe("exchange_soap_selected", Rect(30, 975, 205, 1200),
-        "pet_exchange/soap_soap_selected.png")
+    private val soapTitle = PetProfile.Probe("exchange_soap_title",
+        layoutRect(ExchangeSheetLayout.TITLE_SOAP), "pet_exchange/dialog_soap_title.png",
+        exactDrift = true)
+    private val cookieSelected = PetProfile.Probe("exchange_cookie_selected",
+        layoutRect(ExchangeSheetLayout.SELECTED), "pet_exchange/food_cookie_selected.png")
+    private val soapSelected = PetProfile.Probe("exchange_soap_selected",
+        layoutRect(ExchangeSheetLayout.SELECTED), "pet_exchange/soap_soap_selected.png")
 
     private fun titleProbe(item: Consumable) = if (item == Consumable.COOKIE) foodTitle else soapTitle
-    private fun selectedProbe(item: Consumable) = if (item == Consumable.COOKIE) cookieSelected else soapSelected
+    /** The selected-tile probe moved with the sheet, so the template still covers the frame. */
+    private fun selectedProbe(item: Consumable, drift: Int): PetProfile.Probe {
+        val base = if (item == Consumable.COOKIE) cookieSelected else soapSelected
+        val region = ExchangeSheetLayout.selected(drift)
+        return base.copy(rect = Rect(region.left, region.top, region.right, region.bottom))
+    }
+    private fun layoutRect(region: ExchangeSheetLayout.Region) =
+        Rect(region.left, region.top, region.right, region.bottom)
     private fun sceneProbe(item: Consumable) = if (item == Consumable.COOKIE) flow.foodScene else flow.bath
     fun unitPrice(item: Consumable) = if (item == Consumable.COOKIE) 5 else 2
 
-    private fun titleScore(frame: Bitmap, item: Consumable): Double =
-        flow.matcher.match(frame, titleProbe(item), 0.5).score
+    /**
+     * The pay button band of the exchange sheet (720x1600). It is the LAST element of the sheet
+     * to be painted, and the pay total is read from it, so a painted band proves the dialog body
+     * has finished rendering. Measured 2026-11-04 on DKS9K23420020242 (virtual display 39): the
+     * blank phase leaves 0/58500 painted pixels in this band, the complete phase 55096/58500.
+     * The band follows the sheet drift: on display 40 the button sits at 1348..1443.
+     */
+    /** True when the exchange sheet's body has finished painting on this frame. */
+    private fun bodyRendered(frame: Bitmap, drift: Int): Boolean {
+        val band = ExchangeSheetLayout.payBand(drift)
+        val w = band.width; val h = band.height
+        val px = IntArray(w * h)
+        frame.getPixels(px, 0, w, band.left, band.top, w, h)
+        return ExchangeDialogRenderPolicy.rendered(px)
+    }
+
+    /**
+     * Locates the sheet on this frame and reports its vertical drift. The title template is
+     * searched to the pixel (exactDrift), because the measured 22 px offset falls between two
+     * coarse steps and the sheet then scored 0.629 instead of 0.9961.
+     */
+    private fun locate(frame: Bitmap, item: Consumable): TemplateMatcher.Result =
+        flow.matcher.match(frame, titleProbe(item), 0.5)
+
+    private fun titleScore(frame: Bitmap, item: Consumable): Double = locate(frame, item).score
 
     /**
      * True when the item's exchange dialog is verifiably open on a fresh frame. Used by the
@@ -74,20 +119,37 @@ class PetExchangeFlow(private val flow: PetFlowContext, private val navigation: 
         return try { titleScore(f, item) >= 0.90 } finally { f.recycle() }
     }
 
-    /** True while the exchange dialog is verifiably on screen. */
-    private suspend fun awaitDialog(item: Consumable): Bitmap = with(flow) {
-        val deadline = System.currentTimeMillis() + 8000
-        var last = 0.0
-        while (System.currentTimeMillis() < deadline) {
-            val f = frame(latest = true)
-            try {
-                last = titleScore(f, item)
-                if (last >= 0.95) { save(f, "exchange-dialog-open"); return f }
-            } catch (t: Throwable) { f.recycle(); throw t }
-            f.recycle()
-            delay(400)
+    /** A located sheet: the frame it was found on and the vertical drift of the whole sheet. */
+    private class Sheet(val frame: Bitmap, val drift: Int)
+
+    /**
+     * Waits for a frame where the exchange dialog is identifiable AND its body has finished
+     * painting. The title match alone is NOT enough: QQ paints the sheet in two phases and the
+     * title is already there (0.9961) in the blank one, so a title-only wait let a half-drawn
+     * frame through and the quantity read failed with DIALOG_DIGITS_ABSENT.
+     */
+    private suspend fun renderedSheet(item: Consumable, timeoutMs: Long, failure: String): Sheet =
+        with(flow) {
+            val deadline = System.currentTimeMillis() + timeoutMs
+            var last = 0.0
+            while (System.currentTimeMillis() < deadline) {
+                val f = frame(latest = true)
+                try {
+                    val located = locate(f, item)
+                    last = located.score
+                    if (last >= TITLE_GATE && bodyRendered(f, located.drift)) return Sheet(f, located.drift)
+                } catch (t: Throwable) { f.recycle(); throw t }
+                f.recycle()
+                delay(400)
+            }
+            error(if (last >= TITLE_GATE) "$failure:$last:body-blank" else "$failure:$last")
         }
-        error("EXCHANGE_DIALOG_UNCONFIRMED:$last")
+
+    /** True while the exchange dialog is verifiably on screen, with its body fully painted. */
+    private suspend fun awaitDialog(item: Consumable): Sheet {
+        val sheet = renderedSheet(item, 8000, "EXCHANGE_DIALOG_UNCONFIRMED")
+        flow.save(sheet.frame, "exchange-dialog-open")
+        return sheet
     }
 
     private fun readField(frame: Bitmap, l: Int, t: Int, r: Int, b: Int, bright: Boolean,
@@ -109,8 +171,14 @@ class PetExchangeFlow(private val flow: PetFlowContext, private val navigation: 
     // reader no longer asserts exact widths, so a QQ rescale shifts the ink inside the ROI rather
     // than tripping a stale constant. The qty ROI starts AFTER the '-' bar (its right edge is 533)
     // so the minus symbol never pollutes the digit grouping.
-    fun readQuantity(frame: Bitmap) = readField(frame, 535, 1285, 625, 1315, false, qtyReader)
-    fun readPayTotal(frame: Bitmap) = readField(frame, 390, 1400, 445, 1435, true, payReader)
+    fun readQuantity(frame: Bitmap, drift: Int = 0): DialogDigitReader.Reading {
+        val region = ExchangeSheetLayout.quantity(drift)
+        return readField(frame, region.left, region.top, region.right, region.bottom, false, qtyReader)
+    }
+    fun readPayTotal(frame: Bitmap, drift: Int = 0): DialogDigitReader.Reading {
+        val region = ExchangeSheetLayout.payTotal(drift)
+        return readField(frame, region.left, region.top, region.right, region.bottom, true, payReader)
+    }
 
     /**
      * Steps the quantity down to [target] with the minus button (516,1287). Unreadable
@@ -120,8 +188,13 @@ class PetExchangeFlow(private val flow: PetFlowContext, private val navigation: 
         var steps = 0
         flow.apply {
             while (true) {
-                val f = frame(latest = true)
-                val reading = try { readQuantity(f).also { if (it.known) save(f, "exchange-qty-" + it.text) } } finally { f.recycle() }
+                // A blank sheet is a rendering race, not a digit failure: wait for the body to
+                // finish painting instead of failing the round on a half-drawn frame.
+                val sheet = this@PetExchangeFlow.renderedSheet(item, 4000, "EXCHANGE_DIALOG_UNCONFIRMED")
+                val reading = try {
+                    readQuantity(sheet.frame, sheet.drift)
+                        .also { if (it.known) save(sheet.frame, "exchange-qty-" + it.text) }
+                } finally { sheet.frame.recycle() }
                 if (reading.known) {
                     val v = reading.value()
                     when {
@@ -135,7 +208,8 @@ class PetExchangeFlow(private val flow: PetFlowContext, private val navigation: 
                 // Unknown intermediate (unrecorded digit shape): skip it and keep stepping.
                 check(steps < 12) { "EXCHANGE_QUANTITY_STEPS:$steps" }
                 steps++
-                safety(); input.tap(517f, 1277f); delay(700)
+                val minus = ExchangeSheetLayout.minusTap(sheet.drift)
+                safety(); input.tap(minus.first.toFloat(), minus.second.toFloat()); delay(700)
                 if (item == Consumable.COOKIE) verify(listOf(foodTitle), "exchange-dialog-still-open")
                 else verify(listOf(soapTitle), "exchange-dialog-still-open")
             }
@@ -153,13 +227,18 @@ class PetExchangeFlow(private val flow: PetFlowContext, private val navigation: 
      * tap could dismiss it or select something else). Returns the recorded allowance after the
      * dialog verifiably closed; the flow ends back on the scene.
      */
-    suspend fun buy(item: Consumable, quantity: Int, origin: String, dialogAlreadyOpen: Boolean = false): ExchangeBudget.Allowance = with(flow) {
+    suspend fun buy(item: Consumable, quantity: Int, origin: String, dialogAlreadyOpen: Boolean = false,
+        ownedCount: ObservedValue<Int>? = null): ExchangeBudget.Allowance = with(flow) {
+        paymentAttempt.requireNoPending()
+        val stock=ownedCount ?: error("CARE_PURCHASE_INVENTORY_UNCONFIRMED")
+        CareResourceGate.requirePurchase(stock,quantity,System.currentTimeMillis())
+        val authorize=freshPayGuard ?: error("CARE_FRESH_PAYMENT_GUARD_MISSING")
         state = "EXCHANGE_BUY"
         val unit = unitPrice(item)
         // Budget is a precondition: refuse BEFORE any dialog interaction.
         val allowance = budget.reserve(item.name, quantity, unit)
         budgetEvent("purchase-reserve", allowance, origin)
-        var payDelivered = false
+        var payAttempted = false
         var callsBefore = 0
         try {
             if (!dialogAlreadyOpen) {
@@ -170,20 +249,35 @@ class PetExchangeFlow(private val flow: PetFlowContext, private val navigation: 
             }
             val dialog = awaitDialog(item)
             try {
-                val product = matcher.match(dialog, selectedProbe(item), 0.5).score
+                val product = matcher.match(dialog.frame, selectedProbe(item, dialog.drift), 0.5).score
                 check(product >= 0.90) { "EXCHANGE_PRODUCT_UNCONFIRMED:$product" }
                 emit("exchange-product", product)
-            } finally { dialog.recycle() }
+            } finally { dialog.frame.recycle() }
             val finalQty = stepTo(item, quantity)
             // Terminal full verification: quantity and pay total must both be readable numbers.
-            val f = frame(latest = true)
-            val qtyRead: Int; val totalRead: Int
+            // Any recovery/navigation must precede the final same-frame payment proof.
+            safety()
+            val payObservationStartedMs=System.currentTimeMillis()
+            val sheet = renderedSheet(item, 5000, "EXCHANGE_DIALOG_UNCONFIRMED_BEFORE_PAY")
+            val f = sheet.frame
+            val drift = sheet.drift
+            val qtyRead: Int; val totalRead: Int; val wallet: ObservedValue<Int>
             try {
+                check(f.width==720 && f.height==1600) { "EXCHANGE_DISPLAY_UNSUPPORTED" }
+                check(titleScore(f,item)>=TITLE_GATE) { "EXCHANGE_DIALOG_UNCONFIRMED_BEFORE_PAY" }
+                check(matcher.match(f,selectedProbe(item,drift),0.5).score>=0.90) { "EXCHANGE_PRODUCT_UNCONFIRMED_BEFORE_PAY" }
+                val observedAt=System.currentTimeMillis()
                 save(f, "exchange-before-pay")
-                val q = readQuantity(f)
+                val roi=ExchangeWalletParser.roiBounds(drift)
+                val local=Bitmap.createBitmap(f,roi.left,roi.top,roi.width(),roi.height())
+                val walletEvidence=File(evidence,"round-$round-exchange-wallet-${System.nanoTime()}.png")
+                try { walletEvidence.outputStream().use { check(local.compress(Bitmap.CompressFormat.PNG,100,it)) } }
+                finally { if(local!==f) local.recycle() }
+                wallet=walletReader.readExchange(f,observedAt,walletEvidence.absolutePath,pageIdentityVerified=true,drift=drift)
+                val q = readQuantity(f, drift)
                 check(q.known) { "EXCHANGE_QUANTITY_UNREADABLE:${q.reason}" }
                 qtyRead = q.value()
-                val p = readPayTotal(f)
+                val p = readPayTotal(f, drift)
                 check(p.known) { "EXCHANGE_TOTAL_UNREADABLE:${p.reason}" }
                 totalRead = p.value()
             } finally { f.recycle() }
@@ -192,17 +286,31 @@ class PetExchangeFlow(private val flow: PetFlowContext, private val navigation: 
             check(totalRead == expected) { "EXCHANGE_TOTAL_MISMATCH:$totalRead!=$expected" }
             emit("exchange-verified", result = JSONObject().put("item", item.name).put("quantity", qtyRead)
                 .put("total", totalRead).put("unit", unit).toString())
-            // Pay. The tap baseline decides whether an unknown outcome could have spent coins.
+            CareResourceGate.requireWallet(wallet,totalRead,0,System.currentTimeMillis(),payObservationStartedMs)
+            authorize(item,qtyRead,unit,totalRead,wallet)
+            // Recheck freshness after the caller's suspendable tuition decision. No page recovery
+            // may run after this proof: it could replace the dialog that supplied the wallet.
+            CareResourceGate.requireWallet(wallet,totalRead,0,System.currentTimeMillis(),payObservationStartedMs)
+            emit("exchange-affordability",result=EventJson.encode(mapOf("total" to totalRead,
+                "unit" to unit,"wallet" to wallet.fields())))
+            beforeConsumingInput?.invoke(item)
+            CareResourceGate.requireWallet(wallet,totalRead,0,System.currentTimeMillis(),payObservationStartedMs)
+            kotlinx.coroutines.currentCoroutineContext().ensureActive()
+            guard()
             callsBefore = input.injectionAttempts
-            safety(); input.tap(360f, 1425f)
-            payDelivered = input.injectionAttempts > callsBefore
+            paymentAttempt.beforePay()
+            payAttempted = true
+            val payTap = ExchangeSheetLayout.payTap(drift)
+            input.tap(payTap.first.toFloat(), payTap.second.toFloat())
             confirmClosed(item)
+            paymentAttempt.confirmedPaid()
             allowance.confirmPaid()
             budgetEvent("purchase-paid", allowance, "total=$totalRead")
             emit("exchange-paid", result = JSONObject().put("item", item.name).put("quantity", qtyRead)
                 .put("total", totalRead).put("origin", origin).toString())
         } catch (t: Throwable) {
             // No re-pay here and no second attempt anywhere: an unconfirmed outcome is retained.
+            val payDelivered = consumableDeliveryEvidence(payAttempted,callsBefore,input.injectionAttempts)>0
             val outcome = allowance.settleAfterFailure(payDelivered)
             budgetEvent("purchase-settle", allowance, outcome.name)
             throw t
@@ -224,6 +332,7 @@ class PetExchangeFlow(private val flow: PetFlowContext, private val navigation: 
                 lastScene = matcher.match(f, sceneProbe(item), 0.5).score
                 if (lastTitle < 0.90 && lastScene >= profile.matchThreshold) {
                     save(f, "exchange-after-pay")
+                    recovery.confirm(round,"EXCHANGE_PAID",sceneProbe(item).name,false)
                     return@with
                 }
             } finally { f.recycle() }
@@ -243,6 +352,9 @@ class PetExchangeFlow(private val flow: PetFlowContext, private val navigation: 
     }
 
     companion object {
+        /** The sheet title must match this well before any number is read or any tap is sent. */
+        private const val TITLE_GATE = 0.95
+
         /** Unreadable reasons that must never be skipped while stepping (dialog/layout broken). */
         val HARD_UNREADABLE = setOf("DIALOG_DIGITS_ABSENT", "DIALOG_ONLY_CURSOR", "DIALOG_TOO_MANY_GROUPS",
             "DIALOG_LEADING_ZERO", "DIALOG_ROI_SIZE", "DIALOG_DIGIT_WIDTH", "DIALOG_DIGIT_HEIGHT",

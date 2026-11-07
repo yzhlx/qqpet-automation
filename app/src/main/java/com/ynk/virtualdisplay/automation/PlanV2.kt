@@ -1,0 +1,234 @@
+package com.ynk.virtualdisplay.automation
+
+import java.util.Collections
+
+enum class PlanStepType { SIGN_IN, MAILBOX, LUCKY_BAG, WORK, CARE, STUDY, ADVENTURE }
+enum class WorkTrigger { ALWAYS, IF_FUNDS_SHORT }
+enum class ExecutionProfile { SELECTED_ACTIONS, LEGACY_MANAGED }
+
+sealed interface PlanStep {
+    val stepId: String
+    val type: PlanStepType
+}
+
+data class WorkStep(
+    override val stepId: String,
+    val workOptionId: String,
+    val trigger: WorkTrigger = WorkTrigger.ALWAYS,
+    val shifts: Int = 1,
+) : PlanStep {
+    override val type: PlanStepType get() = PlanStepType.WORK
+    init {
+        require(stepId.isNotBlank()) { "PLAN_STEP_ID_BLANK" }
+        require(workOptionId.isNotBlank()) { "PLAN_WORK_OPTION_BLANK" }
+        require(shifts == 1) { "PLAN_WORK_SHIFTS_INVALID:$shifts" }
+    }
+}
+
+data class CareStep(
+    override val stepId: String,
+    val energyThreshold: Int,
+    val cleanlinessThreshold: Int,
+) : PlanStep {
+    override val type: PlanStepType get() = PlanStepType.CARE
+    init {
+        require(stepId.isNotBlank()) { "PLAN_STEP_ID_BLANK" }
+        require(energyThreshold in 60..100) { "PLAN_CARE_ENERGY_OUT_OF_RANGE:$energyThreshold" }
+        require(cleanlinessThreshold in 60..100) { "PLAN_CARE_CLEANLINESS_OUT_OF_RANGE:$cleanlinessThreshold" }
+    }
+}
+
+/** STR-09：均衡轮换里的一门课——练哪个属性、上哪门课。 */
+data class StudyRotation(val attribute: String, val courseId: String) {
+    init {
+        require(attribute.isNotBlank()) { "PLAN_ROTATION_ATTRIBUTE_BLANK" }
+        require(courseId.isNotBlank()) { "PLAN_ROTATION_COURSE_BLANK" }
+    }
+}
+
+/**
+ * 一个学习步骤。开了均衡（[rotation] 非空）时，[courseId] 是第一节上的课，
+ * 后面按 [rotation] 的顺序轮换；单属性目标时 [targetAttribute] 写明练哪个属性。
+ */
+data class StudyStep(
+    override val stepId: String,
+    val courseId: String,
+    val rounds: Int = 1,
+    val targetAttribute: String? = null,
+    val rotation: List<StudyRotation> = emptyList(),
+) : PlanStep {
+    override val type: PlanStepType get() = PlanStepType.STUDY
+
+    /** 本步骤会上的课：轮换时按轮换顺序，否则就是自己这一门。 */
+    val courseIds: List<String>
+        get() = if (rotation.isEmpty()) listOf(courseId) else rotation.map { it.courseId }
+
+    init {
+        require(stepId.isNotBlank()) { "PLAN_STEP_ID_BLANK" }
+        require(courseId.isNotBlank()) { "PLAN_COURSE_BLANK" }
+        require(rounds in 1..10) { "PLAN_STUDY_ROUNDS_OUT_OF_RANGE:$rounds" }
+        if (rotation.isNotEmpty()) {
+            require(rotation.size <= 3) { "PLAN_STUDY_ROTATION_TOO_LARGE:${rotation.size}" }
+            require(rotation.map { it.attribute }.distinct().size == rotation.size) {
+                "PLAN_STUDY_ROTATION_ATTRIBUTE_DUPLICATE"
+            }
+            require(rotation.map { it.courseId }.distinct().size == rotation.size) {
+                "PLAN_STUDY_ROTATION_COURSE_DUPLICATE"
+            }
+            require(rotation.first().courseId == courseId) { "PLAN_STUDY_ROTATION_FIRST_COURSE_MISMATCH" }
+            require(targetAttribute == null) { "PLAN_STUDY_ROTATION_TARGET_CONFLICT" }
+        }
+    }
+}
+
+data class SignInStep(
+    override val stepId: String,
+) : PlanStep {
+    override val type: PlanStepType get() = PlanStepType.SIGN_IN
+    init {
+        require(stepId.isNotBlank()) { "PLAN_STEP_ID_BLANK" }
+    }
+}
+
+data class MailboxStep(
+    override val stepId: String,
+) : PlanStep {
+    override val type: PlanStepType get() = PlanStepType.MAILBOX
+    init {
+        require(stepId.isNotBlank()) { "PLAN_STEP_ID_BLANK" }
+    }
+}
+
+data class LuckyBagStep(
+    override val stepId: String,
+    val maxDailyCount: Int = 5,
+    val scanIntervalMinutes: Int = 30,
+) : PlanStep {
+    override val type: PlanStepType get() = PlanStepType.LUCKY_BAG
+    init {
+        require(stepId.isNotBlank()) { "PLAN_STEP_ID_BLANK" }
+        require(maxDailyCount in 1..20) { "PLAN_LUCKY_BAG_MAX_DAILY_COUNT_OUT_OF_RANGE:$maxDailyCount" }
+        require(scanIntervalMinutes in 5..180) { "PLAN_LUCKY_BAG_SCAN_INTERVAL_OUT_OF_RANGE:$scanIntervalMinutes" }
+    }
+}
+
+
+data class AdventureStep(
+    override val stepId: String,
+    val mode: AdventureMode = AdventureMode.NEARBY_WALK,
+    val rounds: Int = 1,
+    val maxDailyRounds: Int? = null,
+) : PlanStep {
+    override val type: PlanStepType get() = PlanStepType.ADVENTURE
+    init {
+        require(stepId.isNotBlank()) { "PLAN_STEP_ID_BLANK" }
+        require(rounds in 1..10) { "PLAN_ADVENTURE_ROUNDS_OUT_OF_RANGE:$rounds" }
+        if (maxDailyRounds != null) {
+            require(maxDailyRounds in 1..50) { "PLAN_ADVENTURE_MAX_DAILY_INVALID:$maxDailyRounds" }
+        }
+    }
+}
+
+
+/** Pure configuration. The list is detached and unmodifiable even if a caller supplied a MutableList. */
+class PlanV2(
+    val schemaVersion: Int = 2,
+    val planId: String,
+    val name: String,
+    val dailyBudgetMinutes: Int,
+    steps: List<PlanStep>,
+    val executionProfile: ExecutionProfile = ExecutionProfile.SELECTED_ACTIONS,
+    val legacySource: String? = null,
+    /** 金币底线：学习扣费后余额不得低于该值；null 表示不启用 (STR-13)。 */
+    val minCoinFloor: Int? = null,
+    /** 每日学习净支出上限（金币）；null 表示不启用 (STR-13)。 */
+    val maxDailyNetSpend: Int? = null,
+    /** 相邻步骤间最小间隔（分钟）；null 表示不启用 (STR-15)。 */
+    val stepIntervalMinutes: Int? = null,
+    /** 方案级失败后冷却（分钟）；冷却期内拒绝重开同一方案 (STR-15)。 */
+    val failureCooldownMinutes: Int? = null,
+    /** 受阻时按规则转移到后面的动作 (STR-01/STR-02)；false 表示受阻就让本轮停下。 */
+    val transferOnBlock: Boolean = false,
+    /** 今日学习停止线（节）；null 表示不启用 (STR-08)。 */
+    val dailyStudyRoundCap: Int? = null,
+) {
+    val steps: List<PlanStep> = Collections.unmodifiableList(steps.toList())
+
+    init {
+        require(schemaVersion == 2) { "PLAN_SCHEMA_UNSUPPORTED:$schemaVersion" }
+        require(planId.isNotBlank()) { "PLAN_ID_BLANK" }
+        require(name.isNotBlank() && name.length in 1..80) { "PLAN_NAME_INVALID" }
+        require(dailyBudgetMinutes in 1..480) { "PLAN_BUDGET_OUT_OF_RANGE:$dailyBudgetMinutes" }
+        require(this.steps.size in 1..7) { "PLAN_STEPS_COUNT_INVALID:${this.steps.size}" }
+        require(this.steps.map { it.stepId }.distinct().size == this.steps.size) { "PLAN_STEP_ID_DUPLICATE" }
+        require(this.steps.map { it.type }.distinct().size == this.steps.size) { "PLAN_STEP_TYPE_DUPLICATE" }
+        require(this.steps.zipWithNext().all { (left, right) -> left.type.ordinal < right.type.ordinal }) {
+            "PLAN_STEP_ORDER_INVALID"
+        }
+        this.steps.filterIsInstance<WorkStep>().forEach { work ->
+            require(work.trigger != WorkTrigger.IF_FUNDS_SHORT || this.steps.any { it is StudyStep }) {
+                "PLAN_CONDITIONAL_WORK_REQUIRES_STUDY"
+            }
+        }
+        if (minCoinFloor != null) require(minCoinFloor in 0..999_999) { "PLAN_MIN_COIN_FLOOR_OUT_OF_RANGE:$minCoinFloor" }
+        if (maxDailyNetSpend != null) require(maxDailyNetSpend in 1..999_999) { "PLAN_MAX_DAILY_NET_SPEND_OUT_OF_RANGE:$maxDailyNetSpend" }
+        if (stepIntervalMinutes != null) require(stepIntervalMinutes in 1..120) { "PLAN_STEP_INTERVAL_OUT_OF_RANGE:$stepIntervalMinutes" }
+        if (failureCooldownMinutes != null) require(failureCooldownMinutes in 1..240) { "PLAN_FAILURE_COOLDOWN_OUT_OF_RANGE:$failureCooldownMinutes" }
+        if (dailyStudyRoundCap != null) {
+            require(dailyStudyRoundCap in 1..50) { "PLAN_DAILY_STUDY_CAP_OUT_OF_RANGE:$dailyStudyRoundCap" }
+            require(this.steps.any { it is StudyStep }) { "PLAN_DAILY_STUDY_CAP_REQUIRES_STUDY" }
+        }
+    }
+
+    fun copy(
+        schemaVersion: Int = this.schemaVersion,
+        planId: String = this.planId,
+        name: String = this.name,
+        dailyBudgetMinutes: Int = this.dailyBudgetMinutes,
+        steps: List<PlanStep> = this.steps,
+        executionProfile: ExecutionProfile = this.executionProfile,
+        legacySource: String? = this.legacySource,
+        minCoinFloor: Int? = this.minCoinFloor,
+        maxDailyNetSpend: Int? = this.maxDailyNetSpend,
+        stepIntervalMinutes: Int? = this.stepIntervalMinutes,
+        failureCooldownMinutes: Int? = this.failureCooldownMinutes,
+        transferOnBlock: Boolean = this.transferOnBlock,
+        dailyStudyRoundCap: Int? = this.dailyStudyRoundCap,
+    ) = PlanV2(schemaVersion, planId, name, dailyBudgetMinutes, steps, executionProfile, legacySource,
+        minCoinFloor, maxDailyNetSpend, stepIntervalMinutes, failureCooldownMinutes, transferOnBlock, dailyStudyRoundCap)
+
+    override fun equals(other: Any?): Boolean = other is PlanV2 &&
+        schemaVersion == other.schemaVersion && planId == other.planId && name == other.name &&
+        dailyBudgetMinutes == other.dailyBudgetMinutes && steps == other.steps &&
+        executionProfile == other.executionProfile && legacySource == other.legacySource &&
+        minCoinFloor == other.minCoinFloor && maxDailyNetSpend == other.maxDailyNetSpend &&
+        stepIntervalMinutes == other.stepIntervalMinutes && failureCooldownMinutes == other.failureCooldownMinutes &&
+        transferOnBlock == other.transferOnBlock && dailyStudyRoundCap == other.dailyStudyRoundCap
+
+    override fun hashCode(): Int {
+        var result = schemaVersion
+        result = 31 * result + planId.hashCode()
+        result = 31 * result + name.hashCode()
+        result = 31 * result + dailyBudgetMinutes
+        result = 31 * result + steps.hashCode()
+        result = 31 * result + executionProfile.hashCode()
+        result = 31 * result + (legacySource?.hashCode() ?: 0)
+        result = 31 * result + (minCoinFloor ?: 0)
+        result = 31 * result + (maxDailyNetSpend ?: 0)
+        result = 31 * result + (stepIntervalMinutes ?: 0)
+        result = 31 * result + (failureCooldownMinutes ?: 0)
+        result = 31 * result + (if (transferOnBlock) 1 else 0)
+        return 31 * result + (dailyStudyRoundCap ?: 0)
+    }
+
+    override fun toString(): String = "PlanV2(planId=$planId, name=$name, steps=$steps, executionProfile=$executionProfile)"
+}
+
+/** Callers supply the verified zero-coin-entry work whitelist; no Android or catalog initialization. */
+object PlanValidator {
+    fun validate(plan: PlanV2, verifiedWorkIds: Set<String>) {
+        plan.steps.filterIsInstance<WorkStep>().forEach { work ->
+            require(work.workOptionId in verifiedWorkIds) { "PLAN_WORK_OPTION_NOT_VERIFIED:${work.workOptionId}" }
+        }
+    }
+}

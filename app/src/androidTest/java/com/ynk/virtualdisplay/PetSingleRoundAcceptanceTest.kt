@@ -101,7 +101,7 @@ class PetSingleRoundAcceptanceTest {
         fun guard() {
             check(android.os.Build.MODEL == "FOA-AL00") { "DEVICE_MODEL_CHANGED" }
             val qq = app.packageManager.getPackageInfo("com.tencent.mobileqq", 0)
-            check(qq.versionName == "9.3.70" && qq.longVersionCode == 16410L) { "QQ_VERSION_CHANGED" }
+            check(qq.versionName == "9.3.75" && qq.longVersionCode == 16580L) { "QQ_VERSION_CHANGED" }
             check(repo.managedDisplayIds.value.contains(displayId)) { "DISPLAY_NOT_MANAGED" }
             check(repo.connectionStatus.value == ConnectionStatus.CONNECTED) { "DISPLAY_DISCONNECTED" }
             val stats = shell("dumpsys activity activities")

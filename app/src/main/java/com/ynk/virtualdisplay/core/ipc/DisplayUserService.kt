@@ -17,6 +17,7 @@ import com.genymobile.scrcpy.device.Device
 import com.genymobile.scrcpy.wrappers.ServiceManager
 import org.lsposed.hiddenapibypass.HiddenApiBypass
 import java.util.concurrent.ConcurrentHashMap
+import com.ynk.virtualdisplay.automation.PetDisplayPicker
 import android.media.ImageReader
 import android.graphics.PixelFormat
 import android.os.HandlerThread
@@ -40,7 +41,12 @@ class DisplayUserService @Keep constructor(private val context: Context) : IDisp
 
     companion object {
         private const val TAG = "DisplayUserService"
+        private const val APP_PACKAGE = "com.ynk.virtualdisplay"
         private val KNOWN_MANAGED_NAME_PREFIXES = listOf("Shizuku_VD_", "vd")
+
+        /** Other pids from a `pidof` line; never this process. */
+        internal fun stalePids(pidofOutput: String, selfPid: Int): List<Int> =
+            pidofOutput.trim().split(Regex("\\s+")).mapNotNull { it.toIntOrNull() }.filter { it != selfPid }
     }
 
     private val displayManager by lazy {
@@ -55,6 +61,7 @@ class DisplayUserService @Keep constructor(private val context: Context) : IDisp
     init {
         try {
             Log.d(TAG, "DisplayUserService init in process: ${getCurrentProcessName()}")
+            killStaleServiceProcesses()
             HiddenApiBypass.addHiddenApiExemptions("")
             Workarounds.apply()
             Log.d(TAG, "Workarounds applied successfully")
@@ -63,6 +70,32 @@ class DisplayUserService @Keep constructor(private val context: Context) : IDisp
         } catch (e: Throwable) {
             Log.e(TAG, "Critical error during service initialization", e)
         }
+    }
+
+    /**
+     * The daemon survives an app upgrade, and a new version starts a second process. Measured
+     * 2026-11-01: ten leftovers made the app's map taps and frames fail until they were killed,
+     * while adb taps on the same screen still worked.
+     */
+    private fun killStaleServiceProcesses() {
+        for (suffix in listOf("display_service", "capture_service")) {
+            runCatching {
+                val pidof = ProcessBuilder("pidof", "$APP_PACKAGE:$suffix").redirectErrorStream(true).start()
+                val output = pidof.inputStream.bufferedReader().use { it.readText() }
+                pidof.waitFor()
+                stalePids(output, android.os.Process.myPid()).forEach { pid ->
+                    Log.w(TAG, "Killing stale $suffix process $pid")
+                    android.os.Process.killProcess(pid)
+                }
+            }.onFailure { Log.w(TAG, "Stale $suffix cleanup failed", it) }
+        }
+    }
+
+    override fun getDisplaysHostingPackage(packageName: String): IntArray {
+        val dumpsys = ProcessBuilder("dumpsys", "activity", "activities").redirectErrorStream(true).start()
+        val output = dumpsys.inputStream.bufferedReader().use { it.readText() }
+        dumpsys.waitFor()
+        return PetDisplayPicker.displaysHosting(output, packageName).toIntArray()
     }
 
     private fun getCurrentProcessName(): String {
@@ -189,12 +222,14 @@ class DisplayUserService @Keep constructor(private val context: Context) : IDisp
                 Log.e(TAG, "releaseVirtualDisplay failed for active handle: displayId=$displayId", e)
                 knownDisplays[displayId]?.isOrphan = true
                 knownDisplays[displayId]?.lastSeenAtMs = System.currentTimeMillis()
+                // Report the failure: a silent return made the app say "已释放" while the screen stayed.
+                throw IllegalStateException("RELEASE_FAILED:$displayId", e)
             }
         } else {
             val known = knownDisplays[displayId]
             if (known == null) {
                 Log.w(TAG, "releaseVirtualDisplay: Display $displayId not found in registry")
-                return
+                throw IllegalStateException("NOT_OWNED:$displayId")
             }
             val released = bestEffortReleaseOrphan(displayId)
             if (released) {
@@ -204,6 +239,7 @@ class DisplayUserService @Keep constructor(private val context: Context) : IDisp
                 known.isOrphan = true
                 known.lastSeenAtMs = System.currentTimeMillis()
                 Log.w(TAG, "releaseVirtualDisplay: orphan display $displayId cannot be released without recoverable handle")
+                throw IllegalStateException("ORPHAN_NOT_RELEASABLE:$displayId")
             }
         }
     }

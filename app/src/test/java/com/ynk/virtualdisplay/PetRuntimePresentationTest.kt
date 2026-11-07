@@ -401,7 +401,7 @@ class PetRuntimePresentationTest {
         assertEquals("轮次：2/3", view.roundText)
         assertEquals("已完成：1/3", view.completedText)
         assertEquals("运行时长：02:05", view.durationText)
-        assertEquals("暂停：2 次 · 原因：RECOVERY_PAGE_MISMATCH", view.pauseText)
+        assertEquals("暂停：2 次 · 原因：页面对不上", view.pauseText)
         assertEquals("等待成绩", view.nextStepText)
         assertEquals(ManagedSessionPhase.CURRENT, view.sessionPhase)
     }
@@ -459,6 +459,37 @@ class PetRuntimePresentationTest {
         assertEquals("拒绝默认/无效 displayId", view.legacyStatusText)
         assertNotEquals(view.legacyStatusText, view.lifecycleText)
         assertTrue(view.legacyActive)
+    }
+
+
+    // --- OBS-02 course countdown ---------------------------------------------------------------
+
+    private fun studying(
+        state: ManagedRuntimeState = healthy(ManagedRuntimeState(
+            sessionId = "s", runState = SessionRunState.RUNNING, round = 2, totalRounds = 3,
+            currentFlow = "STUDY")),
+        startedAt: Long = wall,
+    ) = state.copy(courseStartedAtMs = startedAt, courseMinutes = 10)
+
+    @Test fun courseCountdownUsesTheConfirmedStartAndDuration() {
+        val view = viewOf(studying(), running(), wallNow = wall + 4 * 60_000L)
+        assertEquals("第 2 节 · 预计还要 6 分钟", view.courseProgressText)
+    }
+
+    @Test fun courseCountdownNeverInventsProgressWithoutStartOrDuration() {
+        val noStart = healthy(ManagedRuntimeState(sessionId = "s", runState = SessionRunState.RUNNING))
+        assertNull(viewOf(noStart, running()).courseProgressText)
+        val noMinutes = noStart.copy(courseStartedAtMs = wall)
+        assertNull(viewOf(noMinutes, running()).courseProgressText)
+    }
+
+    @Test fun aFinishedCourseWaitsForTheResultInsteadOfCountingDown() {
+        val view = viewOf(studying(), running(), wallNow = wall + 11 * 60_000L)
+        assertEquals("第 2 节 · 课程时间已到，等待结果", view.courseProgressText)
+    }
+
+    @Test fun aHistoricalSessionShowsNoCountdown() {
+        assertNull(viewOf(studying(), PetRuntime.Snapshot(running = false), wallNow = wall + 60_000L).courseProgressText)
     }
 
     // --- read-only guarantee -------------------------------------------------------------------

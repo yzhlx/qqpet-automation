@@ -1,4 +1,4 @@
-package com.ynk.virtualdisplay.automation
+﻿package com.ynk.virtualdisplay.automation
 
 import android.graphics.Bitmap
 import android.graphics.Rect
@@ -26,6 +26,10 @@ class MlKitCourseNameReader : CourseNameReader {
                 lines.set(result.textBlocks.flatMap { block ->
                     block.lines.mapNotNull { line ->
                         val box = line.boundingBox ?: return@mapNotNull null
+                        // Reject invalid geometry; clipping can turn a corrupt target into a real tap.
+                        if (box.left < 0 || box.top < 0 || box.right > frame.width ||
+                            box.bottom > frame.height || box.left >= box.right || box.top >= box.bottom)
+                            return@mapNotNull null
                         TextLine(line.text, Rect(box))
                     }
                 })

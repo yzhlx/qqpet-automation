@@ -129,6 +129,13 @@ class ShizukuDisplayRepository(private val context: Context) : IDisplayRepositor
         }
     }
 
+    override suspend fun displaysHosting(packageName: String): Result<Set<Int>> = withContext(bridgeDispatcher) {
+        runCatching {
+            val svc = displayService ?: throw IllegalStateException("Service not connected")
+            svc.getDisplaysHostingPackage(packageName).toSet()
+        }
+    }
+
     override suspend fun setDisplaySurface(displayId: Int, surface: Surface?): Result<Unit> = withContext(bridgeDispatcher) {
         runCatching {
             val svc = displayService ?: throw IllegalStateException("Service not connected")

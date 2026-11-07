@@ -67,7 +67,7 @@ fun VirtualDisplayScreen(
         val dm = context.resources.displayMetrics
         listOf(
             DisplayPreset("本机", dm.widthPixels, dm.heightPixels, dm.densityDpi),
-            DisplayPreset("手机 720p", 720, 1280, 320),
+            DisplayPreset("宠物托管", 720, 1600, 320),
             DisplayPreset("平板 2.5K", 2560, 1600, 320),
             DisplayPreset("电视 1080p", 1920, 1080, 320)
         )
@@ -411,11 +411,15 @@ fun VirtualDisplayScreen(
                                 enabled = !uiState.isLoading
                             ) {
                                 if (uiState.isLoading) {
-                                    CircularProgressIndicator(
-                                        modifier = Modifier.size(18.dp),
-                                        strokeWidth = 2.dp,
-                                        color = MaterialTheme.colorScheme.onPrimary
-                                    )
+                                    if (com.ynk.virtualdisplay.ui.theme.AppearancePrefs.reduceMotion(context)) {
+                                        Text("…", color = MaterialTheme.colorScheme.onPrimary)
+                                    } else {
+                                        CircularProgressIndicator(
+                                            modifier = Modifier.size(18.dp),
+                                            strokeWidth = 2.dp,
+                                            color = MaterialTheme.colorScheme.onPrimary
+                                        )
+                                    }
                                 } else {
                                     Text("创建并启动", fontWeight = FontWeight.Bold)
                                 }

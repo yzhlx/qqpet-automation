@@ -4,6 +4,8 @@ import com.ynk.virtualdisplay.automation.ManagedRuntimeState
 import com.ynk.virtualdisplay.automation.ObservedValue
 import com.ynk.virtualdisplay.automation.PetRuntime
 import com.ynk.virtualdisplay.automation.SessionRunState
+import com.ynk.virtualdisplay.ui.StrategyDisplayLine
+import com.ynk.virtualdisplay.ui.StrategyPresentation
 
 /**
  * Read-only presentation mapping for the managed session snapshot.
@@ -73,11 +75,16 @@ data class ManagedRuntimeView(
     val roundText: String,
     val completedText: String,
     val durationText: String,
+    /** OBS-02：本节课程的预计剩余，只有本会话正在上课且时长已确认时才有。 */
+    val courseProgressText: String?,
     val pauseText: String,
     val nextStepText: String,
     /** States only which readings are current observations; never a course-readiness verdict. */
     val confirmedReadingsText: String,
     val health: List<HealthDisplayLine>,
+    /** STR-16: why every action of this round was done or left out. */
+    val strategyLines: List<StrategyDisplayLine>,
+    val strategySummary: String,
 ) {
     /**
      * Parses the "轮次：N/M" line back into a pair for headline composition. Null when the snapshot
@@ -139,10 +146,13 @@ object ManagedRuntimePresentation {
             completedText = if (managed.totalRounds <= 0) "已完成：${managed.completedRounds} 节"
                 else "已完成：${managed.completedRounds}/${managed.totalRounds}",
             durationText = durationText(managed, elapsedNowMs),
+            courseProgressText = courseProgressText(aged, currentSession, wallNowMs),
             pauseText = pauseText(managed.pauseCount, managed.pauseReason),
             nextStepText = managed.nextStep,
             confirmedReadingsText = confirmedReadingsText(aged, currentSession),
             health = health,
+            strategyLines = StrategyPresentation.lines(aged.strategyActions),
+            strategySummary = StrategyPresentation.summary(aged.strategyActions),
         )
     }
 
@@ -204,6 +214,24 @@ object ManagedRuntimePresentation {
         return "运行时长：${formatDuration(displayedRuntimeMs(managed, elapsedNowMs))}"
     }
 
+    /**
+     * OBS-02：用开课确认时的墙钟与页面读到的时长算预计剩余。没有这两项、不是本会话或已结束时
+     * 返回 null；不按轮次或运行时长猜课程进度。
+     */
+    fun courseProgressText(state: ManagedRuntimeState, sessionIsCurrent: Boolean, wallNowMs: Long): String? {
+        if (!sessionIsCurrent || !isActive(state.runState)) return null
+        val started = state.courseStartedAtMs ?: return null
+        val minutes = state.courseMinutes ?: return null
+        if (minutes <= 0) return null
+        val remaining = minutes * 60_000L - (wallNowMs - started).coerceAtLeast(0)
+        val round = if (state.round > 0) "第 " + state.round + " 节 · " else ""
+        return when {
+            remaining > 60_000L -> round + "预计还要 " + ((remaining + 59_999L) / 60_000L) + " 分钟"
+            remaining > 0L -> round + "预计不到 1 分钟结束"
+            else -> round + "课程时间已到，等待结果"
+        }
+    }
+
     fun formatDuration(ms: Long): String {
         val safe = if (ms < 0) 0 else ms
         val totalSeconds = safe / 1000
@@ -215,7 +243,7 @@ object ManagedRuntimePresentation {
     }
 
     fun pauseText(pauseCount: Int, pauseReason: String?): String =
-        if (pauseReason == null) "暂停：$pauseCount 次" else "暂停：$pauseCount 次 · 原因：$pauseReason"
+        if (pauseReason == null) "暂停：$pauseCount 次" else "暂停：$pauseCount 次 · 原因：${com.ynk.virtualdisplay.ui.records.RecordsPresentation.stopReasonText(pauseReason)}"
 
     /**
      * Wall-clock instant after which no Known reading in this snapshot can still be current.

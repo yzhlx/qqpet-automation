@@ -13,6 +13,9 @@ data class DisplayInfoModel(
     val height: Int
 )
 
+val MainUiState.petDisplay: DisplayInfoModel?
+    get() = displays.firstOrNull { it.id == petDisplayId }
+
 /** The three user-facing tabs of the v0.1 redesign: 托管 / 记录 / 设置. */
 enum class ScreenTab {
     HOST,
@@ -31,6 +34,8 @@ enum class OverlayScreen {
     LOGS,
     CONSOLE,
     CALIBRATION,
+    MANUAL,
+    TUTORIAL,
 }
 
 /**
@@ -41,6 +46,10 @@ data class MainUiState(
     val connectionStatus: ConnectionStatus = ConnectionStatus.IDLE,
     val displays: List<DisplayInfoModel> = emptyList(),
     val orphanDisplayIds: List<Int> = emptyList(),
+    /** Displays QQ is on, as last reported by the privileged service. */
+    val qqDisplayIds: Set<Int> = emptySet(),
+    /** The background screen the pet automation uses; see [com.ynk.virtualdisplay.automation.PetDisplayPicker]. */
+    val petDisplayId: Int? = null,
     val statusMessage: String = "Ready",
     val isLoading: Boolean = false,
     val currentTab: ScreenTab = ScreenTab.HOST,

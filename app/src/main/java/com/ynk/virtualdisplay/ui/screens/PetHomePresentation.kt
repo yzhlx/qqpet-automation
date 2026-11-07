@@ -1,9 +1,15 @@
 package com.ynk.virtualdisplay.ui.screens
 
 import com.ynk.virtualdisplay.automation.ManagedRuntimeState
+import com.ynk.virtualdisplay.automation.ManualPause
+import com.ynk.virtualdisplay.automation.ManualPauseState
 import com.ynk.virtualdisplay.automation.ObservedValue
 import com.ynk.virtualdisplay.automation.SessionRunState
+import com.ynk.virtualdisplay.automation.QuietWindow
+import com.ynk.virtualdisplay.automation.QuietWindowPolicy
+import com.ynk.virtualdisplay.automation.QuietWindowText
 import com.ynk.virtualdisplay.automation.at
+import com.ynk.virtualdisplay.data.model.ShizukuState
 
 /**
  * Pure presentation layer for the v0.1 managed UI. No Android, Compose or automation *side-effect*
@@ -15,9 +21,9 @@ import com.ynk.virtualdisplay.automation.at
  *  1. The four observation states (KNOWN / UNKNOWN / STALE / UNSUPPORTED) stay visibly distinct.
  *     A missing reading reads as "—", never 0; a stale reading shows its previous number labelled
  *     as expired; a historical reading is never dressed up as a live one.
- *  2. Control affordances come from REAL capabilities only. The automation layer exposes just
- *     START and STOP. There is no manual pause/resume API, so pause is never an operable button;
- *     PAUSED / RESUMING are reported as the automatic recovery (SessionRecovery) that they are.
+ *  2. Control affordances come from REAL capabilities only. The automation layer exposes START,
+ *     STOP and a manual pause that only takes effect between actions; PAUSED / RESUMING driven by
+ *     SessionRecovery are reported as the automatic recovery that they are.
  */
 
 /** One of the three top health stats, kept distinct across the four observation states. */
@@ -71,7 +77,7 @@ object HealthStatPresentation {
         is ObservedValue.Stale -> HealthStat(
             name = name,
             valueText = "≈${aged.previous.value}",
-            meta = "已过期 · ${timeFormatter(aged.previous.observedAt)}",
+            meta = "上次 ${timeFormatter(aged.previous.observedAt)}",
             status = HealthStatStatus.STALE,
             current = false,
         )
@@ -87,39 +93,47 @@ data class StatusPill(val text: String, val tone: StatusPillTone)
 
 object StatusPillPresentation {
     /**
-     * Reference labels: 空闲 (nothing running), 托管中 (a live session), 已暂停 (auto-recovery
-     * paused). NOT_STARTED / a settled historical snapshot read as 空闲 on the home screen because
+     * Reference labels: 蟹在歇着 (nothing running), 蟹在忙 (a live session), 已暂停 (a manual pause
+     * or auto-recovery). NOT_STARTED / a settled historical snapshot read as 蟹在歇着 on the home screen because
      * no managed batch is running right now; the exact lifecycle text is still available on the card.
      */
     fun of(view: ManagedRuntimeView, legacyActive: Boolean): StatusPill = when {
         !legacyActive && view.lifecycle == ManagedLifecycle.RUNNING -> StatusPill("启动中", StatusPillTone.NEUTRAL)
-        view.lifecycle == ManagedLifecycle.RUNNING -> StatusPill("托管中", StatusPillTone.ACTIVE)
+        view.lifecycle == ManagedLifecycle.RUNNING -> StatusPill("蟹在忙", StatusPillTone.ACTIVE)
         view.lifecycle == ManagedLifecycle.PAUSED -> StatusPill("已暂停", StatusPillTone.ATTENTION)
         view.lifecycle == ManagedLifecycle.RESUMING -> StatusPill("恢复中", StatusPillTone.ATTENTION)
-        view.lifecycle == ManagedLifecycle.COMPLETED -> StatusPill("已完成", StatusPillTone.SUCCESS)
+        view.lifecycle == ManagedLifecycle.COMPLETED -> StatusPill("蟹啦，搞定", StatusPillTone.SUCCESS)
         view.lifecycle == ManagedLifecycle.FAILED -> StatusPill("失败", StatusPillTone.FAILURE)
         view.lifecycle == ManagedLifecycle.STOPPED -> StatusPill("已停止", StatusPillTone.NEUTRAL)
-        else -> StatusPill("空闲", StatusPillTone.NEUTRAL)
+        else -> StatusPill("蟹在歇着", StatusPillTone.NEUTRAL)
     }
 }
 
 /**
  * The footer control model. Derived from real capabilities, never from what the mock-up drew.
  *
- * The business layer only supports START (a bounded 1..3 round batch) and STOP. There is no manual
- * pause/resume entry point, so [pauseEnabled] and [manualPauseAvailable] are always false: the UI
- * must show pause as automatic recovery only, never as a button the user can press.
+ * The business layer supports START (a bounded batch), STOP and a manual pause ([ManualPause]). The
+ * manual pause only takes effect at the next boundary between actions, so it is offered only for a
+ * session that has one, and never while the automatic recovery (SessionRecovery) owns PAUSED /
+ * RESUMING.
  */
 data class ManagedControls(
     val startEnabled: Boolean,
     val stopEnabled: Boolean,
+    /** 暂停 can be pressed right now. */
     val pauseEnabled: Boolean,
-    /** False for the whole of v0.1: no manual pause API exists in the automation layer. */
+    /** The pause button is shown: a boundary is still ahead, or a manual pause is requested or held. */
     val manualPauseAvailable: Boolean,
+    /** A manual pause is requested or held, so the same button withdraws or continues it. */
+    val resumeEnabled: Boolean,
+    /** 暂停 / 取消暂停 / 继续. */
+    val pauseButtonText: String,
     /** True when PAUSED/RESUMING is being driven automatically by SessionRecovery. */
     val automaticRecoveryActive: Boolean,
-    /** Human explanation for why the pause control is not operable. */
-    val pauseUnavailableReason: String,
+    /** Why a shown pause button cannot be pressed now; null when it can. */
+    val pauseUnavailableReason: String?,
+    /** Shown while a pause request waits for its boundary. A held pause is explained by the paused banner. */
+    val manualPauseNote: String?,
     /** True when the primary footer is the single 开始托管 button (idle / settled). */
     val showStartPrimary: Boolean,
     /** Real, human-readable reason the start button is disabled; null when start is possible. */
@@ -129,8 +143,8 @@ data class ManagedControls(
 )
 
 object ManagedControlsPresentation {
-    private const val PAUSE_REASON =
-        "v0.1 未开放手动暂停：检测到异常时会自动暂停并尝试恢复，期间不发送任何输入。"
+    private const val RECOVERING_REASON = "正在自动恢复，恢复后才能暂停。"
+    private const val REQUESTED_NOTE = "做完当前这一步就暂停，正在上的课或正在打的工不会被打断。"
 
     /**
      * @param legacyActive whether the foreground service is running a session right now
@@ -142,6 +156,8 @@ object ManagedControlsPresentation {
      *   start. Shown verbatim so the user is never told "ready" by a UI that is more permissive than
      *   the real gate.
      * @param displayReady whether a 720×1600 virtual display is currently available and managed.
+     * @param pausable whether a boundary between actions is still ahead (ManagedRuntimeState.pauseBoundariesLeft > 0).
+     * @param manualPause the current [ManualPause] state.
      */
     fun of(
         legacyActive: Boolean,
@@ -149,6 +165,8 @@ object ManagedControlsPresentation {
         canStart: Boolean,
         profileBlockers: List<String> = emptyList(),
         displayReady: Boolean = true,
+        pausable: Boolean = false,
+        manualPause: ManualPauseState = ManualPauseState.NONE,
     ): ManagedControls {
         val blocker = when {
             canStart -> null
@@ -156,14 +174,24 @@ object ManagedControlsPresentation {
             !displayReady -> "未找到已托管的 720×1600 虚拟屏，请先在「设置 › 虚拟屏控制台」创建。"
             else -> "Shizuku 未就绪或虚拟屏未被托管，暂不能开始。"
         }
+        val manualActive = legacyActive && manualPause != ManualPauseState.NONE
+        val manualHeld = legacyActive && manualPause == ManualPauseState.HELD
+        val recovering = legacyActive && !manualHeld &&
+            (runState == SessionRunState.PAUSED || runState == SessionRunState.RESUMING)
         return ManagedControls(
             startEnabled = canStart && !legacyActive,
             stopEnabled = legacyActive,
-            pauseEnabled = false,
-            manualPauseAvailable = false,
-            automaticRecoveryActive = legacyActive &&
-                (runState == SessionRunState.PAUSED || runState == SessionRunState.RESUMING),
-            pauseUnavailableReason = PAUSE_REASON,
+            pauseEnabled = legacyActive && pausable && !manualActive && !recovering,
+            manualPauseAvailable = legacyActive && (pausable || manualActive),
+            resumeEnabled = manualActive,
+            pauseButtonText = when {
+                manualHeld -> "继续"
+                manualActive -> "取消暂停"
+                else -> "暂停"
+            },
+            automaticRecoveryActive = recovering,
+            pauseUnavailableReason = if (legacyActive && pausable && !manualActive && recovering) RECOVERING_REASON else null,
+            manualPauseNote = if (manualActive && !manualHeld) REQUESTED_NOTE else null,
             showStartPrimary = !legacyActive,
             blockerNote = if (legacyActive) null else blocker,
             batchRoundsSelectable = !legacyActive && canStart,
@@ -200,6 +228,19 @@ object RoundProgressPresentation {
     }
 }
 
+/** The four stages of one lesson. Steps outside a lesson have no stage, so no track is drawn for them. */
+object StudyStepTrack {
+    val LABELS = listOf("检查状态", "开始上课", "等成绩", "读取课后状态")
+
+    fun indexOf(step: String): Int? = when (step.uppercase()) {
+        "INITIAL_NAVIGATION", "CHECK_STATE", "VERIFY_READY", "RECOVER_IF_NEEDED" -> 0
+        "SELECT_COURSE", "CLEAR_PREVIOUS_RESULT", "START_COURSE" -> 1
+        "HIGH_FIVE", "WAIT_HIGH_FIVE_WINDOW", "WAIT_RESULT" -> 2
+        "READ_POST_STATE", "NEXT_ROUND" -> 3
+        else -> null
+    }
+}
+
 /**
  * One-row summary of the most recent finished batch, for the idle home card. It is built ONLY from a
  * persisted run record (see [com.ynk.virtualdisplay.ui.data.SessionRunRecord]); when there is no
@@ -213,3 +254,66 @@ data class LastRunSummary(
     val minutes: Int,
     val screenshots: Int,
 )
+
+/**
+ * STR-17：夜间暂停在主页上的那一行字。
+ *
+ * 只在真的设置了窗口时出现；窗口外也保留一行，让用户知道「现在为什么能开始」，
+ * 不必进设置去猜。判定复用 [QuietWindowPolicy]，这里只负责措辞。
+ */
+object QuietWindowPresentation {
+    fun statusLine(window: QuietWindow, nowMinute: Int): String? {
+        if (!window.enabled || window.startMinute == window.endMinute) return null
+        return if (QuietWindowPolicy.isQuiet(nowMinute, window)) {
+            "夜间暂停中 · " + QuietWindowText.opensAt(window) + " 再开始"
+        } else {
+            "夜间暂停 " + window.startText() + "–" + window.endText() + " · 现在可以开始"
+        }
+    }
+
+    fun isQuietNow(window: QuietWindow, nowMinute: Int): Boolean =
+        QuietWindowPolicy.isQuiet(nowMinute, window)
+}
+
+
+/**
+ * 首页检查卡里 Shizuku 第一行的说法与下一步。
+ *
+ * 「服务没启动」和「服务在跑但没授权」是两种完全不同的阻塞，恢复动作也不同：
+ * 前者让用户点启动，后者让用户在 Shizuku 里勾选蟹啦。都没确认时不冒充已连接。
+ */
+data class ShizukuSetupHint(
+    val stateLabel: String,
+    val actionLabel: String?,
+    val message: String?,
+)
+
+fun shizukuSetupHint(state: ShizukuState): ShizukuSetupHint = when (state) {
+    ShizukuState.PermissionDenied -> ShizukuSetupHint(
+        stateLabel = "未授权",
+        actionLabel = "去授权",
+        message = "Shizuku 已在运行，但还没允许蟹啦使用。打开 Shizuku →「已授权应用」→ 勾选蟹啦；" +
+            "若弹出授权窗口请选「始终允许」。不用重新配对，方案与进度已保存。",
+    )
+    ShizukuState.NotRunning -> ShizukuSetupHint(
+        stateLabel = "未连接",
+        actionLabel = "去恢复",
+        message = "Shizuku 已停止：打开 Shizuku 点「启动」即可恢复，通常无需重新配对；" +
+            "若系统清除了无线调试授权，按 Shizuku 页面提示重新配对。方案与进度已保存。",
+    )
+    ShizukuState.Ready -> ShizukuSetupHint("已连接", null, null)
+    ShizukuState.Checking -> ShizukuSetupHint("检查中…", null, null)
+}
+
+/**
+ * 第 2、3 步都要等第 1 步就绪。用户提前点「一键创建」时，必须一句话说明为什么没反应、
+ * 下一步点哪里：静默失败会让人以为按钮坏了，也可能把「未知」误当成已完成。
+ */
+fun stepBlockedMessage(state: ShizukuState): String? = when (state) {
+    ShizukuState.PermissionDenied ->
+        "先完成第 1 步：Shizuku 还没允许蟹啦使用。点上面的「去授权」，在弹窗里选「始终允许」。"
+    ShizukuState.NotRunning ->
+        "先完成第 1 步：Shizuku 服务没在运行。点上面的「去恢复」，在 Shizuku 里点「启动」。"
+    ShizukuState.Checking -> "正在检查 Shizuku 状态，稍等一秒再点。"
+    ShizukuState.Ready -> null
+}

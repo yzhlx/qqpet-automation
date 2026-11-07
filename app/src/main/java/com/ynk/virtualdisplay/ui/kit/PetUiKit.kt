@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
@@ -28,6 +29,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -134,7 +136,7 @@ fun PetListRow(
                 color = if (dimmed) PetTokens.Ink3 else PetTokens.Ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
             if (sub != null) {
                 Spacer(Modifier.height(3.dp))
-                Text(sub, fontSize = 11.5.sp, color = if (dimmed) Color(0xFFB4B9C4) else PetTokens.Ink3,
+                Text(sub, fontSize = 11.5.sp, color = if (dimmed) PetTokens.Chevron else PetTokens.Ink3,
                     maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
         }
@@ -182,8 +184,50 @@ fun PetApproxValue(prefix: Boolean, value: String, modifier: Modifier = Modifier
 @Composable
 fun PetProgressBar(fraction: Float, modifier: Modifier = Modifier, color: Color = PetTokens.Blue) {
     val f = fraction.coerceIn(0f, 1f)
-    Box(modifier.fillMaxWidth().height(9.dp).background(Color(0xFFEDEFF4), pillShapes)) {
+    Box(modifier.fillMaxWidth().height(9.dp).background(PetTokens.BarTrack, pillShapes)) {
         Box(Modifier.fillMaxWidth(f).height(9.dp).background(color, pillShapes))
+    }
+}
+
+/** One segment per round: finished segments are full, the running one is pale with a dot. */
+@Composable
+fun PetSegmentBar(total: Int, completed: Int, running: Boolean, modifier: Modifier = Modifier) {
+    Row(modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        repeat(total.coerceAtLeast(1)) { index ->
+            val current = running && index == completed
+            Box(
+                Modifier.weight(1f).height(9.dp).background(
+                    when {
+                        index < completed -> PetTokens.Blue
+                        current -> PetTokens.BlueSoft
+                        else -> PetTokens.BarTrack
+                    },
+                    pillShapes,
+                ),
+                contentAlignment = Alignment.Center,
+            ) {
+                if (current) Box(Modifier.size(5.dp).background(PetTokens.Blue, CircleShape))
+            }
+        }
+    }
+}
+
+/** − value + control for a bounded number; the ends stop instead of wrapping. */
+@Composable
+fun PetStepper(value: Int, range: IntRange, step: Int, enabled: Boolean, onValue: (Int) -> Unit) {
+    val shape = RoundedCornerShape(PetTokens.TileRadius)
+    Row(Modifier.border(1.dp, PetTokens.Line, shape), verticalAlignment = Alignment.CenterVertically) {
+        StepperKey("−", enabled && value > range.first) { onValue((value - step).coerceIn(range)) }
+        Text("$value", Modifier.width(44.dp), fontSize = 15.sp, fontWeight = FontWeight.Bold,
+            color = PetTokens.Ink, textAlign = TextAlign.Center)
+        StepperKey("+", enabled && value < range.last) { onValue((value + step).coerceIn(range)) }
+    }
+}
+
+@Composable
+private fun StepperKey(text: String, enabled: Boolean, onClick: () -> Unit) {
+    Box(Modifier.size(38.dp).clickable(enabled = enabled, onClick = onClick), contentAlignment = Alignment.Center) {
+        Text(text, fontSize = 19.sp, color = if (enabled) PetTokens.Ink2 else PetTokens.Chevron)
     }
 }
 
@@ -214,6 +258,7 @@ fun PetFootButton(
     val enabled = tone != PetButtonTone.DISABLED
     Box(
         modifier = modifier
+            .fillMaxWidth()
             .height(PetTokens.BtnHeight)
             .background(bg, shape)
             .then(if (border != Color.Transparent) Modifier.border(1.5.dp, border, shape) else Modifier)
@@ -254,5 +299,23 @@ fun PetPlaceholderFilm(modifier: Modifier = Modifier) {
     Box(modifier.background(Brush.linearGradient(listOf(PetTokens.FilmTop, PetTokens.FilmBottom))),
         contentAlignment = Alignment.Center) {
         PetIcon(PetGlyph.Cam, 20.dp, alpha = 0.5f)
+    }
+}
+
+
+/**
+ * MKA-08「减少动效」：开启后等待指示不再旋转，用静态文字代替；关闭时是常规 spinner。
+ * 全应用的等待指示都走这一个入口，开关一处生效。
+ */
+@Composable
+fun CalmSpinner(
+    context: android.content.Context,
+    modifier: Modifier = Modifier,
+    color: Color = PetTokens.Ink2,
+) {
+    if (com.ynk.virtualdisplay.ui.theme.AppearancePrefs.reduceMotion(context)) {
+        Text("处理中…", fontSize = 13.sp, color = color, modifier = modifier)
+    } else {
+        CircularProgressIndicator(modifier = modifier, color = color)
     }
 }

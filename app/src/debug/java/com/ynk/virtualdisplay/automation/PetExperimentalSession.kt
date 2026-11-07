@@ -33,7 +33,9 @@ class PetExperimentalSession(
     private fun probe(name: String, l: Int, t: Int, r: Int, b: Int) =
         PetProfile.Probe(name, Rect(l,t,r,b), "pet_experimental/$name.png")
     private val home = probe("home",600,130,670,190)
-    private val room = probe("room",320,1340,405,1465)
+    // Room identity lives in PetPageProbes so this legacy runner cannot drift from the shipping
+    // definition: it reads the same asset at the same ROI.
+    private val room = PetPageProbes.room
     private val healthPanel = probe("health",169,228,250,415)
     private val cookie = probe("cookie",280,1255,440,1360)
     private val soap = PetProfile.Probe("soap",Rect(280,1280,440,1400),"pet_mvp/soap.png")

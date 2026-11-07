@@ -65,7 +65,7 @@ object CapsuleUiMapper {
         return CapsuleUiModel(
             visible = active || terminalVisible,
             visual = visual,
-            title = "QQ宠物托管",
+            title = "蟹啦",
             statusText = view.lifecycleText,
             durationText = view.durationText.removePrefix("运行时长："),
             flowText = view.flowText,

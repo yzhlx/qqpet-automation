@@ -15,7 +15,9 @@ enum class EventKind { HEALTH_OBSERVED, HEALTH_UNKNOWN, FRAME_VALID, FRAME_INVAL
     // Batch-wide consumable allowance ledger. Its own kind on purpose: SESSION_STATE is catalogued by
     // the runtime-state reader and CHECKPOINT is the page/health recovery ledger, so neither may be
     // reused to carry budget semantics without corrupting those records.
-    CARE_BUDGET }
+    CARE_BUDGET,
+    // The pet's adventure: a finished one (read off the map panel) or one handed over still running.
+    ADVENTURE_COMPLETED, ADVENTURE_PENDING }
 interface EventClock {
     fun wallTimeMs(): Long
     fun monotonicMs(): Long
@@ -28,6 +30,10 @@ data class SessionEvent(val eventId: String, val sessionId: String, val sequence
         "sequence" to sequence,"wallTimeMs" to wallTimeMs,"monotonicMs" to monotonicMs,
         "bootId" to bootId.fields(),"source" to source.name,"kind" to kind.name,"payload" to payload,"evidence" to evidence))
 }
+
+/** Stable event payload for flow observations; result must survive into the durable JSONL journal. */
+internal fun sessionErrorEventPayload(state: String, action: String, result: String, reason: String?): Map<String, Any?> =
+    linkedMapOf("state" to state, "action" to action, "result" to result, "reason" to reason)
 
 /** One local ordered durable JSONL stream; no queue or product state machine. */
 class SessionEventStore(directory: File, val sessionId: String, private val clock: EventClock) {

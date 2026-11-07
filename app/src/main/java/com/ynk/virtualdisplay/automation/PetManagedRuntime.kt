@@ -18,10 +18,17 @@ data class ManagedRuntimeState(
     val nextStep:String="等待启动",
     val pauseReason:String?=null,
     val pauseCount:Int=0,
+    /** Boundaries between actions not yet passed, where a manual pause can still take effect. */
+    val pauseBoundariesLeft:Int=0,
     val runtimeMs:Long=0,
+    /** OBS-02：本节课程在墙钟上的开始时间与页面确认的时长；两者都有才显示预计剩余。 */
+    val courseStartedAtMs:Long?=null,
+    val courseMinutes:Int?=null,
     val energy:ObservedValue<Int> = ObservedValue.Unknown("NOT_OBSERVED",0,"session not started"),
     val cleanliness:ObservedValue<Int> = ObservedValue.Unknown("NOT_OBSERVED",0,"session not started"),
     val mood:ObservedValue<Int> = ObservedValue.Unknown("NOT_OBSERVED",0,"session not started"),
+    /** STR-16: the real outcome and reason of every action of this round, for the "why" explanation. */
+    val strategyActions:List<StrategyExplanation.Action> = emptyList(),
 ) {
     fun at(wall:Long,elapsed:Long)=copy(energy=energy.at(wall,60000),cleanliness=cleanliness.at(wall,60000),
         mood=mood.at(wall,60000),runtimeMs=startedElapsedMs?.let {(elapsed-it).coerceAtLeast(0)} ?: 0)

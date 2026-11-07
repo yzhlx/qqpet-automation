@@ -1,6 +1,7 @@
 package com.ynk.virtualdisplay
 
 import android.graphics.BitmapFactory
+import android.graphics.Rect
 import android.os.Build
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
@@ -97,6 +98,7 @@ class PetPageIdentityTest {
         val expectFood = listOf("food-2033-before.png", "food-9448-enter.png")
         val expectRoom = listOf(
             "room-9448-home.png", "room-9343-before.png", "room-2045-after.png", "room-9448-18-before.png",
+            "room-2257-abort.png",
         )
         val all = expectBath + expectFood + expectRoom
         for (name in all) {
@@ -109,6 +111,80 @@ class PetPageIdentityTest {
                     assertFalse("$probe must reject foreign page $name (score=$s)", s >= 0.97)
                 }
             }
+        }
+    }
+
+    // ---------------------------------------------------------------------------------------
+    // ROOM identity. Regression for the managed-session abort at 22:57 on 2026-10-25: the
+    // room page was identified by QQ's LEFT ICON COLUMN, which carries the signed-in user's
+    // avatar and an unread badge - pixels this app never controls. When the badge repainted,
+    // the column scored 0.9235 against the shipped template and initialise() died with
+    // INITIAL_PAGE_UNKNOWN on a frame that is visibly the room page (fixture room-2257-abort.png).
+    // The same column also leaked: 0.9738..0.9888 on real FOOD frames, above every gate, and it
+    // only avoided misclassifying food because initialise() tests foodScene first.
+    // Identity is now the pet-bed/chair scene region: byte-identical across all 14 live room
+    // frames, 1.0000 on every room state including the abort frames, <= 0.8097 on every foreign.
+    // ---------------------------------------------------------------------------------------
+
+    /** Every real room frame is identified, including the two that aborted a live session. */
+    @Test fun roomSceneIdentifiesEveryMeasuredRoomState() {
+        val fixtures = listOf(
+            "room-9448-home.png", "room-9343-before.png", "room-2045-after.png",
+            "room-9448-18-before.png",
+            "room-2257-abort.png",   // the frame that aborted with INITIAL_PAGE_UNKNOWN
+        )
+        for (name in fixtures) {
+            val s = score(name, "room")
+            println("ROOM_POSITIVE fixture=$name score=$s")
+            assertTrue("Room scene identity must hold on $name (score=$s)", s >= 0.97)
+        }
+    }
+
+    /**
+     * The room identity must stay off QQ's chrome. The old ROI was the left icon column
+     * [40,120,130,560); the replacement is scene furniture below it. Pin the geometry so a
+     * future re-calibration cannot silently move identity back over the avatar and badge band.
+     */
+    @Test fun roomIdentityRoiIsSceneNotChrome() {
+        val iconColumn = Rect(40, 120, 130, 560)
+        val topChromeBand = Rect(0, 0, 720, 600)
+        val room = PetPageProbes.room.rect
+        assertFalse("room ROI $room must not overlap the QQ left icon column $iconColumn",
+            overlaps(room, iconColumn))
+        assertFalse("room ROI $room must sit below the top chrome band (header, avatar, badges)",
+            overlaps(room, topChromeBand))
+    }
+
+    private fun overlaps(a: Rect, b: Rect) =
+        a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom
+
+    /**
+     * The exact 22:57 failure mode, pinned as a fact about the OLD geometry: the left icon
+     * column [40,120,130,560) is QQ chrome and repaints between sessions (avatar + unread
+     * badge), so it can never be a stable identity. If a future change ever moves the room ROI
+     * back over that column, this assertion says so in the same terms as the abort.
+     */
+    @Test fun oldLeftIconColumnRepaintsBetweenSessions() {
+        val roomFrame = frame("room-9448-home.png")
+        val abortFrame = frame("room-2257-abort.png")
+        try {
+            var changed = 0
+            var total = 0
+            for (y in 120 until 560 step 4) {
+                for (x in 40 until 130 step 4) {
+                    total++
+                    if (roomFrame.getPixel(x, y) != abortFrame.getPixel(x, y)) changed++
+                }
+            }
+            assertTrue(
+                "The QQ icon column unexpectedly measured stable ($changed/$total). If the game " +
+                    "stopped repainting it, re-measure the room identity before trusting any " +
+                    "chrome-based ROI again.",
+                changed > total / 10,
+            )
+        } finally {
+            roomFrame.recycle()
+            abortFrame.recycle()
         }
     }
 

@@ -79,6 +79,12 @@ fun DisplayPreview(
                         }
 
                         override fun onSurfaceTextureDestroyed(surfaceTexture: SurfaceTexture): Boolean {
+                            // The SurfaceTexture is released when this returns true, so the surface the display
+                            // still points at is dead (SurfaceFlinger: dequeueBuffer error -32). Unbind it now;
+                            // the service falls back to its own reader, and capture re-attaches on its next timeout.
+                            CoroutineScope(Dispatchers.Main).launch {
+                                repository.setDisplaySurface(displayId, null)
+                            }
                             return true
                         }
 

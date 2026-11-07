@@ -28,6 +28,7 @@ evidence/screencap-err.txt
 # recipe. Never commit: .build-tmp is >100MB and Userslu158dsh-qqpet is a symlink
 # pointing back at the project's own parent directory.
 /.build-tmp/
+/app/.build-tmp/
 /.gradle-user/
 /Userslu158dsh-qqpet
 # Working copies of device probing scripts with screenshots; per the privacy rule
@@ -40,3 +41,17 @@ evidence/screencap-err.txt
 /work/
 /tools/digit-recon/frames/
 /tools/digit-recon/__pycache__/
+
+# Local execution scratch and signing material must stay private.
+/.foreman/
+/phys-*.png
+__pycache__/
+*.pyc
+*.keystore
+*.jks
+.env*
+
+/.build-test/
+
+.kotlin/
+/*.png

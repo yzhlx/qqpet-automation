@@ -10,13 +10,17 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.TimeoutCancellationException
 import org.json.JSONObject
 import java.io.File
+import java.io.FileNotFoundException
 
 class PetFlowContext(val context: Context, val capture: HeadlessDisplayCapture,
     val input: PetInputController, val evidence: File, val guard: () -> Unit,
     val logger: (String, Double?, String, String, String?) -> Unit,
     val onObservation: (String,Double?) -> Unit = {_,_->},
     val onRecovery: (SessionRunState,String,Int)->Unit = {_,_,_->},
-    val reconcile: (SessionCheckpoint,String)->Boolean={_,_->false}) {
+    val reconcile: (SessionCheckpoint,String)->Boolean={_,_->false},
+    val energyThreshold: Int = SessionPlan.DEFAULT_THRESHOLD,
+    val cleanlinessThreshold: Int = SessionPlan.DEFAULT_THRESHOLD,
+    learningEvidence: (suspend (Bitmap)->Boolean)? = null) {
     val profile=PetProfile.calibrated()
     val matcher=TemplateMatcher(context)
     var round=0
@@ -28,15 +32,27 @@ class PetFlowContext(val context: Context, val capture: HeadlessDisplayCapture,
         PetProfile.Probe(name, Rect(l,t,r,b), "pet_experimental/$name.png")
     val home = PetPageProbes.home
     val room = PetPageProbes.room
+    /** Every shipped room-skin template; a room page is proven by whichever skin matches. */
+    val roomProbes = PetPageProbes.roomProbes
+    val roomCatSkin = PetPageProbes.roomCatSkin
     val healthPanel = PetPageProbes.healthPanel
     val cookie = PetPageProbes.cookie
     /** FOOD page IDENTITY: the stable floor/cushion scene region, never the cookie plate. */
     val foodScene = PetPageProbes.foodScene
+    val foodExchangeBubble = PetPageProbes.foodExchangeBubble
+    val bathExchangeBubble = PetPageProbes.bathExchangeBubble
     val soap = PetPageProbes.soap
     /** Bath page IDENTITY: stable scene region, never the pale-repainting soap button. */
     val bath = PetPageProbes.bath
     val outdoor = PetPageProbes.outdoor
     val academy = PetPageProbes.academy
+    /** QQ HOST page: proof that the pet mini-program is gone and QQ's search page is showing. */
+    val qqHostSearch = PetPageProbes.qqHostSearch
+    val qqSearchPetRow = PetPageProbes.qqSearchPetRow
+    val qqMessageSearchBox = PetPageProbes.qqMessageSearchBox
+    /** QQ message tab, proven by either of its two search-box layouts. */
+    val qqMessageSearchBoxes = PetPageProbes.qqMessageSearchBoxes
+    val qqSearchHistoryPet = PetPageProbes.qqSearchHistoryPet
     val highFive = PetPageProbes.highFive
     val gradeA = PetPageProbes.gradeA
     val upgrade = PetPageProbes.upgrade
@@ -44,11 +60,19 @@ class PetFlowContext(val context: Context, val capture: HeadlessDisplayCapture,
     val careUpgradeReward = PetPageProbes.careUpgradeReward
     val recovery=PetRecoveryBoundary(context,capture,guard,
         (listOf(home,room,healthPanel,cookie,foodScene,soap,bath,outdoor,academy,highFive,profile.resultProbe,
-            profile.courseListProbe,profile.courseDetailProbe)).associate {it.name to listOf(it)}+
+            profile.courseListProbe,profile.courseDetailProbe,qqHostSearch,qqSearchPetRow)).associate {it.name to listOf(it)}+
             mapOf("LEARNING" to profile.learningProbes),onState=onRecovery,reconcile=reconcile,
-            validateHealth=PetStudyHealthPolicy::requireReady)
+            // Recovery around a lesson start must NOT re-impose the care thresholds: a paid-for lesson
+            // is gated by course/tuition/minutes, so this only proves a health value was actually READ
+            // (no Unknown/Stale masquerading as data). A low value is fine; an unreadable one is not
+            // allowed to authorise anything either, but it can no longer block the lesson itself.
+            validateHealth={health,at -> health.current(at);Unit},learningEvidence=learningEvidence)
     suspend fun safety() {
-        recovery.boundary(round,state,state=="START_COURSE")
+        // START_COURSE used to mark health as required, which turned every app restart or capture
+        // hiccup during the lesson-start window into RECOVERY_HEALTH_UNCONFIRMED and stopped a lesson
+        // the pet could pay for. The lesson's inputs are idempotent-guarded by the flow itself (one
+        // tap, then confirm), so recovery only needs the PAGE to match.
+        recovery.boundary(round,state,false)
         recovery.beforeBoundary()
         guard()
         check(!(context.getSystemService(Context.KEYGUARD_SERVICE) as KeyguardManager).isKeyguardLocked) { "PHONE_LOCKED" }
@@ -57,7 +81,7 @@ class PetFlowContext(val context: Context, val capture: HeadlessDisplayCapture,
         onObservation(state, score)
         logger(state, score, "round-$round:$action", result, reason)
         if(reason!=null) capture.facts.events.append(EventSource.APP_AUTOMATION,EventKind.ERROR,
-            mapOf("state" to state,"action" to action,"reason" to reason),listOf(evidence.absolutePath))
+            sessionErrorEventPayload(state, action, result, reason),listOf(evidence.absolutePath))
     }
     fun save(frame: Bitmap, name: String) {
         evidence.mkdirs()
@@ -75,6 +99,21 @@ class PetFlowContext(val context: Context, val capture: HeadlessDisplayCapture,
     }
     fun score(frame: Bitmap, probes: List<PetProfile.Probe>) =
         probes.maxOf { matcher.match(frame,it,profile.matchThreshold).score }
+    /**
+     * [score] for a probe that only the QQ entry chain needs. A missing template reads as "this
+     * page is not shown" (0.0) instead of throwing, so an absent entry-chain asset can never
+     * stop a session that is already on the pet room; the miss is logged so it stays visible.
+     * [PetProbeAssetsTest] keeps the asset set complete at build time.
+     */
+    fun scoreOptional(frame: Bitmap, probe: PetProfile.Probe): Double = matchOptional(frame,probe).score
+    /** [scoreOptional] that also reports where the template sits ([TemplateMatcher.Result.drift]). */
+    fun matchOptional(frame: Bitmap, probe: PetProfile.Probe): TemplateMatcher.Result = try {
+        matcher.match(frame,probe,profile.matchThreshold)
+    } catch(t: FileNotFoundException) {
+        emit("template-missing:"+probe.assetPath,0.0,"SKIPPED")
+        TemplateMatcher.Result(false,0.0)
+    }
+    fun healthDrift(frame: Bitmap) = matcher.match(frame,healthPanel,profile.matchThreshold).drift
     suspend fun verify(probes: List<PetProfile.Probe>, name: String, saveEvidence: Boolean = true, latest: Boolean = false): Double {
         val f = frame(latest)
         try {
@@ -85,7 +124,7 @@ class PetFlowContext(val context: Context, val capture: HeadlessDisplayCapture,
             emit(name,s,capture.telemetry().put("action",name).put("templateName",best.first.name)
                 .put("matchScore",s).put("result",if(s>=profile.matchThreshold) "PASS" else "FAIL").toString())
             check(s>=profile.matchThreshold) { "PAGE_MISMATCH:$state:$name:$s" }
-            recovery.confirm(round,state,if(best.first in profile.learningProbes) "LEARNING" else best.first.name,state=="START_COURSE")
+            recovery.confirm(round,state,if(best.first in profile.learningProbes) "LEARNING" else best.first.name,false)
             return s
         } finally { f.recycle() }
     }
@@ -101,7 +140,7 @@ class PetFlowContext(val context: Context, val capture: HeadlessDisplayCapture,
                 emit(name,lastScore,capture.telemetry().put("templateName",best.first.name)
                     .put("result",if(matched) "PASS" else "SETTLING").toString())
                 if(matched) {
-                    recovery.confirm(round,state,if(best.first in profile.learningProbes) "LEARNING" else best.first.name,state=="START_COURSE")
+                    recovery.confirm(round,state,if(best.first in profile.learningProbes) "LEARNING" else best.first.name,false)
                     save(current,name);return lastScore
                 }
             } finally {current.recycle()}
@@ -139,8 +178,12 @@ class PetFlowContext(val context: Context, val capture: HeadlessDisplayCapture,
         }
         error("PAGE_MISMATCH:$state:$name:$lastScore")
     }
-    fun healthJson(h: PetCareReading) = JSONObject().put("stamina",h.energy)
-        .put("cleanliness",h.cleanliness)
-        .put("mood",JSONObject(h.observations.mood.at(System.currentTimeMillis(),60000).fields()))
-        .put("observations",JSONObject(h.observations.fields()))
+    // A record of what was measured, so it must not go through the 60 s decision gate: the care
+    // "before" reading is routinely older than that by the time the care result is written down.
+    fun healthJson(h: PetCareReading) = JSONObject().apply {
+        h.measuredEnergy?.let { put("stamina",it) }
+        h.measuredCleanliness?.let { put("cleanliness",it) }
+        put("mood",JSONObject(h.observations.mood.fields()))
+        put("observations",JSONObject(h.observations.fields()))
+    }
 }

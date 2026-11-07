@@ -50,7 +50,7 @@ import kotlin.math.roundToInt
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 
-private val CollapsedWidth = 96.dp
+private val CollapsedWidth = 72.dp
 private val ExpandedWidth = 220.dp
 
 /** The calibrated automation display is 720x1600, so this window keeps the real game ratio. */
@@ -68,8 +68,10 @@ private val PipAspect = 1600f / 720f
 fun PetAgentPipHost(modifier: Modifier = Modifier) {
     val runtime by PetRuntime.state.collectAsState()
     val managed by PetManagedRuntime.state.collectAsState()
+    val manualPause by com.ynk.virtualdisplay.automation.ManualPause.state.collectAsState()
     val active = runtime.running || ManagedRuntimePresentation.isActive(managed.runState)
     if (!active) return
+    if (manualPause != com.ynk.virtualdisplay.automation.ManualPauseState.NONE) return
 
     // Releasing the token stops preview scaling work entirely: no viewer, no processing.
     DisposableEffect(Unit) {
@@ -101,8 +103,9 @@ fun PetAgentPipHost(modifier: Modifier = Modifier) {
             pipHeight = pipH,
             margin = with(density) { 12.dp.toPx() },
             top = with(density) { 12.dp.toPx() },
-            // Clear of the 托管 footer buttons so the preview never hides a real control.
-            bottom = with(density) { 96.dp.toPx() },
+            // Clear of the tab bar (about 59dp) plus the 托管 footer (about 71dp), so the preview
+            // never hides 停止托管. The margin below adds the visible gap.
+            bottom = with(density) { 132.dp.toPx() },
         )
         var position by remember { mutableStateOf(Offset.Zero) }
         var placed by remember { mutableStateOf(false) }

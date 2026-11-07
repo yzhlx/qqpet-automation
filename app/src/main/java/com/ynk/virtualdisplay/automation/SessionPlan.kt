@@ -39,6 +39,7 @@ data class SessionPlan(
     val workBeforeStudy: Boolean = false,
     /** Catalog id of the shift to run. Only consulted when [workBeforeStudy] is set. */
     val workOptionId: String? = DEFAULT_WORK_OPTION_ID,
+    val targetAttribute: String? = null,
 ) {
     init {
         require(courseId.isNotBlank()) { "PLAN_COURSE_BLANK" }
@@ -51,12 +52,6 @@ data class SessionPlan(
 
     /** The human-readable course name carried inside [courseId]. */
     val courseName: String get() = courseId.substringAfter(':', courseId)
-
-    /**
-     * True when this course's lesson length was measured on device. Both the budget guard and the
-     * UI read this one rule: a 托管 session can only start on a course whose minutes it can charge.
-     */
-    val hasKnownDuration: Boolean get() = hasMeasuredDuration(courseId)
 
     /**
      * Minutes one lesson of [courseId] charges against the shared daily budget. Only the
@@ -75,6 +70,7 @@ data class SessionPlan(
         .put("dailyBudgetMinutes", dailyBudgetMinutes)
         .put("workBeforeStudy", workBeforeStudy)
         .put("workOptionId", workOptionId ?: JSONObject.NULL)
+        .put("targetAttribute", targetAttribute ?: JSONObject.NULL)
 
     companion object {
         const val DEFAULT_COURSE_ID = "study:蹦蹦跳跳体能课"
@@ -93,23 +89,20 @@ data class SessionPlan(
          * Durations confirmed by a real completed lesson. The scan records a duration per course
          * too, but until that reading is closed-loop verified the budget guard trusts only this.
          */
-        val KNOWN_COURSE_MINUTES: Map<String, Int> = mapOf(DEFAULT_COURSE_ID to 10)
+        val KNOWN_COURSE_MINUTES: Map<String, Int> = mapOf(
+            DEFAULT_COURSE_ID to 10,
+            "study:看图识世界课" to 10,
+            "study:闪亮自我表达课" to 10,
+            "study:田径运动课" to 10,
+            "study:世界地理课" to 10,
+            "study:演说表达课" to 10,
+            "study:萌芽夏令营" to 10,
+        )
 
-        /** The single rule behind [SessionPlan.hasKnownDuration], usable before a plan is built. */
-        fun hasMeasuredDuration(courseId: String): Boolean = KNOWN_COURSE_MINUTES.containsKey(courseId)
-
-        /** The ranges the plan sheet offers. Same source as the [SessionPlan] checks above. */
+        /** The ranges a plan may hold, shared by the [SessionPlan] checks above. */
         val ROUNDS_RANGE = MIN_ROUNDS..MAX_ROUNDS
         val THRESHOLD_RANGE = MIN_THRESHOLD..MAX_THRESHOLD
         val BUDGET_RANGE = 1..DailyBudgetStore.HARD_STOP_MINUTES
-
-        /**
-         * One numeric field of the plan sheet. Text that is empty, unparsable or outside [range] is
-         * not a value yet: "6" on the way to "65" must never be committed, because the plan's own
-         * range check would throw and take the composition down with it.
-         */
-        fun parseIntOrNull(raw: String, range: IntRange): Int? =
-            raw.toIntOrNull()?.takeIf { it in range }
 
         /** A missing or older file decodes as the defaults, so an upgrade changes nothing. */
         fun fromJson(json: JSONObject): SessionPlan = SessionPlan(
@@ -120,6 +113,7 @@ data class SessionPlan(
             dailyBudgetMinutes = json.optInt("dailyBudgetMinutes", DailyBudgetStore.HARD_STOP_MINUTES),
             workBeforeStudy = json.optBoolean("workBeforeStudy", false),
             workOptionId = if (json.has("workOptionId") && !json.isNull("workOptionId")) json.getString("workOptionId") else null,
+            targetAttribute = if (json.has("targetAttribute") && !json.isNull("targetAttribute")) json.getString("targetAttribute") else null,
         )
     }
 }

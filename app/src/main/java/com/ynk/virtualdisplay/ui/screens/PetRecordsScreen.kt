@@ -1,9 +1,5 @@
 package com.ynk.virtualdisplay.ui.screens
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -13,7 +9,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -25,16 +20,13 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ynk.virtualdisplay.automation.PetManagedRuntime
 import com.ynk.virtualdisplay.automation.PetRuntime
+import com.ynk.virtualdisplay.ui.data.JournalEvent
 import com.ynk.virtualdisplay.ui.data.PetEvidenceRepository
 import com.ynk.virtualdisplay.ui.data.SessionEvidence
 import com.ynk.virtualdisplay.ui.kit.PetCard
@@ -44,19 +36,16 @@ import com.ynk.virtualdisplay.ui.kit.PetNote
 import com.ynk.virtualdisplay.ui.kit.PetPill
 import com.ynk.virtualdisplay.ui.kit.PetRowHeader
 import com.ynk.virtualdisplay.ui.kit.PetSection
-import com.ynk.virtualdisplay.ui.kit.PetGlyph
-import com.ynk.virtualdisplay.ui.kit.PetIcon
-import com.ynk.virtualdisplay.ui.kit.rememberEvidenceBitmap
-import com.ynk.virtualdisplay.ui.records.ActionOutcome
 import com.ynk.virtualdisplay.ui.records.MetricChange
 import com.ynk.virtualdisplay.ui.records.RecordsPresentation
 import com.ynk.virtualdisplay.ui.records.RecordsSummary
 import com.ynk.virtualdisplay.ui.records.SessionHistoryRow
+import com.ynk.virtualdisplay.ui.records.TimelinePresentation
+import com.ynk.virtualdisplay.ui.records.TimelineRow
 import com.ynk.virtualdisplay.ui.records.VerdictTone
 import com.ynk.virtualdisplay.ui.theme.PetTokens
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -73,7 +62,9 @@ fun PetRecordsScreen() {
 
     val repo = remember { PetEvidenceRepository(context) }
     var today by remember { mutableStateOf<List<SessionEvidence>>(emptyList()) }
+    var yesterday by remember { mutableStateOf<List<SessionEvidence>>(emptyList()) }
     var history by remember { mutableStateOf<List<SessionHistoryRow>>(emptyList()) }
+    var events by remember { mutableStateOf<List<JournalEvent>>(emptyList()) }
     var loaded by remember { mutableStateOf(false) }
 
     val hhmm = remember { SimpleDateFormat("HH:mm", Locale.US) }
@@ -84,6 +75,8 @@ fun PetRecordsScreen() {
     LaunchedEffect(runtime.running, managed.sessionId) {
         suspend fun reload() = withContext(Dispatchers.IO) {
             today = repo.todaySessions()
+            yesterday = repo.yesterdaySessions()
+            events = repo.todayJournalEvents()
             history = RecordsPresentation.history(
                 repo.sessionDirectories(limit = 40).map { repo.read(it) },
                 timeFormatter, dateFormatter,
@@ -99,11 +92,10 @@ fun PetRecordsScreen() {
     }
 
     val summary = RecordsPresentation.summary(today, timeFormatter, dateFormatter)
+    val yesterdayLine = RecordsPresentation.dailyLine(yesterday.mapNotNull { it.record })
+    val timeline = TimelinePresentation.rows(today, events, timeFormatter)
     val focus = today.firstOrNull()
-    val focusRounds = focus?.rounds.orEmpty()
-    val changes = focus?.let { RecordsPresentation.changes(it.rounds) }.orEmpty()
-    val actions = focus?.let { RecordsPresentation.actions(it.rounds, it.record) }.orEmpty()
-    val frames = RecordsPresentation.pairedFrames(focus, focusRounds)
+    val changes = focus?.let { RecordsPresentation.changes(it.rounds, it.record) }.orEmpty()
 
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 15.dp)) {
         Spacer(Modifier.height(2.dp))
@@ -114,16 +106,23 @@ fun PetRecordsScreen() {
             PetCard {
                 PetSection("今天")
                 Spacer(Modifier.height(6.dp))
-                PetNote("今天还没有运行记录。完成一次托管后，这里会显示真实的读数变化与截图。")
+                PetNote("今天还没有运行记录。完成一次托管后，这里会显示读数变化。")
             }
         } else {
             TodayCard(summary)
             Spacer(Modifier.height(11.dp))
-            ChangesCard(changes, frames)
+            if (changes.any { it.beforeText != "—" || it.afterText != "—" }) ChangesCard(changes)
+            else PetNote("这次运行没有成对的前后读数，所以不显示变化。")
+        }
+
+        if (timeline.isNotEmpty()) {
             Spacer(Modifier.height(11.dp))
-            ActionsCard(actions)
-            Spacer(Modifier.height(11.dp))
-            UnsupportedCard()
+            TimelineCard(timeline)
+        }
+
+        if (yesterdayLine != null) {
+            Spacer(Modifier.height(9.dp))
+            PetNote("昨天 · " + yesterdayLine)
         }
 
         if (history.isNotEmpty()) {
@@ -132,10 +131,7 @@ fun PetRecordsScreen() {
         }
 
         Spacer(Modifier.height(11.dp))
-        PetNote(
-            "小数、金币与库存当前无法从游戏可靠读取，所以记录里不出现这些数字；" +
-                "所有读数都来自本机截图识别，随时可在系统里清空。"
-        )
+        PetNote("读数来自本机截图识别，只保存在这台手机上。")
         Spacer(Modifier.height(16.dp))
     }
 }
@@ -156,8 +152,16 @@ private fun TodayCard(summary: RecordsSummary) {
         Spacer(Modifier.height(11.dp))
         Row(Modifier.fillMaxWidth()) {
             StripCell(summary.courses, "学习 节", Modifier.weight(1f))
+            StripCell(summary.workCount, "打工 班", Modifier.weight(1f))
+            StripCell(summary.adventureCount, "冒险 轮", Modifier.weight(1f))
             StripCell(summary.careCount, "护理 次", Modifier.weight(1f))
-            StripCell(summary.pauseCount, "暂停 次", Modifier.weight(1f))
+        }
+        // 签到／信箱／福袋也计入今日；没做过就不占一行，不显示 0。
+        RecordsPresentation.dailyRewardsText(summary)?.let { line ->
+            Spacer(Modifier.height(9.dp))
+            PetDivider()
+            Spacer(Modifier.height(7.dp))
+            PetNote(line)
         }
     }
 }
@@ -165,52 +169,54 @@ private fun TodayCard(summary: RecordsSummary) {
 @Composable
 private fun StripCell(value: Int, label: String, modifier: Modifier = Modifier) {
     Column(modifier, horizontalAlignment = Alignment.CenterHorizontally) {
-        Text("$value", fontSize = 21.sp, fontWeight = FontWeight.Bold, color = PetTokens.Ink,
-            fontFamily = FontFamily.Monospace)
+        Text("$value", fontSize = 21.sp, fontWeight = FontWeight.Bold, color = PetTokens.Ink)
         Spacer(Modifier.height(2.dp))
         Text(label, fontSize = 10.5.sp, color = PetTokens.Ink3)
     }
 }
 
 @Composable
-private fun ChangesCard(changes: List<MetricChange>, frames: List<File>) {
+private fun TimelineCard(rows: List<TimelineRow>) {
     PetCard {
-        PetRowHeader("已确认的状态变化", "≈ 截图识别")
-        Spacer(Modifier.height(10.dp))
-        if (frames.isNotEmpty()) {
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(9.dp)) {
-                frames.take(3).forEach { file -> FrameThumb(file, Modifier.weight(1f)) }
-            }
-            Spacer(Modifier.height(12.dp))
-        }
-        changes.forEachIndexed { index, change ->
+        PetRowHeader("今天的事件", "按时间倒序")
+        Spacer(Modifier.height(6.dp))
+        rows.forEachIndexed { index, row ->
             if (index > 0) PetDivider(Modifier.padding(vertical = 2.dp))
-            ChangeRow(change, index == 0)
+            Row(
+                Modifier.fillMaxWidth().padding(vertical = 7.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    row.timeText, fontSize = 12.sp, color = PetTokens.Ink3,
+                    modifier = Modifier.width(44.dp),
+                )
+                Column(Modifier.weight(1f)) {
+                    Text(row.label, fontSize = 13.5.sp, fontWeight = FontWeight(650), color = PetTokens.Ink)
+                    if (row.detail.isNotEmpty()) {
+                        Spacer(Modifier.height(2.dp))
+                        Text(row.detail, fontSize = 11.sp, color = PetTokens.Ink3, maxLines = 2)
+                    }
+                }
+                Spacer(Modifier.width(8.dp))
+                when (row.tone) {
+                    VerdictTone.CONFIRMED -> PetChip(row.chip, PetTokens.GreenSoft, PetTokens.GreenInk)
+                    VerdictTone.PENDING -> PetChip(row.chip, PetTokens.AmberSoft, PetTokens.AmberInk)
+                    VerdictTone.UNKNOWN -> PetChip(row.chip, PetTokens.GraySoft, PetTokens.Ink2)
+                }
+            }
         }
     }
 }
 
 @Composable
-private fun FrameThumb(file: File, modifier: Modifier = Modifier) {
-    val bmp = rememberEvidenceBitmap(file.absolutePath, 260)
-    Column(modifier) {
-        Box(
-            Modifier.fillMaxWidth().height(88.dp).clip(RoundedCornerShape(9.dp))
-                .background(PetTokens.FilmTop),
-            contentAlignment = Alignment.Center,
-        ) {
-            if (bmp != null) {
-                androidx.compose.foundation.Image(
-                    bitmap = bmp, contentDescription = file.name,
-                    modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop,
-                )
-            } else {
-                PetIcon(PetGlyph.Cam, 18.dp, alpha = 0.5f)
-            }
+private fun ChangesCard(changes: List<MetricChange>) {
+    PetCard {
+        PetRowHeader("状态变化", "截图识别")
+        Spacer(Modifier.height(6.dp))
+        changes.forEachIndexed { index, change ->
+            if (index > 0) PetDivider(Modifier.padding(vertical = 2.dp))
+            ChangeRow(change, index == 0)
         }
-        Spacer(Modifier.height(5.dp))
-        Text(RecordsPresentation.frameCaption(file.name), fontSize = 10.sp,
-            color = PetTokens.Ink3, maxLines = 1)
     }
 }
 
@@ -227,7 +233,7 @@ private fun ChangeRow(change: MetricChange, first: Boolean) {
         }
         Text(
             "${change.beforeText} → ${change.afterText}",
-            fontSize = 13.sp, color = PetTokens.Ink2, fontFamily = FontFamily.Monospace,
+            fontSize = 13.sp, color = PetTokens.Ink2,
         )
         Spacer(Modifier.width(8.dp))
         if (change.confirmed) {
@@ -245,54 +251,9 @@ private fun ChangeRow(change: MetricChange, first: Boolean) {
 }
 
 @Composable
-private fun ActionsCard(actions: List<ActionOutcome>) {
-    PetCard {
-        PetRowHeader("动作与道具", "发出 ≠ 生效")
-        actions.forEachIndexed { index, action ->
-            if (index > 0) PetDivider(Modifier.padding(vertical = 2.dp))
-            Row(Modifier.fillMaxWidth().padding(vertical = 9.dp), verticalAlignment = Alignment.CenterVertically) {
-                Column(Modifier.weight(1f)) {
-                    Text(action.label, fontSize = 14.sp, fontWeight = FontWeight(650), color = PetTokens.Ink)
-                    Spacer(Modifier.height(3.dp))
-                    Text(action.meta, fontSize = 11.sp, color = PetTokens.Ink3)
-                }
-                Spacer(Modifier.width(8.dp))
-                when (action.verdictTone) {
-                    VerdictTone.CONFIRMED -> Text(action.verdict, fontSize = 13.sp,
-                        fontWeight = FontWeight(650), color = PetTokens.GreenInk)
-                    VerdictTone.PENDING -> PetChip(action.verdict, PetTokens.AmberSoft, PetTokens.AmberInk)
-                    VerdictTone.UNKNOWN -> PetChip(action.verdict, PetTokens.GraySoft, PetTokens.Ink2)
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun UnsupportedCard() {
-    PetCard {
-        PetSection("本版本读取不到的数据")
-        Spacer(Modifier.height(7.dp))
-        listOf(
-            "属性：力量 / 智力 / 魅力" to "NO_READER_IN_SLICE1",
-            "金币与收益" to "NO_READER_IN_SLICE1",
-            "背包库存数量" to "无稳定可识别位置",
-            "成绩等级" to "结果页仅确认出现，等级未接入识别",
-        ).forEach { (name, why) ->
-            Row(Modifier.fillMaxWidth().padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-                Text(name, fontSize = 13.sp, color = PetTokens.Ink2, modifier = Modifier.weight(1f))
-                PetChip("不支持读取", PetTokens.GraySoft, PetTokens.Ink2)
-            }
-        }
-        Spacer(Modifier.height(2.dp))
-        PetNote("这些项目不会以估算值出现在记录里，也不计入“已确认”。")
-    }
-}
-
-@Composable
 private fun HistoryCard(history: List<SessionHistoryRow>) {
     PetCard {
-        PetSection("历史运行")
+        PetSection("历史记录")
         Spacer(Modifier.height(6.dp))
         history.forEachIndexed { index, row ->
             if (index > 0) PetDivider(Modifier.padding(vertical = 2.dp))
@@ -301,16 +262,16 @@ private fun HistoryCard(history: List<SessionHistoryRow>) {
                     Text(row.whenText, fontSize = 13.5.sp, fontWeight = FontWeight(650), color = PetTokens.Ink)
                     Spacer(Modifier.height(3.dp))
                     Text(row.detail, fontSize = 11.sp, color = PetTokens.Ink3, maxLines = 2)
+                    if (row.strategySummary.isNotEmpty()) {
+                        Spacer(Modifier.height(2.dp))
+                        Text(row.strategySummary, fontSize = 11.sp, color = PetTokens.BlueInk, maxLines = 2)
+                    }
                 }
                 Spacer(Modifier.width(8.dp))
-                Column(horizontalAlignment = Alignment.End) {
-                    when (row.outcomeTone) {
-                        VerdictTone.CONFIRMED -> PetChip(row.outcomeText, PetTokens.GreenSoft, PetTokens.GreenInk)
-                        VerdictTone.PENDING -> PetChip(row.outcomeText, PetTokens.RedSoft, PetTokens.RedInk)
-                        VerdictTone.UNKNOWN -> PetChip(row.outcomeText, PetTokens.GraySoft, PetTokens.Ink2)
-                    }
-                    Spacer(Modifier.height(4.dp))
-                    Text("${row.screenshots} 张截图", fontSize = 10.sp, color = PetTokens.Ink3)
+                when (row.outcomeTone) {
+                    VerdictTone.CONFIRMED -> PetChip(row.outcomeText, PetTokens.GreenSoft, PetTokens.GreenInk)
+                    VerdictTone.PENDING -> PetChip(row.outcomeText, PetTokens.RedSoft, PetTokens.RedInk)
+                    VerdictTone.UNKNOWN -> PetChip(row.outcomeText, PetTokens.GraySoft, PetTokens.Ink2)
                 }
             }
         }
