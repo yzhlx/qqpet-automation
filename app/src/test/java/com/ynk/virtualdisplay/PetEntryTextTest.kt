@@ -223,4 +223,89 @@ class PetEntryTextTest {
     @Test fun theSearchPageAndTheRoomHaveNoTabBar() {
         assertNull(PetEntryText.messageTabPoint(chrome))
     }
+
+    /**
+     * QQ's message page as the device showed it on 2026-11-07 11:01 (VD51, 720x1600): a promo banner
+     * ("小游戏新一波福利") makes the header tall, so the search box sits at y≈367 instead of 232-298,
+     * and two notice rows follow it. Both search-box templates miss it, and the cold start died with
+     * ENTER_PET_UNRECOVERED:initial:screen=OTHER_TAB after tapping the already selected 消息 tab,
+     * which made QQ scroll the list and hide the box. ML Kit's texts are the ones in the device log
+     * ("Q搜索" carries the magnifier as a Q); the boxes are read off that frame.
+     */
+    private val promoMessagePage = listOf(
+        line("用户昵称", 120, 128, 290, 168), line("e在线-WiFi", 122, 174, 246, 200),
+        line("小游戏新一波福利", 32, 225, 255, 255), line("每日红包等你拿", 32, 262, 228, 292),
+        line("Q搜索", 303, 348, 414, 386),
+        line("发现QQ新版本", 150, 458, 332, 492), line("当前无法接收新消息通知。", 150, 555, 475, 588),
+        line("QQ游戏中心", 152, 652, 340, 688), line("腾讯新闻", 152, 797, 286, 832),
+        line("QQ团队", 152, 941, 270, 977), line("我的关联QQ账号", 152, 1085, 405, 1121),
+        line("消息", 66, 1560, 110, 1587), line("频道", 248, 1560, 292, 1587),
+        line("联系人", 418, 1560, 482, 1587), line("动态", 598, 1560, 652, 1587),
+    )
+
+    @Test fun theMessagePageWithAPromoBannerYieldsItsSearchBox() {
+        val p = PetEntryText.messageSearchBoxPoint(promoMessagePage)
+        assertNotNull(p)
+        assertEquals(358.5f, p!!.first, 0.5f)
+        assertEquals(367f, p.second, 0.5f)
+        // The banner fills y 0-305 and the old fixed tap (360,271) lands on it: the point must be below.
+        assertTrue("tap y=${p.second} must clear the banner", p.second > 320f)
+        assertFalse(PetEntryText.isSearchPage(promoMessagePage))
+    }
+
+    @Test fun aMisreadSearchLabelStillYieldsTheBox() {
+        val misread = promoMessagePage.map { if (it.text == "Q搜索") line("Q搜素", 303, 348, 414, 386) else it }
+        assertNotNull(PetEntryText.messageSearchBoxPoint(misread))
+    }
+
+    @Test fun theCompactMessagePageStillYieldsItsBox() {
+        val compact = listOf(
+            line("用户昵称", 120, 90, 290, 130), line("在线 - 4G", 122, 136, 246, 160),
+            line("搜索", 348, 232, 414, 268), line("QQ游戏中心", 152, 440, 340, 476),
+        ) + tabBar
+        val p = PetEntryText.messageSearchBoxPoint(compact)
+        assertNotNull(p)
+        assertEquals(381f, p!!.first, 0.5f)
+        assertEquals(250f, p.second, 0.5f)
+    }
+
+    @Test fun aMessagePageScrolledPastItsSearchBoxHasNoBoxToTap() {
+        // What the page reads like after the tab tap: the list jumped to the next unread chat.
+        val scrolled = promoMessagePage.filter { it.text !in listOf("Q搜索", "发现QQ新版本", "当前无法接收新消息通知。") }
+        assertNull(PetEntryText.messageSearchBoxPoint(scrolled))
+        assertNotNull(PetEntryText.messageTabPoint(scrolled))
+    }
+
+    @Test fun theContactsPagesOwnSearchBoxIsNotTheMessageSearchBox() {
+        // 联系人 has a 搜索 box and the same tab bar, but no online-status header and it opens another search.
+        val contacts = listOf(
+            line("联系人", 120, 125, 220, 158), line("搜索", 348, 232, 414, 268), line("新朋友", 32, 570, 134, 606),
+        ) + tabBar
+        assertNull(PetEntryText.messageSearchBoxPoint(contacts))
+    }
+
+    @Test fun aDialogOverTheMessagePageHasNothingToTap() {
+        // 2026-11-07 10:58: "QQ测试版邀请你试玩" covered the page; a tap must never be spent under it.
+        val dialog = promoMessagePage + listOf(line("立即体验", 292, 995, 428, 1030), line("近期不提醒", 276, 1100, 444, 1138))
+        assertNull(PetEntryText.messageSearchBoxPoint(dialog))
+    }
+
+    @Test fun aPageWithoutQqsTabBarIsNeverTheMessagePage() {
+        val noBar = promoMessagePage.filter { it.bounds.top < 1500 }
+        assertNull(PetEntryText.messageSearchBoxPoint(noBar))
+    }
+
+    @Test fun aSearchLabelAwayFromTheTopOfThePageIsNotTheBox() {
+        val lowered = promoMessagePage.map { if (it.text == "Q搜索") line("Q搜索", 303, 1000, 414, 1038) else it }
+        assertNull(PetEntryText.messageSearchBoxPoint(lowered))
+        val offCentre = promoMessagePage.map { if (it.text == "Q搜索") line("Q搜索", 20, 348, 120, 386) else it }
+        assertNull(PetEntryText.messageSearchBoxPoint(offCentre))
+    }
+
+    @Test fun theSearchPageAndTheRoomHaveNoMessageSearchBox() {
+        assertNull(PetEntryText.messageSearchBoxPoint(chrome))
+        assertNull(PetEntryText.messageSearchBoxPoint(misread))
+        assertNull(PetEntryText.messageSearchBoxPoint(listOf(line("出门", 333, 1428, 387, 1458), line("喂食", 611, 724, 665, 756))))
+        assertNull(PetEntryText.messageSearchBoxPoint(emptyList()))
+    }
 }

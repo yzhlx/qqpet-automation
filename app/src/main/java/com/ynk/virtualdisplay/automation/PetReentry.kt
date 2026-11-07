@@ -22,7 +22,11 @@ package com.ynk.virtualdisplay.automation
 object PetReentry {
     /** The screen is on one of the recognised QQ pages, or none of them. */
     enum class Screen {
-        /** QQ message tab, search box visible. */
+        /**
+         * QQ message tab, search box visible: proven by a template (box at y 223-298) or, when the
+         * header grew and the box sits lower, by text ([PetEntryText.messageSearchBoxPoint]).
+         * Never answered with a tap on the bottom 消息 tab: that tab is already selected.
+         */
         MESSAGE_SEARCH_BOX,
         /** QQ search page, recent-searches "宠物" visible. */
         SEARCH_HISTORY_PET,

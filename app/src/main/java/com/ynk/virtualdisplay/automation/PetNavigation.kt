@@ -633,6 +633,8 @@ class PetNavigation(private val flow: PetFlowContext, private val workReader: Wo
         const val ENTRY_OCR_LOG_CHARS=400
         /** Fresh-frame OCR reads of an unrecognised QQ page before it counts as unrecognised. */
         const val ENTRY_OCR_READS=3
+        /** A tab bar with no search box in sight is read this many times before the 消息 tab is tapped. */
+        const val ENTRY_TAB_CONFIRM_READS=2
         const val ENTRY_OCR_GAP_MS=300L
 
         /**
@@ -1410,6 +1412,7 @@ class PetNavigation(private val flow: PetFlowContext, private val workReader: Wo
             var historyPoint: Pair<Float, Float>? = null
             var historySource = ""
             var messageTabPoint: Pair<Float, Float>? = null
+            var searchBoxPoint: Pair<Float, Float>? = null
             // The first frame is judged at once; after a tap the next page is still arriving, so an
             // unrecognised frame is retried until the settle deadline before the chain gives up.
             val deadline = SystemClock.elapsedRealtime() + if(acted) ENTER_SETTLE_MS else 0L
@@ -1437,7 +1440,12 @@ class PetNavigation(private val flow: PetFlowContext, private val workReader: Wo
                                 // fresh frame, before it counts as unrecognised.
                                 var point: Pair<Float, Float>? = null
                                 var reads = 0
-                                while(point == null && messageTabPoint == null && reads < ENTRY_OCR_READS) {
+                                // A tab bar without a search box gets one more look before the tab is
+                                // tapped: tapping the already selected 消息 tab makes QQ scroll the
+                                // list and hide the box (measured 2026-11-07 11:01), so the tap is
+                                // only for a page that is positively not the message page.
+                                while(point == null && searchBoxPoint == null &&
+                                    !(messageTabPoint != null && reads >= ENTRY_TAB_CONFIRM_READS) && reads < ENTRY_OCR_READS) {
                                     if(reads > 0) delay(ENTRY_OCR_GAP_MS)
                                     val lines = entryPageLines(label + "-enter-page-ocr")
                                     reads++
@@ -1445,16 +1453,20 @@ class PetNavigation(private val flow: PetFlowContext, private val workReader: Wo
                                         searchPageSeen = true
                                         point = PetEntryText.historyWordPoint(lines)
                                     } else {
+                                        // QQ's message page whose header grew (promo banner, notice rows)
+                                        // moves the box away from both templates: its text finds it.
+                                        searchBoxPoint = PetEntryText.messageSearchBoxPoint(lines)
                                         // QQ left on another tab (联系人, 动态…): its bottom bar carries a
                                         // 消息 label that brings the message page back.
-                                        messageTabPoint = PetEntryText.messageTabPoint(lines)
+                                        messageTabPoint = if(searchBoxPoint == null) PetEntryText.messageTabPoint(lines) else null
                                     }
                                 }
                                 if(point != null) {
                                     historyPoint = point
                                     historySource = "ocr"
                                     PetReentry.Screen.SEARCH_HISTORY_PET
-                                } else if(messageTabPoint != null) PetReentry.Screen.OTHER_TAB
+                                } else if(searchBoxPoint != null) PetReentry.Screen.MESSAGE_SEARCH_BOX
+                                else if(messageTabPoint != null) PetReentry.Screen.OTHER_TAB
                                 else PetReentry.Screen.UNKNOWN
                             }
                         }
@@ -1472,8 +1484,13 @@ class PetNavigation(private val flow: PetFlowContext, private val workReader: Wo
                     safety(); input.tap(x, y); acted = true; delay(profile.pageSettleMs)
                 }
                 PetReentry.Action.OPEN_SEARCH -> {
-                    emit(label + "-enter-open-search", null, "MESSAGE_SEARCH_BOX")
-                    safety(); input.tap(360f, 271f); acted = true; delay(profile.pageSettleMs)
+                    // The templates know the box at y 223-298 and tap (360,271), inside both; a box
+                    // found by its text is tapped where it is drawn (a promo banner pushes it to y≈367,
+                    // and (360,271) would then land on the banner).
+                    val box = searchBoxPoint
+                    emit(label + "-enter-open-search", null,
+                        if(box == null) "MESSAGE_SEARCH_BOX" else "MESSAGE_SEARCH_BOX,src=ocr,tap=" + box.first.toInt() + "," + box.second.toInt())
+                    safety(); input.tap(box?.first ?: 360f, box?.second ?: 271f); acted = true; delay(profile.pageSettleMs)
                 }
                 PetReentry.Action.TAP_HISTORY_PET -> {
                     historyTaps++
@@ -1796,6 +1813,13 @@ class PetNavigation(private val flow: PetFlowContext, private val workReader: Wo
                 // QQ left on another tab (联系人, 频道, 动态): measured 2026-11-07 02:44 the session
                 // stopped here after four looks. The tab bar names itself on the page, and one tap on
                 // its 消息 label brings back the message page the chain starts from.
+                // The message page itself, with its search box drawn lower than the templates know
+                // (measured 2026-11-07 11:01: promo banner + notice rows): not another tab, and its
+                // 消息 tab must not be tapped - the chain opens the box where its text says it is.
+                if(PetEntryText.messageSearchBoxPoint(pageLines)!=null) {
+                    emit("initial-page-qq-message-text",null,"QQ_MESSAGE_TAB")
+                    return@with enterPetApp("initial")
+                }
                 if(PetEntryText.messageTabPoint(pageLines)!=null) {
                     emit("initial-page-qq-other-tab",null,"QQ_OTHER_TAB")
                     return@with enterPetApp("initial")

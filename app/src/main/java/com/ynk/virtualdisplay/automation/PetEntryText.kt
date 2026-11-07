@@ -43,6 +43,7 @@ object PetEntryText {
     /** ML Kit's known glyph confusions on QQ's plain UI text (traditional forms for simplified ones). */
     private fun clean(text: String): String = text
         .replace("機素", "搜索")
+        .replace("搜素", "搜索")
         .replace('設', '设')
         .replace('劇', '剧')
         .replace('問', '问')
@@ -121,6 +122,68 @@ object PetEntryText {
             return x to y
         }
         return null
+    }
+
+    /** The header of QQ's message page names the user's presence ("在线 - WiFi"); no other tab has it. */
+    private val PRESENCE_WORDS = listOf("在线", "离线", "隐身", "忙碌", "离开", "勿扰")
+    private val NETWORK_WIFI = Regex("(?i)wi-?fi")
+    private val NETWORK_MOBILE = Regex("(?i)(^|[^a-z0-9])[345]g($|[^a-z0-9])")
+
+    /** Buttons of a dialog that covers the page: a tap under a modal is never the page's own. */
+    private val DIALOG_BUTTONS = listOf(
+        "立即体验", "近期不提醒", "我知道了", "暂不升级", "暂不更新", "立即更新", "立即升级", "以后再说",
+        "取消", "确定", "允许", "禁止",
+    )
+
+    /** The search box shows its hint, optionally behind the magnifier ML Kit reads as a letter ("Q搜索"). */
+    private val SEARCH_BOX_TEXT = Regex("^[A-Za-z0-9@©|]{0,2}搜索$")
+
+    /** The message page's header and search box live in the top part of the frame (measured y 90-400 on 720x1600). */
+    private const val HEADER_ZONE_FRACTION = 0.25f
+    private const val SEARCH_BOX_TOP_FRACTION = 0.05f
+    private const val SEARCH_BOX_BOTTOM_FRACTION = 0.40f
+    private const val SEARCH_BOX_X_FROM = 0.30f
+    private const val SEARCH_BOX_X_TO = 0.70f
+
+    /**
+     * A tap target on the search box of QQ's MESSAGE page, read from text, or null.
+     *
+     * Two templates know the box at y 223-298, but QQ's header grows (a promo banner, notice rows
+     * under the box), and measured 2026-11-07 11:01 the box then sat at y≈367 where both templates
+     * miss. The page was taken for "another tab", the already selected 消息 tab was tapped, QQ
+     * scrolled the list and the box left the screen. The page is the message page when ALL of:
+     *  - QQ's tab bar is on screen ([messageTabPoint]), so this is QQ and not a chat or the pet;
+     *  - the header carries the user's presence line (在线 - WiFi), which no other tab has: the
+     *    contacts page has a 搜索 box too but opens another search;
+     *  - no dialog button is on screen;
+     *  - a line that reads 搜索 (the box's hint) sits in the upper part of the frame, near the middle.
+     * The point is the centre of that line, so it follows the box wherever the header put it.
+     */
+    fun messageSearchBoxPoint(lines: List<TextLine>, frameWidth: Int = 720, frameHeight: Int = 1600): Pair<Float, Float>? {
+        if (messageTabPoint(lines, frameWidth, frameHeight) == null) return null
+        val texts = lines.map { clean(it.text) }
+        // A button is a short line of its own; a chat preview that merely says "确定" is not a dialog.
+        if (texts.any { t -> val s = t.trim(); DIALOG_BUTTONS.any { b -> s.length <= b.length + 2 && s.contains(b) } }) return null
+        val headerBottom = frameHeight * HEADER_ZONE_FRACTION
+        val presence = lines.any { l ->
+            if (l.bounds.top >= headerBottom) return@any false
+            val t = clean(l.text)
+            PRESENCE_WORDS.any { t.contains(it) } || NETWORK_WIFI.containsMatchIn(t) || NETWORK_MOBILE.containsMatchIn(t)
+        }
+        if (!presence) return null
+        val top = frameHeight * SEARCH_BOX_TOP_FRACTION
+        val bottom = frameHeight * SEARCH_BOX_BOTTOM_FRACTION
+        val candidates = lines.filter { l ->
+            val t = clean(l.text).trim().replace(" ", "")
+            val cx = (l.bounds.left + l.bounds.right) / 2f
+            val cy = (l.bounds.top + l.bounds.bottom) / 2f
+            SEARCH_BOX_TEXT.matches(t) && cy in top..bottom && cx in frameWidth * SEARCH_BOX_X_FROM..frameWidth * SEARCH_BOX_X_TO
+        }
+        val box = candidates.minByOrNull { it.bounds.top } ?: return null
+        val x = (box.bounds.left + box.bounds.right) / 2f
+        val y = (box.bounds.top + box.bounds.bottom) / 2f
+        if (x < 0f || x > frameWidth || y < 0f || y > frameHeight) return null
+        return x to y
     }
 
     /** The y where the recent-searches entries start: under the heading, else under the scope row, else the default. */
