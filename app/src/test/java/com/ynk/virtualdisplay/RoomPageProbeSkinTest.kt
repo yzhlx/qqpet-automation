@@ -92,14 +92,20 @@ class RoomPageProbeSkinTest {
     }
 
     /** The ROI PetPageProbes.room uses; asserted so a coordinate move cannot pass silently. */
-    private val roomRect = intArrayOf(20, 720, 120, 840)
+    private val roomRect = intArrayOf(130, 600, 250, 660)
+
+    /** The cat-skin probe keeps the old chair-arm ROI; it is traceability only, not identity. */
+    private val catRect = intArrayOf(20, 720, 120, 840)
+
+    /** The pre-9.3.80 room ROI, now covered by QQ's hat icon. Kept to pin the defect. */
+    private val oldRoomRect = intArrayOf(20, 720, 120, 840)
 
     @Test fun theRoomRoiIsTheOneTheCodeUses() {
         val source = java.io.File("src/main/java/com/ynk/virtualdisplay/automation/PetPageProbes.kt")
         val text = source.readText()
         assertTrue(
-            "PetPageProbes.room ROI must stay 20,720,120,840 unless the template is recalibrated",
-            text.contains("experimental(\"room\", 20, 720, 120, 840)"),
+            "PetPageProbes.room ROI must stay 130,600,250,660 unless the template is recalibrated",
+            text.contains("experimental(\"room\", 130, 600, 250, 660)"),
         )
     }
 
@@ -119,7 +125,7 @@ class RoomPageProbeSkinTest {
      */
     @Test fun theCatSkinTemplateIsNotTheLiveRoom() {
         val live = image("/health-panel/room-live-display47-2026-11-06.png")
-        val s = score(live, catTemplate, roomRect)
+        val s = score(live, catTemplate, catRect)
         assertTrue("the video-feed template must not claim the live room, got " + s, s < 0.95)
     }
 
@@ -156,19 +162,19 @@ class RoomPageProbeSkinTest {
 
     @Test fun theCatSkinProbeDoesNotMatchTheHalloweenRoom() {
         val live = image("/health-panel/room-live-display46.png")
-        val s = score(live, catTemplate, roomRect)
+        val s = score(live, catTemplate, catRect)
         assertTrue("cat-skin probe must not claim the halloween room, got " + s, s < 0.95)
     }
 
     @Test fun theCatSkinProbeDoesNotMatchTheQqHostPages() {
         val qqMain = image("/health-panel/qq-main-display45.png")
-        val s = score(qqMain, catTemplate, roomRect)
+        val s = score(qqMain, catTemplate, catRect)
         assertTrue("QQ message list must not read as the cat-skin room, got " + s, s < 0.95)
     }
 
     @Test fun theCatSkinProbeDoesNotMatchTheBathScene() {
         val bath = image("/health-panel/panel-bath-display41.png")
-        val s = score(bath, catTemplate, roomRect)
+        val s = score(bath, catTemplate, catRect)
         assertTrue("bath scene must not read as the cat-skin room, got " + s, s < 0.95)
     }
 
@@ -202,5 +208,82 @@ class RoomPageProbeSkinTest {
         val qq = score(qqMain, template, roomRect)
         assertTrue("room must clear the 0.95 gate with margin, got " + room, room >= 0.97)
         assertTrue("QQ page must stay clearly below the gate, got " + qq, qq <= 0.90)
+    }
+
+    // ---- QQ 9.3.80 left icon column (issue #5) ------------------------------------------------
+
+    /**
+     * QQ 9.3.80 added an icon to its left column and the hat icon moved into the old ROI. This
+     * frame is the live 9.3.80 room (display 3, 2026-11-14) with the header and the account
+     * avatar icon painted grey; the ROI pixels are untouched.
+     */
+    @Test fun theProbeMatchesTheQq9380RoomLayout() {
+        val live = image("/health-panel/room-qq9380-display3.png")
+        val s = score(live, template, roomRect)
+        assertTrue("room probe must match the QQ 9.3.80 room, got " + s, s >= 0.95)
+    }
+
+    /** The defect itself: the old chair-arm ROI is covered by QQ's hat icon on 9.3.80. */
+    @Test fun theOldRoiIsCoveredByQqChromeOnQq9380() {
+        val live = image("/health-panel/room-qq9380-display3.png")
+        val old = image("/health-panel/room-live-display47-2026-11-06.png")
+        val oldTemplate = old.getSubimage(oldRoomRect[0], oldRoomRect[1],
+            oldRoomRect[2] - oldRoomRect[0], oldRoomRect[3] - oldRoomRect[1])
+        val s = score(live, oldTemplate, oldRoomRect)
+        assertTrue("the old ROI must be the reason 9.3.80 failed (expected < 0.95), got " + s, s < 0.95)
+    }
+
+    /** The new ROI must stay right of QQ's left icon column, which now reaches y≈800. */
+    @Test fun theRoiStaysRightOfQqLeftIconColumnInBothLayouts() {
+        val iconColumnRight = 128 // icon circles end at x≈123, the red badge included
+        assertTrue("room ROI must start right of QQ's icon column", roomRect[0] >= iconColumnRight)
+    }
+
+    /** Old-layout rooms recorded on this device must not regress (androidTest pet_pages). */
+    @Test fun everyRecordedRoomFrameStillMatches() {
+        val dir = java.io.File("src/androidTest/assets/pet_pages")
+        val rooms = dir.listFiles { f -> f.name.startsWith("room-") }!!.sortedBy { it.name }
+        assertTrue("expected the recorded room frames", rooms.size >= 5)
+        for (f in rooms) {
+            val s = score(ImageIO.read(f), template, roomRect)
+            assertTrue("recorded room frame ${f.name} must still match, got $s", s >= 0.95)
+        }
+    }
+
+    /** No recorded non-room page may read as the room with the moved ROI. */
+    @Test fun noRecordedNonRoomFrameMatches() {
+        val frames = buildList {
+            java.io.File("src/androidTest/assets/pet_pages").listFiles { f ->
+                f.name.startsWith("bath-") || f.name.startsWith("food-") || f.name.startsWith("academy-")
+            }!!.forEach { add(it) }
+            java.io.File("src/test/resources/qq-entry").listFiles()!!.forEach { add(it) }
+            java.io.File("src/test/resources/exchange-dialog").listFiles()!!.forEach { add(it) }
+            add(java.io.File("src/test/resources/health-panel/qq-main-display45.png"))
+            add(java.io.File("src/test/resources/health-panel/panel-bath-display41.png"))
+            add(java.io.File("src/test/resources/health-panel/room-live-display47-cat-skin.png"))
+        }.filter { it.name.endsWith(".png") }
+        var checked = 0
+        for (f in frames) {
+            val img = ImageIO.read(f)
+            if (img.width != 720 || img.height != 1600) continue
+            checked++
+            val s = score(img, template, roomRect)
+            assertTrue("non-room frame ${f.name} must not read as room, got $s", s < 0.90)
+        }
+        assertTrue("expected at least 15 full 720x1600 non-room frames, checked $checked", checked >= 15)
+    }
+
+    /**
+     * Pages a flow reaches from the 9.3.80 room, captured live on display 3 (2026-11-14). The
+     * outdoor map is the one the review flagged: its grass is the same green as the chair back
+     * and initialise() tests room before outdoor. Measured 0.8709 (drift +56), food 0.8624,
+     * bath 0.8478. Food and bath have the header and account avatar painted grey.
+     */
+    @Test fun qq9380ScenesReachedFromTheRoomAreNotTheRoom() {
+        for (name in listOf("scene-qq9380-outdoor-display3.png", "scene-qq9380-food-display3.png",
+                "scene-qq9380-bath-display3.png")) {
+            val s = score(image("/health-panel/" + name), template, roomRect)
+            assertTrue("9.3.80 scene $name must not read as room, got $s", s < 0.90)
+        }
     }
 }
