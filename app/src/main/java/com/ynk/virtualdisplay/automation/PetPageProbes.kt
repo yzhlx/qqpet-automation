@@ -22,7 +22,7 @@ object PetPageProbes {
 
     val home = experimental("home", 600, 130, 670, 190)
     /**
-     * Room page IDENTITY: the pet bed / chair arm at the left of the scene, a stable SCENE region.
+     * Room page IDENTITY: the pet chair at the left of the scene, a stable SCENE region.
      *
      * It used to be the left icon column (back / gear / avatar / notebook / hat). That column is
      * QQ's own chrome, NOT the pet game: it carries the signed-in user's avatar and an unread
@@ -50,9 +50,31 @@ object PetPageProbes {
      * Replay of the shipping matcher over the recorded frames:
      *   1.0000 on the live room and on the room with the health sheet open,
      *   0.7138 worst QQ message list, 0.8097 bath - clear of the 0.95 gate.
-     * RoomPageProbeSkinTest locks all of this, including that the ROI did not move.
+     *
+     * QQ 9.3.80 (2026-11-14, issue #5) MOVED THE ROI OFF THE CHAIR ARM. QQ's own left icon
+     * column gained one icon (a notebook with a red dot), every icon below it moved down about
+     * 118 px, and the hat icon now sits inside the old ROI (20,720,120,840). The scene itself did
+     * not move: the old ROI scored 1.0000 on the 11-06 frames and 0.8390 on all 15 live 9.3.80
+     * room frames (3 s apart), so every session stopped with ROOM_EXIT_NOT_ROOM / initial page
+     * unknown with the room open. Lowering the gate would not help: the same old ROI reads up to
+     * 0.853 on recorded non-room pages.
+     *
+     * The ROI is now the top of the green chair back, (130,600,250,660): right of the icon column
+     * in both layouts (icons end at x≈123, red badges included), above the pet's head (the cat on
+     * this account starts at y≈770; the dog on the Xiaomi account still clears it), below the
+     * header. The template is a raw-pixel crop of the live 9.3.80 room
+     * (test fixture health-panel/room-qq9380-display3.png, header and avatar icon masked, ROI
+     * pixels untouched; provenance in pet_experimental/room.json). Replay of the shipping
+     * matcher: 1.0000 on the live 9.3.80 frames and on every recorded old-layout room frame
+     * (health sheet open included), at most 0.879 on the recorded non-room frames (academy,
+     * outdoor, food, bath, exchange dialog, QQ pages) and 0.871 / 0.862 / 0.848 on the live 9.3.80
+     * outdoor map / food / bath (the outdoor grass is the same green; drift +56 is its best spot).
+     * Same 0.95 gate, same matcher.
+     * A pet or skin that covers the chair back reads as "not the room" and the flow stops; it
+     * never turns a non-room page into the room.
+     * RoomPageProbeSkinTest locks the ROI and both layouts.
      */
-    val room = experimental("room", 20, 720, 120, 840)
+    val room = experimental("room", 130, 600, 250, 660)
     /**
      * ROOM page IDENTITY, second skin: the cat room this account is on since 2026-11-06.
      *
@@ -61,8 +83,8 @@ object PetPageProbes {
      * room and every managed session died with INITIAL_PAGE_UNKNOWN with the pet room open on
      * the virtual display (measured 2026-11-06 on virtual display 47).
      *
-     * This template is an exact raw-pixel crop of that live cat-skin room frame at the SAME ROI
-     * (20,720,120,840), so the rescale branch is skipped exactly as it is for [room]. Replayed
+     * This template is an exact raw-pixel crop of that frame at (20,720,120,840) - the ROI [room]
+     * used before QQ 9.3.80 (issue #5); [room] has since moved, this probe has not. Replayed
      * over the recorded frames it scores 1.0000 on the cat-skin room and at most 0.6297 on the
      * halloween room, the QQ message list and the bath scene - all far below the 0.95 gate.
      *

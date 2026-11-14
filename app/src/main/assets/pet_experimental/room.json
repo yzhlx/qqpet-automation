@@ -1,17 +1,19 @@
 {
-  "assetSha256": "a6e9a3c4e0f39d14235bf30d7764704cd32dff06bd3080656a4d9d98623d782e",
+  "assetSha256": "b48a6af08b8ac133dacdaf186222e723195e0eefca29dcbc54c67a64640bcd07",
   "assetSize": [
-    100,
-    120
+    120,
+    60
   ],
   "probe": "room",
   "roi": [
-    20,
-    720,
-    120,
-    840
+    130,
+    600,
+    250,
+    660
   ],
-  "sourceFrame": "1792910695731_round-0-initial-home.png",
-  "sourceFrameSha256": "ef701aff0c815a2b4671564c8f8ad8b32b3546da159f10a1f0a64111f76a3d6b",
-  "sourceVerification": "round-0:initial-home templateName=room result=PASS"
+  "sourceFrame": "room-qq9380-display3.png (app/src/test/resources/health-panel; header and left avatar icon masked, ROI pixels untouched)",
+  "sourceFrameSha256": "968828b081b2ef9cf7e35211c23d95a9bdaed43f90a33248549c74f5011a2557",
+  "rawCaptureSha256": "e0e4fd9c0a48182fb528660c597623cccb83ab2e0abcf81cee4c359a4037a76b",
+  "sourceCapture": "adb exec-out screencap -d 3, FOA-AL00, QQ 9.3.80, 2026-11-14, pet room open",
+  "sourceVerification": "replay: 1.0000 on 15 live QQ 9.3.80 room frames and on every recorded old-layout room frame; max 0.879 on recorded non-room frames"
 }

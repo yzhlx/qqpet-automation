@@ -146,7 +146,8 @@ class PetPageIdentityTest {
      * future re-calibration cannot silently move identity back over the avatar and badge band.
      */
     @Test fun roomIdentityRoiIsSceneNotChrome() {
-        val iconColumn = Rect(40, 120, 130, 560)
+        // QQ 9.3.80 (issue #5) extended the column down to y≈800; the ROI must clear both layouts.
+        val iconColumn = Rect(40, 120, 128, 800)
         val topChromeBand = Rect(0, 0, 720, 600)
         val room = PetPageProbes.room.rect
         assertFalse("room ROI $room must not overlap the QQ left icon column $iconColumn",
